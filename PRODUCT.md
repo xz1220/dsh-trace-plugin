@@ -10,7 +10,7 @@ Codex users reviewing local agent execution alongside an ongoing conversation.
 
 ## Product Purpose
 
-Inspect the complete recorded client request, tool inputs and outputs, and execution timing. This first deliverable is a self-contained HTML design review with explicitly simulated data, not a connected plugin.
+Inspect the complete recorded client request, tool inputs and outputs, and execution timing. The native Codex MCP App reads official rollout-trace bundles locally, using incremental metadata indexing and lazy detail reads. Earlier HTML design reviews remain under design/ and contain explicitly simulated data.
 
 ## Design Direction
 

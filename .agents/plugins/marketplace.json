@@ -1,0 +1,10 @@
+{
+  "name": "rollout-local",
+  "interface": {"displayName": "Local Rollout Tools"},
+  "plugins": [{
+    "name": "rollout-viewer",
+    "source": {"source": "local", "path": "./plugins/rollout-viewer"},
+    "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+    "category": "Developer Tools"
+  }]
+}
