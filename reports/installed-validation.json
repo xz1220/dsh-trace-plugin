@@ -1,5 +1,5 @@
 {
-  "version": "0.1.2",
+  "version": "0.1.3",
   "tools": 9,
   "installedFilesMatchSource": true,
   "mcpInitialization": true,
@@ -10,5 +10,5 @@
   "promptCharacters": 81919,
   "promptChunks": 2,
   "verifiedToolNextRequestLinks": 2,
-  "appResourceBytes": 288461
+  "appResourceBytes": 292782
 }

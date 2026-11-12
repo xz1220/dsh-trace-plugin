@@ -1,6 +1,6 @@
 {
   "name": "rollout-viewer",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Inspect official Codex rollout-trace requests, tool calls, and execution timing.",
   "license": "MIT",
   "mcpServers": "./.mcp.json",
