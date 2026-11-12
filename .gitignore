@@ -5,3 +5,4 @@ design/dsh-source/
 __pycache__/
 *.pyc
 reports/screenshots/
+local-context/

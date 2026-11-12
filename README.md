@@ -1,5 +1,7 @@
 # Codex Rollout Viewer
 
+继续本次工作请先读 [HANDOFF.md](HANDOFF.md)。代码、设计稿、真实录制、实验与运行状态均已整理在本目录；归档原始材料位于 `local-context/`。
+
 Native Codex sidebar plugin for official rollout-trace, using the approved
 DSH-style interface. It shows complete recorded client context, original
 incremental requests, tool input/output and caller relationships, and timing.
