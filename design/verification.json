@@ -1,0 +1,25 @@
+{
+  "artifact": "dsh-design-system.html",
+  "sourceCommit": "e8f7b93a344964de3dca1ace9e72b6e4d6de87cb",
+  "sourceHashesVerified": true,
+  "standaloneHtml": true,
+  "browser": "Ego Lite Chromium",
+  "viewportsChecked": [390, 1280, 1440],
+  "horizontalPageOverflow": false,
+  "checks": [
+    "Light and dark source tokens render and update their computed values",
+    "System records expose system-prompt and tool tabs",
+    "System-update grammar exposes diff, system-prompt, and tool tabs",
+    "Program-tool grammar exposes overview, code, result, schema, and timing tabs",
+    "Search matches tool arguments and clearing search restores nine sample rows",
+    "Error selection and tool-code inspection work",
+    "Original event row measures 30 CSS pixels",
+    "Original toolbar measures 32.5 pixels including its divider",
+    "Original timeline measures 50.5 pixels including its divider"
+  ],
+  "limitations": [
+    "This is an original-CSS specimen and explanatory design study, not a running DSH session",
+    "Sample content and icon stand-ins are marked as illustrative",
+    "Only selected interactions are recreated; the full DSH runtime is not bundled"
+  ]
+}
