@@ -1,0 +1,26 @@
+{
+  "python": "3.9.6",
+  "platform": "arm64",
+  "realRecording": {
+    "rows": 7,
+    "initialIndexMs": 0.336,
+    "warmPageP50Ms": 0.024,
+    "warmPageP95Ms": 0.034,
+    "unchangedPollP50Ms": 0.009,
+    "initialPayloadReads": 0,
+    "warmExtraLogBytes": 0,
+    "fullContextMetadataMs": 1.858,
+    "messages": 11,
+    "contextComplete": true
+  },
+  "synthetic10000Rows": {
+    "rows": 10000,
+    "initialIndexMs": 93.528,
+    "warmPageP50Ms": 0.652,
+    "warmPageP95Ms": 0.702,
+    "unchangedPollP50Ms": 0.01,
+    "initialPayloadReads": 0,
+    "warmExtraLogBytes": 0
+  },
+  "scope": "Local backend timings; OS filesystem cache may already be warm. UI and MCP bridge latency are measured separately."
+}

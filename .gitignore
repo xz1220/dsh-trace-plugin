@@ -2,3 +2,6 @@ node_modules/
 design/screenshots/
 *.log
 design/dsh-source/
+__pycache__/
+*.pyc
+reports/screenshots/
