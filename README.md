@@ -1,5 +1,19 @@
 # DSH trajectory design study / Codex Rollout Viewer
 
+## Current interactive mock
+
+Open `design/codex-trajectory-dsh.html` for the DSH-style Codex sidebar prototype.
+The three guided paths inspect full prompts, trace tool calls, and select timing
+intervals. Full/incremental context, original request JSON, source filtering,
+tool arguments/results/schema, parent/child navigation, wheel zoom, range
+selection, folding, simulated playback, error states, and narrow/dark views work
+locally. All data is synthetic; no local sessions or model APIs are accessed.
+
+Build with `npm run build:mock`. Original DSH CSS is hash-verified by the same
+source cache used for the analysis. The generated HTML is self-contained.
+
+## Source design-system analysis
+
 The current review deliverable is `design/dsh-design-system.html`: a self-contained,
 source-backed decomposition of the DSH trajectory design system. It includes
 original CSS specimens, theme tokens, type/size specifications, conditional detail

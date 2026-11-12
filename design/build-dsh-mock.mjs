@@ -1,0 +1,10 @@
+import {build} from 'esbuild';
+import {readFile,writeFile} from 'node:fs/promises';
+import {ensureSources} from './fetch-dsh-sources.mjs';
+await ensureSources();
+const result=await build({entryPoints:['design/codex-dsh-mock.jsx'],bundle:true,write:false,minify:true,format:'iife',jsx:'automatic',outfile:'design/mock-bundle.js',define:{'process.env.NODE_ENV':'"production"'}});
+const js=result.outputFiles.find(f=>f.path.endsWith('.js')).text.replaceAll('</script','<\\/script');
+const css=result.outputFiles.find(f=>f.path.endsWith('.css')).text;
+const license=await readFile('design/DSH-LICENSE.txt','utf8');
+await writeFile('design/codex-trajectory-dsh.html',`<!doctype html>\n<!-- DSH component styles; ${license} -->\n<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Codex 轨迹 · DSH 风格交互原型</title><style>${css}</style></head><body><div id="root"></div><script>${js}</script></body></html>`);
+console.log('Built self-contained DSH-style Codex mock');

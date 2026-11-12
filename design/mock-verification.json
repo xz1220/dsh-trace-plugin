@@ -1,0 +1,25 @@
+{
+  "artifact": "codex-trajectory-dsh.html",
+  "sourceDesignCommit": "e8f7b93a344964de3dca1ace9e72b6e4d6de87cb",
+  "data": "synthetic",
+  "browser": "Ego Lite Chromium",
+  "viewports": [390, 1280],
+  "sidePanelPreviewWidth": 560,
+  "verifiedPaths": [
+    "Seven-message reconstructed context switches to one-message incremental request",
+    "Expand-all and instruction-source filtering work",
+    "Original request JSON retains previous_response_id and the one transmitted input item",
+    "Tool output, original command arguments, parent code cell, and next request are navigable",
+    "The timing step zooms to the tool interval and dims five out-of-range records",
+    "Pointer range selection and mouse-wheel zoom work",
+    "Selecting a folded subtool from its timeline marker reveals the row",
+    "Playback reaches the completed seven-record state",
+    "Missing-context state exposes one known input; simulated repair restores seven messages",
+    "Failure filtering isolates the failed terminal call",
+    "Unrecorded state can enter the recorded demonstration path",
+    "Narrow mode opens an overlay inspector and closes back to the ledger",
+    "Light and dark modes render correctly",
+    "390px viewport has no horizontal page overflow"
+  ],
+  "scope": "Interactive HTML mock only. No MCP backend, model call, trace-file access, or recording configuration is invoked."
+}

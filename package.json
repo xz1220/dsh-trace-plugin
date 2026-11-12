@@ -2,7 +2,7 @@
   "name": "codex-rollout-viewer-design",
   "private": true,
   "version": "0.1.0",
-  "scripts": {"build:design": "node design/build.mjs", "build:analysis": "node design/build-analysis.mjs"},
+  "scripts": {"build:design": "node design/build.mjs", "build:analysis": "node design/build-analysis.mjs", "build:mock": "node design/build-dsh-mock.mjs"},
   "dependencies": {"react": "18.3.1", "react-dom": "18.3.1"},
   "devDependencies": {"esbuild": "0.25.5"}
 }
