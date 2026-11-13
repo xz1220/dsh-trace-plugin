@@ -4,7 +4,7 @@ A local Codex sidebar app for official `rollout-trace` recordings. The interface
 uses DSH's theme and trajectory styles, with a paged execution ledger, timing
 overview, reconstructed request context, and tool inspectors.
 
-Version 0.2.6 uses the upstream DSH runtime: turn/step grouping, request boundaries,
+Version 0.2.7 uses the upstream DSH runtime: turn/step grouping, request boundaries,
 three levels of folding, full-content search, interactive timing overview,
 virtualized rows, a resizable inspector, Markdown/code/JSON views, prompt/tool
 diffs, and the original image gallery. Complete Codex context and original request
@@ -78,9 +78,11 @@ The optional `--preview` server binds only to loopback and requires a random,
 HttpOnly, SameSite cookie. It uses the same frontend and data tools as the native
 app; `/harness` additionally exercises the MCP Apps postMessage handshake.
 
-The current native desktop mount and the latest image-gallery click regression
-are still pending; see the repository's `docs/DSH_PARITY.md` before treating this
-build as fully accepted.
+Five browser review rounds cover the image gallery, tool/code/assistant images,
+file dragging, copying, navigation and narrow/dark layouts. Version 0.2.7 also
+fixes missing common Chinese labels and incomplete recording lists during cold
+startup. Native desktop mounting and new desktop recordings still need final
+verification; see the repository's `docs/DSH_PARITY.md`.
 
 ## Attribution
 

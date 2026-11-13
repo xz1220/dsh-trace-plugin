@@ -3,6 +3,22 @@
   "commit": "e8f7b93a344964de3dca1ace9e72b6e4d6de87cb",
   "files": [
     {
+      "path": "packages/client/locale/src/locales/zh.ts",
+      "sha256": "df60768badc3c483478f5a57e48aee8219bd48f51764876a1d722432140d0e26"
+    },
+    {
+      "path": "packages/client/ui-attachment/src/MessageImage.module.css",
+      "sha256": "21278a1b8b8303d8e7817e59b416cb9a11317fdd5ac0f7490bd0e67bbdc99e67"
+    },
+    {
+      "path": "packages/client/ui-attachment/src/MessageImage.tsx",
+      "sha256": "8c18e33246e05fdd209128b8b30f264529b619a14827c4d3a510781ce1f0c7cb"
+    },
+    {
+      "path": "packages/client/ui-file-drag/src/client/transfers.ts",
+      "sha256": "405a2e292d507c1ac73b704bbbf24164c5cd29dc3e6fb4aeca6c470255d5e0e2"
+    },
+    {
       "path": "packages/client/ui-primitives/src/CodeCard.module.css",
       "sha256": "3178630168a17cc15a0628b0d94a1f6a7e1c3ebf41d1c89a52e23dcaac5247aa"
     },
@@ -275,6 +291,10 @@
       "sha256": "2988fe5b7b928c0152e563c560d7e6a83e40d3a38b734facb3a47a134ffa640c"
     },
     {
+      "path": "packages/client/ui-theme/src/client/icon-sprite.ts",
+      "sha256": "6611f70b0a892bcd6268b260fa61e00dc460f4f50910d0afa0119e0fa68e377c"
+    },
+    {
       "path": "packages/client/ui-theme/src/styles/base.css",
       "sha256": "803926ce39f5ea48b652021d06b6ca65c4acc7be2c5c4e19bd904ab1dabf0b67"
     },
@@ -323,6 +343,10 @@
       "sha256": "58852ce7e6f76cdb0384a134e2d78b459b161c30aa47c83f800c5ee18ee3f540"
     },
     {
+      "path": "packages/client/ui-trajectory/src/client/locales.ts",
+      "sha256": "d7306c7bff8ef7c926537ff64263f201283a6d1429a70774759bc0ac87de878a"
+    },
+    {
       "path": "packages/client/ui-trajectory/src/client/timeline.ts",
       "sha256": "ed2ebfd8b4233022115d9757d50d3af6cf399690ccc4fcf36f9f3edcf8e7b173"
     },
@@ -343,8 +367,20 @@
       "sha256": "40177483d5b37c28941df1f75a715a7fbe793bc12ecea518ec8642ce36811309"
     },
     {
+      "path": "packages/client/ui-trajectory/src/client/views.module.css",
+      "sha256": "8249778ad95f43a5f073d5cdd09eb65ee302b7e2dda00aaed51a597fb3a536c3"
+    },
+    {
       "path": "packages/util/code-language/src/index.ts",
       "sha256": "98edcfd8abd18ed277ba024a135a50b0d33c30e3a9786f88cceacbe523f48649"
+    },
+    {
+      "path": "packages/util/crypto/src/index.ts",
+      "sha256": "6d314b677a163808a732c53fc509eebea1f8b8cc34b67031644dcfa4a97e28f0"
+    },
+    {
+      "path": "packages/util/file-drag/src/index.ts",
+      "sha256": "3503a00e43ee6e056af9ed9bf1ad8784241eb153d8b1e49214243fb4efff995f"
     },
     {
       "path": "packages/util/values/src/index.ts",
@@ -353,38 +389,6 @@
     {
       "path": "packages/util/values/src/partial-json.ts",
       "sha256": "d06228f26e0c670dc18615082b5be283f72a1562220c977c3c5d54edc0b5971e"
-    },
-    {
-      "path": "packages/client/ui-trajectory/src/client/locales.ts",
-      "sha256": "d7306c7bff8ef7c926537ff64263f201283a6d1429a70774759bc0ac87de878a"
-    },
-    {
-      "path": "packages/client/ui-trajectory/src/client/views.module.css",
-      "sha256": "8249778ad95f43a5f073d5cdd09eb65ee302b7e2dda00aaed51a597fb3a536c3"
-    },
-    {
-      "path": "packages/client/ui-theme/src/client/icon-sprite.ts",
-      "sha256": "6611f70b0a892bcd6268b260fa61e00dc460f4f50910d0afa0119e0fa68e377c"
-    },
-    {
-      "path": "packages/client/ui-attachment/src/MessageImage.tsx",
-      "sha256": "8c18e33246e05fdd209128b8b30f264529b619a14827c4d3a510781ce1f0c7cb"
-    },
-    {
-      "path": "packages/client/ui-attachment/src/MessageImage.module.css",
-      "sha256": "21278a1b8b8303d8e7817e59b416cb9a11317fdd5ac0f7490bd0e67bbdc99e67"
-    },
-    {
-      "path": "packages/client/ui-file-drag/src/client/transfers.ts",
-      "sha256": "405a2e292d507c1ac73b704bbbf24164c5cd29dc3e6fb4aeca6c470255d5e0e2"
-    },
-    {
-      "path": "packages/util/file-drag/src/index.ts",
-      "sha256": "3503a00e43ee6e056af9ed9bf1ad8784241eb153d8b1e49214243fb4efff995f"
-    },
-    {
-      "path": "packages/util/crypto/src/index.ts",
-      "sha256": "6d314b677a163808a732c53fc509eebea1f8b8cc34b67031644dcfa4a97e28f0"
     }
   ]
 }

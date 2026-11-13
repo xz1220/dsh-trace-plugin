@@ -68,7 +68,7 @@ class Catalog:
         self.default_root = codex / 'rollout-traces'
         self.lock = threading.RLock()
         self.cache = {}
-        self.last_scan = 0.0
+        self.last_scan = None
 
     def config(self):
         if not self.config_file.exists():
@@ -101,7 +101,7 @@ class Catalog:
             temp.write_text(json.dumps(config, ensure_ascii=False, indent=2))
             temp.chmod(0o600)
             temp.replace(self.config_file)
-            self.last_scan = 0
+            self.last_scan = None
         return {'registered': True, 'path': str(root)}
 
     def manifest(self, path, labels=None):
@@ -131,7 +131,7 @@ class Catalog:
 
     def list(self, force=False):
         with self.lock:
-            if force or time.monotonic() - self.last_scan > 5:
+            if force or self.last_scan is None or time.monotonic() - self.last_scan > 5:
                 found = {}
                 labels = self.config().get('labels', {})
                 for path in self.candidates():

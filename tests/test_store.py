@@ -3,6 +3,7 @@ import os
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'plugins/rollout-viewer/server'))
@@ -81,6 +82,17 @@ class StoreTests(unittest.TestCase):
         self.assertTrue(index.delta(overview['revision'])['unchanged'])
         index.overview()
         self.assertEqual(index.metrics,before)
+
+    def test_catalog_scans_before_caching_when_monotonic_clock_starts_near_zero(self):
+        self.fixture.conversation()
+        second=Fixture(self.root/'second-bundle')
+        manifest=second.root/'manifest.json';value=json.loads(manifest.read_text())
+        value['trace_id']='trace-second';manifest.write_text(json.dumps(value))
+        self.store.catalog.register(str(second.root))
+        with patch('store.time.monotonic',return_value=0.1):
+            self.assertIsNotNone(self.store.catalog.find(trace_id='trace-test'))
+            listed=self.store.list()['traces']
+        self.assertEqual({item['id'] for item in listed},{'trace-test','trace-second'})
 
     def test_continuation_keeps_all_prompt_and_output_items(self):
         self.fixture.conversation()

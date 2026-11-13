@@ -3,15 +3,12 @@ import {TrajectoryTable} from '../vendor/dsh/packages/client/ui-trajectory/src/c
 import {TrajectoryTimeline} from '../vendor/dsh/packages/client/ui-trajectory/src/client/TrajectoryTimeline.tsx';
 import {TrajectoryToolbar} from '../vendor/dsh/packages/client/ui-trajectory/src/client/TrajectoryToolbar.tsx';
 import {trajectoryTimelineFocusIndexes} from '../vendor/dsh/packages/client/ui-trajectory/src/client/timeline.ts';
-import {zh} from '../vendor/dsh/packages/client/ui-trajectory/src/client/locales.ts';
+import {t} from './locale.js';
 import {renderImageSlot as renderSlot,loadImage} from './images.jsx';
 import {Failure, Skeleton, RequestContent, readComplete} from './content.jsx';
 import view from '../vendor/dsh/packages/client/ui-trajectory/src/client/views.module.css';
 
-const extraCopy={'codex.prompt':'完整上下文','codex.request':'原始请求','codex.response':'原始响应',
-  'record.rawResultUnavailable':'录制中没有原始结果','timing.sessionTimestamps':'官方录制起止事件',
-  'timing.sessionTimestampsRunning':'官方录制开始事件（运行中）'};
-export const t=(key,params={})=>String(extraCopy[key]??zh[key]??key).replace(/\{(\w+)\}/g,(_,name)=>params[name]??'');
+export {t};
 const toggle=(set,key)=>set(current=>{const next=new Set(current);next.has(key)?next.delete(key):next.add(key);return next;});
 const toggleAll=(set,ids,collapsed)=>set(current=>{const next=new Set(current);for(const id of ids)collapsed?next.delete(id):next.add(id);return next;});
 
