@@ -5,12 +5,26 @@ import hashlib
 import base64
 import json
 from collections import OrderedDict
+from itertools import islice
 
 from store import TraceError, item_text, preview, unpack
 
 
 def json_text(value):
     return json.dumps(value, ensure_ascii=False, indent=2)
+
+
+def public_reasoning(item):
+    parts = item.get('summary')
+    return '\n\n'.join(part['text'] for part in parts if isinstance(part,dict) and isinstance(part.get('text'),str)) if isinstance(parts,list) else ''
+
+
+def message_text(item):
+    content=item.get('content',[])
+    if isinstance(content,str):return content
+    if not isinstance(content,list):return item.get('text','') if isinstance(item.get('text'),str) else ''
+    return '\n\n'.join(block.get('text',block.get('refusal')) for block in content if isinstance(block,dict)
+                       and isinstance(block.get('text',block.get('refusal')),str))
 
 
 def usage(value):
@@ -34,7 +48,8 @@ def catalog_tools(value):
             continue
         if entry.get('type') == 'namespace':
             children = catalog_tools(entry.get('tools'))
-            tools.extend({**tool,'qualifiedName': f'{entry.get("name", "")}.{tool["name"]}'} for tool in children)
+            tools.extend({**tool,'sourceName':tool.get('sourceName',tool['name']),
+                          'name':f'{entry.get("name", "")}.{tool["name"]}'} for tool in children)
             continue
         tool = entry.get('function', entry)
         if isinstance(tool, dict):
@@ -43,7 +58,7 @@ def catalog_tools(value):
     return tools
 
 
-def source_blocks(item, owner, label):
+def source_blocks(item, owner, label, metadata_only=False):
     """Preserve block order, original roles, attachments, and publicly returned text."""
     blocks = []
     contents = item.get('content', []) if isinstance(item, dict) else []
@@ -51,22 +66,26 @@ def source_blocks(item, owner, label):
         contents = [{'type': 'text', 'text': contents}]
     for position, block in enumerate(contents):
         if not isinstance(block, dict):
-            blocks.append({'type': 'unknown', 'content': json_text(block)})
+            blocks.append({'type': 'unknown', 'content': '' if metadata_only else json_text(block)})
             continue
         kind = block.get('type', 'unknown')
-        if isinstance(block.get('text'), str):
-            blocks.append({'type': 'text', 'content': block['text']})
+        if isinstance(block.get('text',block.get('refusal')), str):
+            blocks.append({'type': 'text', 'content': block.get('text',block.get('refusal'))})
         elif kind in ('input_image', 'output_image', 'image'):
             url = block.get('image_url', block.get('url'))
             if isinstance(url, dict):
                 url = url.get('url')
+            if url is None and isinstance(block.get('data'),str) and str(block.get('mimeType','')).startswith('image/'):
+                url = f'data:{block["mimeType"]};base64,{block["data"]}'
             asset_id = f'{owner}:{label}:{position}'
-            attachment = {'attachmentId': asset_id,
-                          'name': block.get('filename', block.get('name', f'图片 {position + 1}'))}
+            attachment = {'attachmentId': asset_id}
+            name = block.get('filename',block.get('name'))
+            if isinstance(name,str):
+                attachment['name'] = name
             for key in ('width', 'height'):
-                if key in block:
+                if isinstance(block.get(key),(int,float)) and block[key]>0:
                     attachment[key] = block[key]
-            if isinstance(url, str) and url.startswith('data:image/'):
+            if not metadata_only and isinstance(url, str) and url.startswith('data:image/'):
                 attachment['recordedUrl'] = url
                 header, _, encoded = url.partition(',')
                 attachment['mediaType'] = header[5:].split(';')[0]
@@ -81,17 +100,55 @@ def source_blocks(item, owner, label):
                     except ValueError:
                         pass
             # Never make a network request or read an arbitrary local path from a trace.
-            blocks.append({'type': 'image', 'content': json_text(block), 'attachment': attachment})
-        elif kind in ('input_file', 'file'):
+            blocks.append({'type': 'image', 'content': '' if metadata_only else json_text(block), 'attachment': attachment})
+        elif kind in ('input_file', 'output_file', 'file'):
             ref = {'attachmentId': f'{owner}:{label}:{position}',
                    'name': block.get('filename', block.get('name', '未命名文件'))}
             for source, target in [('mime_type', 'mediaType'), ('mimeType', 'mediaType'), ('size', 'bytes'),('bytes','bytes')]:
                 if source in block:
                     ref[target] = block[source]
-            blocks.append({'type': 'file', 'content': json_text(block), 'file': ref})
+            blocks.append({'type': 'file', 'content': '' if metadata_only else json_text(block), 'file': ref})
         else:
-            blocks.append({'type': kind, 'content': json_text(block)})
+            blocks.append({'type': kind, 'content': '' if metadata_only else json_text(block)})
     return blocks
+
+
+def result_view(raw, code=False):
+    """Read recorded content blocks without mistaking business JSON for an envelope."""
+    value = unpack(raw,code=code)
+    rendered = value
+    if code and isinstance(value,dict) and isinstance(value.get('Result'),dict):
+        rendered = value['Result']
+    contents = None
+    if isinstance(rendered,dict):
+        for key in ('content_items','content'):
+            if isinstance(rendered.get(key),list):
+                contents = list(rendered[key])
+                break
+    if contents is not None:
+        text = '\n\n'.join(block['text'] for block in contents if isinstance(block,dict) and isinstance(block.get('text'),str))
+        fallback = rendered.get('error_text')
+        if not any(isinstance(block,dict) and isinstance(block.get('text'),str) and len(block['text'])>0 for block in contents) and isinstance(fallback,str) and fallback:
+            contents.append({'type':'text','text':fallback})
+            text = fallback
+        images = sum(isinstance(block,dict) and block.get('type') in ('image','input_image','output_image') for block in contents)
+        if not text and images:
+            text = f'图片 ×{images}'
+        return text, contents, isinstance(rendered,dict) and rendered.get('isError') is True
+    output = rendered.get('output',rendered) if isinstance(rendered,dict) else rendered
+    return output, None, isinstance(rendered,dict) and rendered.get('isError') is True
+
+
+def bounded_json_preview(value, depth=0):
+    if isinstance(value,str):
+        return value[:256]+('…' if len(value)>256 else '')
+    if isinstance(value,dict):
+        if depth>=2:return f'{{{len(value)} 个字段}}'
+        return {key:bounded_json_preview(item,depth+1) for key,item in islice(value.items(),4)}
+    if isinstance(value,list):
+        if depth>=2:return f'[{len(value)} 项]'
+        return [bounded_json_preview(item,depth+1) for item in value[:4]]
+    return value
 
 
 class Projection:
@@ -100,15 +157,41 @@ class Projection:
         self.cache = OrderedDict()
         self.detail_cache = OrderedDict()
         self.detail_bytes = 0
+        self.structure_stamp = None
+        self.request_rows = []
+        self.request_numbers = {}
+        self.request_steps = {}
+        self.previous_requests = {}
+        self.turn_numbers = {}
+        self.locations = {}
 
     def requests(self):
-        return [row for row in self.index.rows.values() if row.get('type') in ('request', 'compaction')]
+        stamp = (self.index.epoch, self.index.last_seq)
+        if stamp != self.structure_stamp:
+            self.request_rows = [row for row in self.index.rows.values() if row.get('type') in ('request','compaction')]
+            self.request_numbers = {row['id']:number+1 for number,row in enumerate(self.request_rows)}
+            self.turn_numbers = {key:number+1 for number,key in enumerate(self.index.turns)}
+            self.request_steps = {}
+            self.previous_requests = {}
+            self.locations = {}
+            counters, previous = {}, {}
+            for row in self.request_rows:
+                if row.get('type') != 'request':
+                    continue
+                key = (row['threadId'],row.get('turnId'))
+                counters[key] = counters.get(key,0)+1
+                self.request_steps[row['id']] = counters[key]
+                self.previous_requests[row['id']] = previous.get(row['threadId'])
+                previous[row['threadId']] = row
+            self.structure_stamp = stamp
+        return self.request_rows
 
     def location(self, row):
-        turn_keys = list(self.index.turns)
-        key = row.get('turnId')
-        turn = turn_keys.index(key) + 1 if key in turn_keys else (1 if key and row.get('type') != 'compaction' else None)
         requests = self.requests()
+        if row['id'] in self.locations:
+            return self.locations[row['id']]
+        key = row.get('turnId')
+        turn = self.turn_numbers.get(key,1 if key and row.get('type') != 'compaction' else None)
         parent = row
         visited = set()
         while parent and parent.get('type') not in ('request', 'compaction'):
@@ -120,11 +203,12 @@ class Projection:
             parent = next((candidate for candidate in reversed(requests)
                            if candidate['seq'] < row['seq'] and candidate['threadId'] == row['threadId']), row)
         if parent.get('type') == 'compaction':
-            return turn, 0, f'压缩 {parent["seq"]}', parent
-        siblings = [candidate for candidate in requests if candidate.get('type') == 'request'
-                    and candidate.get('turnId') == parent.get('turnId') and candidate['threadId'] == parent['threadId']]
-        step = next((position + 1 for position, candidate in enumerate(siblings) if candidate['id'] == parent['id']), 1)
-        return turn, step, f'第 {step} 步', parent
+            result = (turn,0,f'压缩 {parent["seq"]}',parent)
+        else:
+            step = self.request_steps.get(parent['id'],1)
+            result = (turn,step,f'第 {step} 步',parent)
+        self.locations[row['id']] = result
+        return result
 
     def request_info(self, row, cumulative=False):
         turn, step, group, _ = self.location(row)
@@ -132,13 +216,16 @@ class Projection:
         response = self.index.payload(row.get('_response')) or {}
         options = {key: value for key, value in request.items() if key not in ('input', 'tools')}
         data = {'rowId': row['id'], 'version':row.get('_updated'), 'seq': row['seq'], 'turn': turn, 'step': step,
-                'group': group, 'number': self.requests().index(row) + 1,
+                'group': group, 'number': self.request_numbers[row['id']],
                 'status': 'error' if row['status'] in ('error', 'cancelled') else row['status'],
                 'startedAt': row['start'], 'completedAt': row.get('end'),
                 'model': row.get('model', request.get('model')), 'requestConfig': options}
         if row.get('provider'):
             data['provider'] = row['provider']
-        if row.get('end') is not None:
+        inspectable = any(isinstance(item,dict) and (item.get('type') in ('message','function_call','custom_tool_call')
+                          or public_reasoning(item))
+                          for item in response.get('output_items',[]))
+        if row.get('end') is not None and (inspectable or row.get('type')=='compaction' and row.get('_response')):
             data['resultSeq'] = row['seq']
         if row.get('_error'):
             data['error'] = row['_error'] if isinstance(row['_error'], str) else json_text(row['_error'])
@@ -170,7 +257,10 @@ class Projection:
         for item in entries:
             if item.get('type') == 'additional_tools':
                 tools.extend(catalog_tools(item.get('tools')))
-        return {'system': system, 'tools': tools, 'config': self.request_info(row)['requestConfig']}
+        effective = OrderedDict()
+        for tool in tools:
+            effective[tool['name']] = tool
+        return {'system': system, 'tools': list(effective.values()), 'config': self.request_info(row)['requestConfig']}
 
     def cells(self, row):
         key = (row['id'], row.get('_updated'))
@@ -188,8 +278,7 @@ class Projection:
             raw = self.index.payload(row.get('_request')) or {}
             inputs = raw.get('input', [])
             response = self.index.payload(row.get('_response')) or {}
-            previous = next((candidate for candidate in reversed(self.requests())
-                             if candidate['threadId'] == row['threadId'] and candidate['seq'] < row['seq'] and candidate.get('type') == 'request'), None)
+            previous = self.previous_requests.get(row['id'])
             # A full request can replay an earlier prefix. Retain only newly introduced items.
             skip = 0
             if not raw.get('previous_response_id') and previous:
@@ -210,9 +299,9 @@ class Projection:
             for position, item in introduced:
                 if not isinstance(item, dict) or item.get('type') not in ('message', 'input_message') or item.get('role') in ('system', 'developer', 'assistant'):
                     continue
-                text = item_text(item)
+                text = message_text(item)
                 context = item.get('role') != 'user' or text.lstrip().startswith(('<environment_context>', '<turn_aborted>', '<codex_internal_context'))
-                blocks = source_blocks(item, row['id'], f'input-{position}')
+                blocks = source_blocks(item, row['id'], f'input-{position}',metadata_only=True)
                 attachments = [block for block in blocks if 'attachment' in block or 'file' in block]
                 # Metadata counts are sufficient to paint the row without shipping a base64 image.
                 source = text if not attachments else '\n'.join(b['content'] for b in blocks if b['type'] == 'text')
@@ -226,11 +315,18 @@ class Projection:
             outputs = response.get('output_items', [])
             messages = [item for item in outputs if isinstance(item, dict) and item.get('type') == 'message']
             reasoning = [item for item in outputs if isinstance(item, dict) and item.get('type') == 'reasoning']
-            returned_text = '\n\n'.join(item_text(item) for item in messages)
-            publicly_returned = '\n\n'.join(part.get('text', '') for item in reasoning for part in item.get('summary', []) if isinstance(part, dict))
+            returned_text = '\n\n'.join(message_text(item) for item in messages)
+            publicly_returned = '\n\n'.join(public_reasoning(item) for item in reasoning)
+            attachments=[block for item in messages for block in source_blocks(item,row['id'],'output',metadata_only=True) if 'attachment' in block or 'file' in block]
+            image_count=sum('attachment' in block for block in attachments)
+            file_count=sum('file' in block for block in attachments)
+            caption=' · '.join(part for part in [f'图片 ×{image_count}' if image_count else '',f'文件 ×{file_count}' if file_count else ''] if part)
+            tool_only=not returned_text and not publicly_returned and any(item.get('type') in ('function_call','custom_tool_call') for item in outputs if isinstance(item,dict))
             facts = usage(response.get('token_usage')) or {}
-            cells.append({**base, 'cellKey': 'assistant', 'kind': 'message', 'text': '' if returned_text else ('（仅工具调用）' if outputs else ''),
-                          **({'previewMarkdown':returned_text[:2048]} if returned_text else {}),
+            cells.append({**base, 'cellKey': 'assistant', 'kind': 'message', 'text': caption or ('（仅工具调用）' if tool_only else ''),
+                          **({'requestOnly':True} if not outputs else {}),
+                          **({'previewMarkdown':(returned_text or publicly_returned)[:2048]} if returned_text or publicly_returned else {}),
+                          **({'sourceBlocks':attachments} if attachments else {}),
                           'outputDetail': ' ' if messages else '', 'thinkingDetail': ' ' if publicly_returned else '',
                           'assistantMetrics': {'timingRecorded': True, 'stepStartTime': row['start'], 'firstTokenTime': None,
                                                'completedTime': row.get('end'), 'usageProvided': bool(facts), 'outputTokens': facts.get('output')},
@@ -239,20 +335,37 @@ class Projection:
             cells.append({**base, 'cellKey': 'compaction', 'kind': 'compacted', 'text': '上下文压缩', 'outputDetail': ' '})
         else:
             raw = self.index.payload(row.get('_input')) or {}
-            result = unpack(self.index.payload(row.get('_output')))
             program = row.get('type') == 'code'
+            output, output_items, result_error = result_view(self.index.payload(row.get('_output')),code=program)
             name = 'functions.exec' if program else raw.get('tool_name', row.get('name', 'unknown'))
-            output = result.get('output', result) if isinstance(result, dict) else result
-            output_text = output if isinstance(output, str) else json_text(output) if output is not None else ''
+            namespace = raw.get('tool_namespace')
+            qualified = f'{namespace}.{name}' if isinstance(namespace,str) and namespace and not name.startswith(namespace+'.') else name
+            invocation = raw.get('payload', raw)
+            arguments = invocation.get('arguments') if isinstance(invocation, dict) else None
+            if isinstance(arguments, str):
+                try:
+                    arguments = json.loads(arguments)
+                except ValueError:
+                    arguments = None
+            native_program = name in ('run_code','cua_run_code') and isinstance(arguments,dict) and isinstance(arguments.get('code'),str)
+            bounded = output if isinstance(output,str) else bounded_json_preview(output)
+            output_text = bounded if isinstance(bounded,str) else json_text(bounded) if bounded is not None else ''
+            result_preview = preview(output_text,160)+('…' if bounded != output or len(output_text)>160 else '')
             cells.append({**base, 'cellKey': 'tool', 'kind': row.get('kind', 'tool'), 'toolName': name,
+                          'isError':base['isError'] or result_error,
+                          'qualifiedToolName':qualified,
                           'callId': row.get('_modelCallId') or row['id'], **({'resultSeq':row['seq']} if row.get('_output') else {}),
                           'text': f'{name} · {preview(row.get("_code") or row.get("_preview"), 100)}',
                           'inputDetail': ' ', 'outputDetail': ' ' if row.get('_output') else '', 'schemaDetail': '',
-                          'result': preview(output_text, 160), 'programSource': ' ' if program else None})
+                          'result': result_preview, 'programSource': ' ' if program or native_program else None})
             if program:
                 cells[-1]['programDescription'] = preview(row.get('_code'), 120)
+            elif native_program:
+                cells[-1]['programDescription'] = preview(arguments.get('description') or arguments['code'],120)
         for slot, cell in enumerate(cells):
             cell.update(recordId=f'{row["id"]}:{cell["cellKey"]}', slot=slot)
+            if cell.get('sourceSeq') is None:
+                cell.pop('sourceSeq',None)
         self.cache[key] = cells
         while len(self.cache) > 1000:
             self.cache.popitem(last=False)
@@ -294,17 +407,17 @@ class Projection:
         data = {**template, 'detailsPending': False}
         if cell_key == 'prompt':
             data['promptDetail'] = self.prompt(row)
-            previous = next((candidate for candidate in reversed(self.requests())
-                             if candidate['threadId'] == row['threadId'] and candidate['seq'] < row['seq'] and candidate.get('type') == 'request'), None)
+            previous = self.previous_requests.get(row['id'])
             if previous:
                 data['previousPromptDetail'] = self.prompt(previous)
         elif cell_key.startswith('input:'):
             position = int(cell_key.split(':')[1])
             item = self.index.payload(row['_request'])['input'][position]
             blocks = source_blocks(item, row['id'], f'input-{position}')
-            data.update(inputDetail='\n\n'.join(b['content'] for b in blocks if b['type'] == 'text'),
-                        sourceBlocks=blocks, messageSource={'role': item.get('role'), 'type': item.get('type'),
-                                                         **(item.get('internal_chat_message_metadata_passthrough') or {})})
+            origin={'role':item.get('role'),'type':item.get('type')}
+            if 'internal_chat_message_metadata_passthrough' in item:
+                origin['metadata']=item['internal_chat_message_metadata_passthrough']
+            data.update(inputDetail='\n\n'.join(b['content'] for b in blocks if b['type'] == 'text'),sourceBlocks=blocks,messageSource=origin)
         elif cell_key == 'assistant':
             response = self.index.payload(row.get('_response')) or {}
             blocks = []
@@ -313,7 +426,7 @@ class Projection:
                 if item.get('type') == 'message':
                     blocks.extend(source_blocks(item, row['id'], 'output'))
                 elif item.get('type') == 'reasoning':
-                    thinking.extend(part['text'] for part in item.get('summary', []) if isinstance(part, dict) and isinstance(part.get('text'), str))
+                    thinking.append(public_reasoning(item))
                 elif item.get('type') in ('function_call', 'custom_tool_call'):
                     blocks.append({'type':'tool-call', 'content': item.get('arguments', item.get('input', '')),
                                    'callId': item.get('call_id'), 'toolName': item.get('name')})
@@ -325,16 +438,26 @@ class Projection:
             if row.get('type') == 'code':
                 data.update(inputDetail=row.get('_code', ''), programSource=row.get('_code', ''))
             else:
+                data.pop('programSource',None)
                 raw = self.index.payload(row.get('_input')) or {}
                 payload = raw.get('payload', raw)
                 args = payload.get('arguments', payload) if isinstance(payload, dict) else payload
                 data['inputDetail'] = args if isinstance(args, str) else json_text(args)
-            result = unpack(self.index.payload(row.get('_output')))
-            output = result.get('output', result) if isinstance(result, dict) else result
+            output, output_items, result_error = result_view(self.index.payload(row.get('_output')),code=row.get('type')=='code')
             data['outputDetail'] = output if isinstance(output, str) else json_text(output) if row.get('_output') else ''
+            data['isError'] = data['isError'] or result_error
+            if output_items is not None:
+                data['outputBlocks'] = source_blocks({'content':output_items},row['id'],'result')
             _, _, _, request = self.location(row)
             if request.get('type') == 'request':
-                schema = next((tool for tool in self.prompt(request)['tools'] if data.get('toolName') in (tool.get('name'),tool.get('qualifiedName'))), None)
+                catalog = self.prompt(request)['tools']
+                schema = next((tool for tool in catalog if tool.get('name') == data.get('qualifiedToolName')), None)
+                if schema is None:
+                    candidates = [tool for tool in catalog if (tool.get('name') == data.get('toolName')
+                                  or data.get('qualifiedToolName') == data.get('toolName')
+                                  and tool.get('sourceName') == data.get('toolName'))]
+                    if len(candidates)==1:
+                        schema=candidates[0]
                 data['schemaDetail'] = json_text(schema) if schema else ''
             if row.get('type') == 'code':
                 # Code cells are captured by the official JavaScript runtime event.
@@ -347,8 +470,20 @@ class Projection:
         for row_id in rows:
             row = self.index.get_row(row_id)
             for cell in self.cells(row):
+                if cell.get('requestOnly'):
+                    continue
                 value = self.detail(row_id, cell['cellKey'])
-                text = json_text(value).casefold()
+                sources=[f'turn {value["turn"]}' if value['turn'] is not None else 'between turns',value['group'],value['kind']]
+                if value['kind']=='message':sources.append('assistant')
+                for key in ('text','previewMarkdown','inputDetail','outputDetail','thinkingDetail','schemaDetail','result','resultPreviewMarkdown','callId','toolName'):
+                    if isinstance(value.get(key),str):sources.append(value[key])
+                for key in ('messageSource','promptDetail','previousPromptDetail'):
+                    if key in value:sources.append(json_text(value[key]))
+                for block in [*value.get('sourceBlocks',[]),*value.get('outputBlocks',[])]:
+                    sources.extend(str(block[key]) for key in ('type','content','callId','toolName') if block.get(key) is not None)
+                    if block.get('attachment',{}).get('name'):sources.append(block['attachment']['name'])
+                    if block.get('file',{}).get('name'):sources.append(block['file']['name'])
+                text = '\n'.join(sources).casefold()
                 if all(term in text for term in terms):
                     matches.append(cell['recordId'])
         return matches

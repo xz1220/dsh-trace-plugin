@@ -57,7 +57,8 @@ def clean_status(value):
 
 
 def preview(value, size=120):
-    return ' '.join(str(value or '').split())[:size]
+    source = '' if value is None else str(value)
+    return ' '.join(source[:max(2048,size*8)].split())[:size]
 
 
 class Catalog:
@@ -149,18 +150,25 @@ class Catalog:
         if thread_id:
             identifier(thread_id)
         with self.lock:
-            for item in self.cache.values():
-                if (trace_id and item['id'] == trace_id) or (thread_id and item['threadId'] == thread_id):
-                    return item
-            # Exact root task/trace IDs resolve by bundle directory name first.
+            if trace_id and thread_id:
+                item = self.find(trace_id=trace_id)
+                if item and item['threadId'] != thread_id:
+                    raise TraceError('录制与聊天标识不一致。')
+                return item
+            if thread_id:
+                # A resumed chat can create several bundles with the same root.
+                # Pick the newest exact-root recording, never an unrelated task.
+                return next((item for item in self.list(force=True) if item['threadId']==thread_id),None)
+            if trace_id and trace_id in self.cache:
+                return self.cache[trace_id]
+            # Explicit trace IDs resolve by bundle directory name first.
             roots = set(self.roots())
             for path in self.candidates():
-                if not ((trace_id and trace_id in path.name) or (thread_id and path.name.endswith(thread_id))
-                        or path in roots):
+                if not ((trace_id and trace_id in path.name) or path in roots):
                     continue
                 try:
                     item = self.manifest(path)
-                    if (trace_id and item['id'] == trace_id) or (thread_id and item['threadId'] == thread_id):
+                    if trace_id and item['id'] == trace_id:
                         self.cache[item['id']] = item
                         return item
                 except (OSError, TraceError):
@@ -193,6 +201,7 @@ class BundleIndex:
         self.responses = {}
         self.request_counter = 0
         self.tool_counter = 0
+        self.code_counter = 0
         self.latest_requests = {}
         self.payload_refs = {}
         self.payload_cache = OrderedDict()
@@ -290,6 +299,7 @@ class BundleIndex:
             if payload.get('response_id'):
                 self.responses[payload['response_id']] = key
         elif kind == 'code_cell_started':
+            self.code_counter += 1
             key = 'cell:' + thread + ':' + payload['runtime_cell_id']
             self.cell_keys[(thread, payload['runtime_cell_id'])] = key
             parent = self.latest_requests.get(thread)
@@ -326,6 +336,7 @@ class BundleIndex:
         elif kind == 'rollout_ended':
             self.status = clean_status(payload.get('status'))
         elif kind == 'compaction_request_started':
+            self.request_counter += 1
             key = 'compaction:' + payload.get('compaction_request_id', str(event['seq']))
             self.row(key, event, type='compaction', kind='context', name='上下文压缩',
                      threadId=payload.get('thread_id', thread),turnId=payload.get('codex_turn_id'),
@@ -363,7 +374,7 @@ class BundleIndex:
                     'revision': f'{self.epoch}:{self.last_seq}', 'status': self.status,
                     'origin': self.meta['startedAt'], 'latestTime': self.latest_time,
                     'totalRows': len(all_rows), 'requestCount': self.request_counter,
-                    'toolCount': self.tool_counter,
+                    'toolCount': self.tool_counter, 'codeCellCount':self.code_counter,
                     'threads': [{'id': k, 'label': v} for k, v in self.threads.items()],
                     'rows': [self.public_row(r) for r in rows],
                     'hasEarlier': len(eligible) > len(rows), 'beforeSeq': rows[0]['seq'] if rows else None}
@@ -386,7 +397,7 @@ class BundleIndex:
                 return {'resync': True}
             return {'revision': f'{self.epoch}:{self.last_seq}', 'status': self.status,
                     'unchanged': seq == self.last_seq, 'latestTime': self.latest_time,
-                    'requestCount': self.request_counter, 'toolCount': self.tool_counter,
+                    'requestCount': self.request_counter, 'toolCount': self.tool_counter, 'codeCellCount':self.code_counter,
                     'threads': [{'id': k, 'label': v} for k, v in self.threads.items()],
                     'totalRows': len(self.rows), 'rows': [self.public_row(r) for r in changed]}
 
@@ -508,7 +519,7 @@ def item_meta(entry, position, current):
             'hasEncryptedContent': isinstance(value, dict) and bool(value.get('encrypted_content'))}
 
 
-def unpack(value):
+def unpack(value, code=False):
     for _ in range(6):
         if isinstance(value, str):
             try:
@@ -516,9 +527,9 @@ def unpack(value):
                 continue
             except ValueError:
                 return value
-        if isinstance(value, dict) and 'value' in value and len(value) <= 3:
+        if isinstance(value, dict) and value.get('type') == 'code_mode_response' and 'value' in value:
             value = value['value']
-        elif isinstance(value, dict) and 'response' in value and len(value) <= 3:
+        elif code and isinstance(value, dict) and set(value)=={'response'}:
             value = value['response']
         else:
             break
@@ -608,7 +619,7 @@ class Store:
                             hasTopLevelTools=context['tools'] is not None)
                 data['sections'] = ['raw_request', 'response', 'tools']
             elif row.get('type') in ('tool', 'code'):
-                result = unpack(index.payload(row.get('_output')))
+                result = unpack(index.payload(row.get('_output')),code=row.get('type')=='code')
                 exit_code = result.get('exit_code') if isinstance(result, dict) else None
                 data.update(exitCode=exit_code, parentId=row.get('parentId'),
                             childIds=[r['id'] for r in index.rows.values() if r.get('parentId') == row_id],
@@ -674,7 +685,7 @@ class Store:
                 raw = index.payload(row.get('_output'))
                 value = 'null' if raw is None and row.get('_output') else raw
                 if section == 'result':
-                    parsed = unpack(raw)
+                    parsed = unpack(raw,code=row.get('type')=='code')
                     if isinstance(parsed, dict):
                         value = parsed.get('output', parsed)
                     elif parsed is not None:

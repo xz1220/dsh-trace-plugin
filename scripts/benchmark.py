@@ -29,11 +29,19 @@ def sample(index):
             'initialPayloadReads':before['payloadReads'],
             'warmExtraLogBytes':index.metrics['logBytesRead']-before['logBytesRead']}
 
+def projection_sample(store,index):
+    before=index.metrics['payloadReads']
+    page,elapsed=timed(lambda:store.projection(index.meta['id']).page())
+    return {'initialProjectionMs':round(elapsed,3),'projectedCells':len(page['cells']),
+            'projectionPayloadReads':index.metrics['payloadReads']-before,
+            'projectionResponseBytes':len(json.dumps(page,ensure_ascii=False).encode())}
+
 parser=argparse.ArgumentParser();parser.add_argument('--trace-id',required=True);parser.add_argument('--out',type=Path);args=parser.parse_args()
 store=Store();index=store.index(args.trace_id);real=sample(index)
 row=[r for r in index.rows.values() if r.get('type')=='request'][-1]
 detail,ms=timed(lambda:store.details(args.trace_id,row['id']))
 real['fullContextMetadataMs']=round(ms,3);real['messages']=len(detail['messages']);real['contextComplete']=detail['context']['complete']
+real.update(projection_sample(store,index))
 with tempfile.TemporaryDirectory() as temporary:
     root=Path(temporary);f=Fixture(root/'bundle')
     ref=f.payload({'input':[]},'inference_request')
@@ -44,7 +52,8 @@ with tempfile.TemporaryDirectory() as temporary:
     (f.root/'trace.jsonl').write_text(''.join(json.dumps(e)+'\n' for e in events))
     test=Store(root/'config.json');test.catalog.default_root=root/'default';test.catalog.register(str(f.root))
     synthetic=sample(test.index('trace-test'))
-report={'python':platform.python_version(),'platform':platform.machine(),'realRecording':real,'synthetic10000Rows':synthetic,
+    synthetic.update(projection_sample(test,test.index('trace-test')))
+report={'pluginVersion':json.loads((ROOT/'package.json').read_text())['version'],'python':platform.python_version(),'platform':platform.machine(),'realRecording':real,'synthetic10000Rows':synthetic,
         'scope':'Local backend timings; OS filesystem cache may already be warm. UI and MCP bridge latency are measured separately.'}
 if args.out:args.out.parent.mkdir(parents=True,exist_ok=True);args.out.write_text(json.dumps(report,indent=2))
 print(json.dumps(report,indent=2))
