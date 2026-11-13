@@ -1,6 +1,6 @@
 {
   "pluginVersion": "0.2.6",
-  "goalStatus": "active",
+  "goalStatus": "blocked",
   "overallAcceptance": "incomplete",
   "reference": {
     "repository": "deepseek-ai/deepseek-harness",
@@ -155,5 +155,10 @@
     "No raw prompts or real trace bundles are committed.",
     "Source and unit checks do not substitute for pending click acceptance.",
     "Do not mark the goal complete until the remaining review and native gates pass."
-  ]
+  ],
+  "blockerAudit": {
+    "consecutiveGoalTurns": 3,
+    "sameBlockerRevalidated": true,
+    "reason": "Replacement browser permission pending and native app not expanded"
+  }
 }

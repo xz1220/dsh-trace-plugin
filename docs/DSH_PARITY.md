@@ -1,6 +1,6 @@
 # DSH 轨迹对照与验收
 
-目标：完全对照 DSH 轨迹的前端 UI 和完整功能开发，完成多轮视觉 review、实际点击、修复和最终验收。目标仍为 active，不能把当前状态标为完成。
+目标：完全对照 DSH 轨迹的前端 UI 和完整功能开发，完成多轮视觉 review、实际点击、修复和最终验收。目标当前为 blocked，等待 UI 入口恢复；不能把当前状态标为完成。
 
 参照 `deepseek-ai/deepseek-harness` 的 `e8f7b93a344964de3dca1ace9e72b6e4d6de87cb`。本地上游 checkout 的 HEAD 已核实为该值。
 
