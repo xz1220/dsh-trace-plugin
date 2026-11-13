@@ -53,7 +53,7 @@ def read_json(path, limit=MAX_PAYLOAD):
 
 def clean_status(value):
     return {'completed': 'complete', 'failed': 'error', 'cancelled': 'cancelled',
-            'interrupted': 'cancelled', 'running': 'running'}.get(value, value or 'running')
+            'interrupted': 'cancelled', 'aborted': 'cancelled', 'running': 'running'}.get(value, value or 'running')
 
 
 def preview(value, size=120):
@@ -203,6 +203,7 @@ class BundleIndex:
         self.status = 'running'
         self.latest_time = self.meta['startedAt'] or 0
         self.unsupported = set()
+        self.projection = None
 
     def refresh(self):
         with self.lock:
@@ -276,7 +277,7 @@ class BundleIndex:
             self.request_counter += 1
             number = self.request_counter
             self.row(key, event, type='request', kind='message', name=f'请求 #{number}',
-                     model=payload.get('model'), threadId=payload.get('thread_id', thread),
+                     model=payload.get('model'), provider=payload.get('provider_name'), threadId=payload.get('thread_id', thread),
                      turnId=payload.get('codex_turn_id'), _request=payload['request_payload'],
                      _response=None, responseId=None)
             self.latest_requests[payload.get('thread_id', thread)] = key
@@ -327,6 +328,8 @@ class BundleIndex:
         elif kind == 'compaction_request_started':
             key = 'compaction:' + payload.get('compaction_request_id', str(event['seq']))
             self.row(key, event, type='compaction', kind='context', name='上下文压缩',
+                     threadId=payload.get('thread_id', thread),turnId=payload.get('codex_turn_id'),
+                     model=payload.get('model'),provider=payload.get('provider_name'),
                      _request=payload.get('request_payload'), _response=None)
         elif kind in ('compaction_request_completed', 'compaction_request_failed'):
             key = 'compaction:' + payload.get('compaction_request_id', '')
@@ -417,47 +420,62 @@ class BundleIndex:
         return row
 
     def context(self, row_id, visiting=None):
+        # Iterative reconstruction avoids recursion and intermediate full copies.
         row = self.get_row(row_id)
         if row.get('type') != 'request':
             raise TraceError("这条记录不是模型请求。")
         if row_id in self.context_cache:
             self.context_cache.move_to_end(row_id)
             return self.context_cache[row_id]
-        visiting = set() if visiting is None else set(visiting)
-        if row_id in visiting or len(visiting) > 500:
-            raise TraceError("响应链循环或超过支持的深度。")
-        visiting.add(row_id)
-        request = self.payload(row.get('_request'))
-        if not isinstance(request, dict) or not isinstance(request.get('input'), list):
-            raise TraceError("原始请求缺少 input 数组。")
-        previous = request.get('previous_response_id')
-        items = []
-        complete = True
-        missing = None
-        tools = request.get('tools')
-        if previous:
-            parent_id = self.responses.get(previous)
-            if not parent_id:
+        seen = set()
+        chain = []
+        cursor = row_id
+        base = None
+        complete, missing = True, None
+        while cursor is not None:
+            if cursor in seen:
+                raise TraceError("响应链包含循环。")
+            seen.add(cursor)
+            if cursor in self.context_cache:
+                base = self.context_cache[cursor]
+                break
+            current = self.rows.get(cursor)
+            if not current or current.get('type') != 'request':
+                complete, missing = False, cursor
+                break
+            raw = self.payload(current.get('_request'))
+            if not isinstance(raw, dict) or not isinstance(raw.get('input'), list):
+                raise TraceError("原始请求缺少 input 数组。")
+            chain.append((cursor, current, raw))
+            previous = raw.get('previous_response_id')
+            if not previous:
+                break
+            cursor = self.responses.get(previous)
+            if cursor is None:
                 complete, missing = False, previous
-            else:
-                parent = self.context(parent_id, visiting)
-                complete, missing = parent['complete'], parent['missing']
-                items.extend(parent['items'])
-                if tools is None:
-                    tools = parent['tools']
+                break
+        items = list(base['items']) if base else []
+        tools = base['tools'] if base else None
+        for request_id, current, raw in reversed(chain):
+            previous = raw.get('previous_response_id')
+            parent_id = self.responses.get(previous) if previous else None
+            if parent_id is not None:
                 output = self.payload(self.rows[parent_id].get('_response')) or {}
                 if not isinstance(output.get('output_items'), list):
                     complete, missing = False, previous
                 else:
-                    items.extend({'value': v, 'requestId': parent_id, 'origin': 'response'} for v in output['output_items'])
-        items.extend({'value': v, 'requestId': row_id, 'origin': 'input'} for v in request['input'])
-        context = {'items': items, 'complete': complete, 'missing': missing, 'tools': tools,
-                   'incremental': bool(previous), 'previousRequestId': self.responses.get(previous),
-                   'raw': request}
-        # Missing prefixes may arrive later, so never cache incomplete reconstructions.
+                    items.extend({'value': value, 'requestId': parent_id, 'origin': 'response'}
+                                 for value in output['output_items'])
+            if raw.get('tools') is not None:
+                tools = raw['tools']
+            items.extend({'value': value, 'requestId': request_id, 'origin': 'input'} for value in raw['input'])
+        raw = chain[0][2]
+        context = {'items':items, 'complete':complete, 'missing':missing, 'tools':tools,
+                   'incremental':bool(raw.get('previous_response_id')),
+                   'previousRequestId':self.responses.get(raw.get('previous_response_id')), 'raw':raw}
         if complete:
             self.context_cache[row_id] = context
-            while len(self.context_cache) > 16:
+            while len(self.context_cache)>16:
                 self.context_cache.popitem(last=False)
         return context
 
@@ -535,6 +553,44 @@ class Store:
         if not meta:
             return {'view': 'select', 'currentThreadId': thread_id, **self.list()}
         return {'view': 'trace', **self.index(meta['id']).overview()}
+
+    def projection(self, trace_id):
+        from projection import Projection
+        index = self.index(trace_id)
+        index.refresh()
+        with index.lock:
+            if index.projection is None:
+                index.projection = Projection(index)
+            return index.projection
+
+    def cell_detail(self, trace_id, row_id, cell_key):
+        projector = self.projection(trace_id)
+        with projector.index.lock:
+            data = dict(projector.detail(row_id, cell_key))
+            fields = {}
+            for key in ('inputDetail','outputDetail','thinkingDetail','schemaDetail','promptDetail',
+                        'previousPromptDetail','sourceBlocks','outputBlocks','messageSource','programSource'):
+                if key in data and data[key] is not None:
+                    value = data.pop(key)
+                    is_json = not isinstance(value, str)
+                    text = json.dumps(value, ensure_ascii=False, indent=2) if is_json else value
+                    fields[key] = {'totalChars': len(text), 'json': is_json}
+            return {'cell': data, 'fields': fields}
+
+    def cell_text(self, trace_id, row_id, cell_key, field, offset=0, version=None):
+        projector = self.projection(trace_id)
+        with projector.index.lock:
+            if version is not None and projector.index.get_row(row_id).get('_updated') != version:
+                raise TraceError('记录已更新，请重新读取内容。')
+            data = projector.detail(row_id, cell_key)
+            if field not in ('inputDetail','outputDetail','thinkingDetail','schemaDetail','promptDetail',
+                             'previousPromptDetail','sourceBlocks','outputBlocks','messageSource','programSource'):
+                raise TraceError('未知的轨迹内容字段。')
+            value = data.get(field)
+            if value is None:
+                return {'text':'', 'available':False, 'totalChars':0, 'nextOffset':None}
+            text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, indent=2)
+            return self.text_page(text, offset)
 
     def details(self, trace_id, row_id):
         index = self.index(trace_id)
@@ -616,7 +672,7 @@ class Store:
                 value = payload.get('arguments', payload) if isinstance(payload, dict) else payload
             elif section in ('result', 'raw_result'):
                 raw = index.payload(row.get('_output'))
-                value = raw
+                value = 'null' if raw is None and row.get('_output') else raw
                 if section == 'result':
                     parsed = unpack(raw)
                     if isinstance(parsed, dict):

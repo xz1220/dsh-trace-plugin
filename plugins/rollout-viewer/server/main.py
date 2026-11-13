@@ -43,6 +43,7 @@ def definition(name, title, properties=None, required=None, app=False, ui=False,
 STRING = {'type': 'string'}
 TRACE = {'traceId': STRING}
 ROW = {**TRACE, 'rowId': STRING}
+CELL = {**ROW, 'cellKey': STRING}
 TOOLS = [
     definition('list_rollout_traces', 'List official rollout recordings', {'refresh': {'type': 'boolean'}}),
     definition('show_rollout_trace', 'Show an official rollout trace', {**TRACE, 'threadId': STRING}, ui=True),
@@ -51,6 +52,11 @@ TOOLS = [
     definition('get_rollout_delta', 'Read new execution events', {**TRACE, 'revision': STRING}, ['traceId', 'revision'], app=True),
     definition('get_rollout_detail', 'Inspect the selected request or tool', ROW, ['traceId', 'rowId'], app=True),
     definition('get_rollout_record', 'Locate one execution record', ROW, ['traceId', 'rowId'], app=True),
+    definition('get_rollout_projection', 'Read DSH trajectory records', {**TRACE, 'rowIds':{'type':'array','items':STRING,'maxItems':500}, 'beforeSeq': {'type':'integer'}, 'afterSeq': {'type':'integer'}, 'limit': {'type':'integer','minimum':1,'maximum':500}}, ['traceId'], app=True),
+    definition('get_rollout_cell_detail', 'Inspect a DSH trajectory record', CELL, ['traceId','rowId','cellKey'], app=True),
+    definition('read_rollout_cell_text', 'Read DSH record content in chunks', {**CELL, 'field':STRING, 'offset':{'type':'integer','minimum':0},'version':{'type':'integer','minimum':0}}, ['traceId','rowId','cellKey','field'], app=True),
+    definition('get_rollout_request_info', 'Read complete request statistics', ROW, ['traceId','rowId'], app=True),
+    definition('search_rollout_cells', 'Search loaded trajectory bodies', {**TRACE,'query':STRING,'rowIds':{'type':'array','items':STRING,'maxItems':1000}}, ['traceId','query','rowIds'], app=True),
     definition('read_rollout_text', 'Read complete recorded content in chunks', {**ROW, 'section': {'type': 'string', 'enum': ['message','message_json','full_context','raw_request','response','tools','code','arguments','result','raw_result','runtime']}, 'itemIndex': {'type': 'integer'}, 'offset': {'type': 'integer', 'minimum': 0}}, ['traceId','rowId','section'], app=True),
     definition('add_rollout_directory', 'Add a local recording directory', {'path': STRING, 'label': STRING}, ['path'], app=True, write=True),
 ]
@@ -72,6 +78,9 @@ def call(name, args, metadata=None):
             raise TraceError('数值参数超出范围。')
         if expected == 'boolean' and type(value) is not bool:
             raise TraceError('布尔参数无效。')
+        if expected == 'array' and (not isinstance(value, list) or len(value) > field.get('maxItems',1000)
+                                    or any(not isinstance(item,str) or len(item)>4096 for item in value)):
+            raise TraceError('列表参数无效。')
         if 'enum' in field and value not in field['enum']:
             raise TraceError('参数不在支持的选项中。')
     if name == 'list_rollout_traces':
@@ -96,6 +105,23 @@ def call(name, args, metadata=None):
     if name == 'get_rollout_record':
         index = STORE.index(args['traceId'])
         return {'row': index.public_row(index.get_row(args['rowId']))}
+    if name == 'get_rollout_projection':
+        return STORE.projection(args['traceId']).page(args.get('limit',200),args.get('beforeSeq'),args.get('afterSeq'),args.get('rowIds'))
+    if name == 'get_rollout_cell_detail':
+        return STORE.cell_detail(args['traceId'],args['rowId'],args['cellKey'])
+    if name == 'read_rollout_cell_text':
+        return STORE.cell_text(args['traceId'],args['rowId'],args['cellKey'],args['field'],args.get('offset',0),args.get('version'))
+    if name == 'get_rollout_request_info':
+        projector = STORE.projection(args['traceId'])
+        with projector.index.lock:
+            row = projector.index.get_row(args['rowId'])
+            if row.get('type') not in ('request','compaction'):
+                raise TraceError('这条记录不是模型请求。')
+            return {'request':projector.request_info(row,cumulative=True)}
+    if name == 'search_rollout_cells':
+        projector = STORE.projection(args['traceId'])
+        with projector.index.lock:
+            return {'matches':projector.search(args['query'],args['rowIds'])}
     if name == 'read_rollout_text':
         return STORE.text(args['traceId'], args['rowId'], args['section'], args.get('itemIndex'), args.get('offset', 0))
     if name == 'add_rollout_directory':
