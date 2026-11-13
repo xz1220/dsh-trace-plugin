@@ -6,18 +6,19 @@ Native Codex sidebar plugin for official rollout-trace, using the approved
 DSH-style interface. It shows complete recorded client context, original
 incremental requests, tool input/output and caller relationships, and timing.
 
-The current implementation is **0.2.6**. It uses DSH's actual trajectory table,
+The current implementation is **0.2.7**. It uses DSH's actual trajectory table,
 timeline, toolbar, inspectors, Markdown, JSON/code components and image gallery,
 not the earlier mock stylesheet. Upstream source is pinned and checked with
 `node scripts/verify-dsh.mjs`; local extensions are documented in
 `vendor/dsh/PATCHES.md`.
 
 Development and verification status is tracked in [the DSH parity ledger](docs/DSH_PARITY.md).
-Four browser review rounds and 38 data-layer checks have passed. The newest tool
-image/gallery path still needs its final click review, and native desktop
-mounting remains unverified. The browser test space disappeared; a new test
-window and an expanded native app are awaiting user action. The goal is not
-marked complete.
+Five browser review rounds and 44 automated checks have passed. Final clicks
+cover tool/code/assistant images, decode retry, file dragging, JSON copy menus,
+context scopes, navigation, recording settings, rapid switching and narrow/dark
+layouts. They exposed two fixed bugs: missing common Chinese labels and an
+incomplete recording list during cold startup. Native desktop mounting and new
+desktop recording remain unverified; the goal is not marked complete.
 
 ## Run and install
 
