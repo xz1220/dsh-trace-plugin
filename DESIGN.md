@@ -1,5 +1,27 @@
 # Design system
 
+## Production update, 2026-11-13
+
+The production UI now imports the original DSH runtime from `vendor/dsh`, including
+the ledger, toolbar, timeline, Markdown/code/JSON inspectors, icon sprite and theme.
+`vendor/dsh/upstream.json` pins the source; `PATCHES.md` documents local extensions.
+Core component CSS is unchanged. Host chrome and Codex evidence controls live in
+`src/viewer.css`. The prior 12px/72px custom ledger overrides below are historical
+and no longer apply to production.
+
+DSH's ledger uses 84px event columns in Chinese and 50px icon columns in narrow
+containers. Preserve its 30px rows, request boundary controls, 32px wrapping
+toolbar, 50px Overview, resizable inspector and drawer below 760px. Do not restore
+the old mock stylesheet as production styling. There is no chat composer in this
+sidebar, so its bottom clearance is zero.
+
+Full/known/incremental Codex context, raw request and raw response are additive
+request tabs. Record bodies hydrate on selection; loading and errors replace the
+inspector body until it is available. Recorded roles, unknown timing, cancellation
+prefixes and incomplete context must remain truthful.
+
+## Earlier design notes
+
 The developer reads a trace next to a chat in an ordinary daytime desktop workspace. The current mock uses original DSH theme and trajectory CSS pinned to e8f7b93a344964de3dca1ace9e72b6e4d6de87cb, with light/dark modes and narrow/expanded review surfaces.
 
 - System sans for UI, system monospace for code and timing.

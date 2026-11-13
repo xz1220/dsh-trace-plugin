@@ -1,0 +1,35 @@
+{
+  "pluginVersion": "0.2.6",
+  "python": "3.9.6",
+  "platform": "arm64",
+  "realRecording": {
+    "rows": 7,
+    "initialIndexMs": 0.315,
+    "warmPageP50Ms": 0.023,
+    "warmPageP95Ms": 0.032,
+    "unchangedPollP50Ms": 0.01,
+    "initialPayloadReads": 0,
+    "warmExtraLogBytes": 0,
+    "fullContextMetadataMs": 0.888,
+    "messages": 11,
+    "contextComplete": true,
+    "initialProjectionMs": 1.804,
+    "projectedCells": 10,
+    "projectionPayloadReads": 6,
+    "projectionResponseBytes": 15672
+  },
+  "synthetic10000Rows": {
+    "rows": 10000,
+    "initialIndexMs": 99.91,
+    "warmPageP50Ms": 0.614,
+    "warmPageP95Ms": 0.669,
+    "unchangedPollP50Ms": 0.009,
+    "initialPayloadReads": 0,
+    "warmExtraLogBytes": 0,
+    "initialProjectionMs": 16.431,
+    "projectedCells": 200,
+    "projectionPayloadReads": 1,
+    "projectionResponseBytes": 164907
+  },
+  "scope": "Local backend timings; OS filesystem cache may already be warm. UI and MCP bridge latency are measured separately."
+}

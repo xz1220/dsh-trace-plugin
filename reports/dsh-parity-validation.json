@@ -1,0 +1,159 @@
+{
+  "pluginVersion": "0.2.6",
+  "goalStatus": "active",
+  "overallAcceptance": "incomplete",
+  "reference": {
+    "repository": "deepseek-ai/deepseek-harness",
+    "commit": "e8f7b93a344964de3dca1ace9e72b6e4d6de87cb",
+    "runtimeFiles": 96,
+    "unchangedFiles": 92,
+    "documentedAdapters": 4,
+    "coreCssChanged": false
+  },
+  "unitChecks": {
+    "pythonTests": 38,
+    "browserTransferContractTests": 3,
+    "passed": true,
+    "realBrowserClicksAreSeparate": true,
+    "total": 41
+  },
+  "completedBrowserReviews": 4,
+  "reviewRounds": [
+    {
+      "round": 1,
+      "scope": "Real recording ledger, request and code inspectors",
+      "fixed": [
+        "missing turn/call hierarchy in old renderer",
+        "request result anchor pointed to an input record",
+        "program summary not available before selection"
+      ]
+    },
+    {
+      "round": 2,
+      "scope": "Fold controls, search, light/dark and 520px sidebar",
+      "fixed": [
+        "missing upstream icon sprite"
+      ],
+      "checks": [
+        "turn/call/subcall folding",
+        "Enter expands summary",
+        "search includes folded content",
+        "dark icons visible"
+      ]
+    },
+    {
+      "round": 3,
+      "scope": "Code/raw/schema/result/diff, ordered attachments, 360px sidebar",
+      "fixed": [
+        "attachment byte fields and zero-byte size",
+        "Markdown preview preserving newlines"
+      ],
+      "checks": [
+        "verbatim code copy including final newline",
+        "raw argument toggle",
+        "schema",
+        "raw and rendered result",
+        "prompt/tool diff",
+        "image lightbox and focus restore",
+        "360px no horizontal overflow"
+      ]
+    },
+    {
+      "round": 4,
+      "scope": "Installed build, long history, timeline, live updates, error/empty/cancelled context and Unicode",
+      "checks": [
+        "840 logical rows with 27 DOM rows",
+        "pagination preserves visible anchor",
+        "timeline selection/zoom/right-pan/tooltip/click",
+        "live response updates without reload",
+        "upward scroll pauses following",
+        "missing prefix is explicit",
+        "cancelled partial output preserved",
+        "multi-agent filter",
+        "search error retry",
+        "keyboard resize and row activation",
+        "60000 Unicode code points page and copy losslessly",
+        "MCP Apps handshake and lazy detail calls"
+      ]
+    },
+    {
+      "round": 5,
+      "scope": "Latest original image gallery, tool/code/assistant images, drag and final full control regression",
+      "status": "pending",
+      "reason": "Ego TaskSpace 20 disappeared before the new image click script could run"
+    }
+  ],
+  "realClipboard": {
+    "characters": 81919,
+    "sha256": "6f4c7f2bfb58f43a7e2f00f39acc2f6999b62f9d2980164ff3d2fc14154bd043",
+    "controlledMarkersPresent": true
+  },
+  "unicode": {
+    "codePoints": 60000,
+    "firstPageLabel": "48000 / 60000",
+    "copyHandlerLossless": true,
+    "clipboardWasStubbedForUnicodeOnly": true
+  },
+  "history": {
+    "requests": 420,
+    "logicalRows": 840,
+    "domRows": 27,
+    "paginationAnchorDeltaPx": 0
+  },
+  "live": {
+    "requestsAfterAppend": 142,
+    "executionRecordsAfterAppend": 143,
+    "selectedRawResponseRefreshed": true,
+    "scrollAnchorDeltaPx": 0
+  },
+  "browserTiming": {
+    "observedBuild": "before final gallery changes",
+    "coreReadyMs": 282.5,
+    "firstContentfulPaintMs": 272,
+    "heapBytes": 53409420,
+    "scope": "One local browser preview run; caches may be warm. Not native host latency."
+  },
+  "mcpAppsHarness": {
+    "initialized": true,
+    "metadataBeforeDetails": true,
+    "requestSelectionAndContextRead": true,
+    "nativeHost": false
+  },
+  "native": {
+    "browserConnected": true,
+    "expandedAppTabsObserved": 0,
+    "desktopMountVerified": false,
+    "mainAppComputerUse": "denied for safety reasons",
+    "currentChatRecordingFound": false,
+    "desktopRecordingEnvironmentConfigured": true,
+    "afterRestartRecordingVerified": false
+  },
+  "pendingUserActions": [
+    "Allow a replacement browser test space",
+    "Expand Rollout Viewer into the Codex side panel"
+  ],
+  "remainingReview": [
+    "Tool/code/assistant image rendering and decode retry",
+    "48px thumbnails and final viewport regression",
+    "Real pointer file drag using DownloadURL",
+    "Wrap preference and JSON copy/menu controls",
+    "Timestamp toggle, detailed caller navigation, role filters and recording settings/empty state",
+    "Native entry, host interactions and new desktop recording",
+    "Full/incremental scope switching and rapid trace/record switching"
+  ],
+  "artifacts": [
+    "reports/screenshots/parity-round1.png",
+    "reports/screenshots/parity-round1-inspector.png",
+    "reports/screenshots/parity-round2-dark-fixed-520.png",
+    "reports/screenshots/parity-round3-attachments-360.png",
+    "reports/screenshots/parity-long-history.png",
+    "reports/screenshots/parity-round4-tooltip.png",
+    "reports/screenshots/parity-live-finished.png",
+    "reports/screenshots/parity-final-keyboard-360.png"
+  ],
+  "notes": [
+    "No raw prompts or real trace bundles are committed.",
+    "Source and unit checks do not substitute for pending click acceptance.",
+    "Do not mark the goal complete until the remaining review and native gates pass."
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "version": "0.2.6",
+  "tools": 14,
+  "installedFilesMatchSource": true,
+  "mcpInitialization": true,
+  "nativeEntryMetadata": true,
+  "requests": 3,
+  "toolsInRecording": 2,
+  "expectedTextChecks": 4,
+  "promptCharacters": 81919,
+  "promptChunks": 2,
+  "verifiedToolNextRequestLinks": 2,
+  "appResourceBytes": 6111134,
+  "dshCells": 10,
+  "lazyHydrationChunks": 2,
+  "fullBodySearch": true,
+  "requestCumulativeUsage": true,
+  "newToolsAppOnly": true,
+  "nativeDesktopMountVerified": false,
+  "checkedInstalledFiles": [
+    "server/main.py",
+    "server/store.py",
+    "server/projection.py",
+    "assets/viewer.html",
+    ".mcp.json",
+    ".codex-plugin/plugin.json",
+    "README.md"
+  ],
+  "codeCellsInRecording": 2,
+  "fullContextSha256": "6f4c7f2bfb58f43a7e2f00f39acc2f6999b62f9d2980164ff3d2fc14154bd043",
+  "exactRootBindingRpc": true
+}

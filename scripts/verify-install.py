@@ -40,10 +40,37 @@ try:
     launch=call('show_rollout_trace',a)
     assert launch['view']=='open' and 'rows' not in launch
     data=call('get_rollout_overview',a)
+    bound=rpc('tools/call',{'name':'open_rollout_viewer','arguments':{},'_meta':{'threadId':data['trace']['threadId']}})['structuredContent']
+    assert bound['view']=='trace' and bound['trace']['threadId']==data['trace']['threadId']
+    missing=rpc('tools/call',{'name':'open_rollout_viewer','arguments':{},'_meta':{'threadId':'unrelated-install-check'}})['structuredContent']
+    assert missing['view']=='select'
+    conflict=rpc('tools/call',{'name':'open_rollout_viewer','arguments':{},'_meta':{'thread_id':data['trace']['threadId'],'threadId':'unrelated-install-check'}})['structuredContent']
+    assert conflict['view']=='select'
     requests=[r for r in data['rows'] if r['type']=='request']
     toolrows=[r for r in data['rows'] if r['type']=='tool']
     row=requests[-1]['id'];detail=call('get_rollout_detail',{**a,'rowId':row})
     assert detail['context']['complete'],'Last request has a missing prefix'
+    projection=call('get_rollout_projection',a)
+    assert projection['cells'] and all(cell['recordId'] for cell in projection['cells'])
+    assert len(projection['requestNumbers'])==len(requests)
+    private_names={'get_rollout_projection','get_rollout_cell_detail','read_rollout_cell_text','get_rollout_request_info','search_rollout_cells'}
+    assert all(tool['_meta']['ui']['visibility']==['app'] for tool in tools if tool['name'] in private_names)
+    info=call('get_rollout_request_info',{**a,'rowId':row})['request']
+    assert info['cumulativeUsage'] and info['status']=='complete'
+    first_cell=projection['cells'][0]
+    metadata=call('get_rollout_cell_detail',{**a,'rowId':first_cell['rowId'],'cellKey':first_cell['cellKey']})
+    assert metadata['fields'] and not metadata['cell']['detailsPending']
+    field,description=next(iter(metadata['fields'].items()))
+    hydration=[];position=0
+    while position is not None:
+        part=call('read_rollout_cell_text',{**a,'rowId':first_cell['rowId'],'cellKey':first_cell['cellKey'],
+                  'field':field,'offset':position,'version':metadata['cell']['version']})
+        hydration.append(part['text']);position=part['nextOffset']
+    hydrated=''.join(hydration)
+    assert len(hydrated)==description['totalChars']
+    if description['json']:json.loads(hydrated)
+    matches=call('search_rollout_cells',{**a,'query':'developer','rowIds':projection['rowIds']})
+    assert matches['matches'],'Full-body search found no instruction records'
     pieces=[];offset=0
     while offset is not None:
         part=call('read_rollout_text',{**a,'rowId':row,'section':'full_context','offset':offset})
@@ -59,10 +86,12 @@ try:
     resource=rpc('resources/read',{'uri':'ui://rollout-viewer/viewer.html'})['contents'][0]
     assert resource['mimeType']=='text/html;profile=mcp-app'
     source=Path(__file__).resolve().parents[1]/'plugins/rollout-viewer'
-    files=['server/main.py','server/store.py','assets/viewer.html','.mcp.json','.codex-plugin/plugin.json']
+    files=['server/main.py','server/store.py','server/projection.py','assets/viewer.html','.mcp.json','.codex-plugin/plugin.json','README.md']
     same=all(hashlib.sha256((source/f).read_bytes()).digest()==hashlib.sha256((root/f).read_bytes()).digest() for f in files)
     assert same,'Installed files differ from the current source'
-    report={'version':version,'tools':len(tools),'installedFilesMatchSource':same,'mcpInitialization':True,'nativeEntryMetadata':True,'requests':data['requestCount'],'toolsInRecording':data['toolCount'],'expectedTextChecks':len(args.expect_text),'promptCharacters':len(content),'promptChunks':len(pieces),'verifiedToolNextRequestLinks':links,'appResourceBytes':len(resource['text'].encode())}
+    report={'version':version,'tools':len(tools),'installedFilesMatchSource':same,'mcpInitialization':True,'nativeEntryMetadata':True,'requests':data['requestCount'],'toolsInRecording':data['toolCount'],'expectedTextChecks':len(args.expect_text),'promptCharacters':len(content),'promptChunks':len(pieces),'verifiedToolNextRequestLinks':links,'appResourceBytes':len(resource['text'].encode()),'dshCells':len(projection['cells']),'lazyHydrationChunks':len(hydration),'fullBodySearch':True,'requestCumulativeUsage':True,'newToolsAppOnly':True,'nativeDesktopMountVerified':False}
+    report.update(checkedInstalledFiles=files,codeCellsInRecording=data.get('codeCellCount',0),
+                  fullContextSha256=hashlib.sha256(content.encode()).hexdigest(),exactRootBindingRpc=True)
     if args.out:args.out.write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps(report,indent=2))
 finally:
