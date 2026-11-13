@@ -365,6 +365,26 @@
     {
       "path": "packages/client/ui-theme/src/client/icon-sprite.ts",
       "sha256": "6611f70b0a892bcd6268b260fa61e00dc460f4f50910d0afa0119e0fa68e377c"
+    },
+    {
+      "path": "packages/client/ui-attachment/src/MessageImage.tsx",
+      "sha256": "8c18e33246e05fdd209128b8b30f264529b619a14827c4d3a510781ce1f0c7cb"
+    },
+    {
+      "path": "packages/client/ui-attachment/src/MessageImage.module.css",
+      "sha256": "21278a1b8b8303d8e7817e59b416cb9a11317fdd5ac0f7490bd0e67bbdc99e67"
+    },
+    {
+      "path": "packages/client/ui-file-drag/src/client/transfers.ts",
+      "sha256": "405a2e292d507c1ac73b704bbbf24164c5cd29dc3e6fb4aeca6c470255d5e0e2"
+    },
+    {
+      "path": "packages/util/file-drag/src/index.ts",
+      "sha256": "3503a00e43ee6e056af9ed9bf1ad8784241eb153d8b1e49214243fb4efff995f"
+    },
+    {
+      "path": "packages/util/crypto/src/index.ts",
+      "sha256": "6d314b677a163808a732c53fc509eebea1f8b8cc34b67031644dcfa4a97e28f0"
     }
   ]
 }

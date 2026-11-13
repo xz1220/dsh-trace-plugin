@@ -1259,7 +1259,8 @@ function recordAttachments(
       metadata: [
         block.attachment?.mediaType ?? fileExtension(ref.name ?? '').toUpperCase(),
         fileSizeText(ref.bytes),
-        ...(block.attachment === undefined ? [] : [`${block.attachment.width} × ${block.attachment.height}`]),
+        ...(typeof block.attachment?.width === 'number' && typeof block.attachment?.height === 'number'
+          ? [`${block.attachment.width} × ${block.attachment.height}`] : []),
       ].filter(Boolean).join(' · '),
     }]
   })
@@ -2014,22 +2015,29 @@ function ProgramInput({ program, initialWrapped, stringWrapping, onOpen, t }: {
     : <OverviewSection label={t('code.source')} onOpen={onOpen} actions={actions}>{body}</OverviewSection>
 }
 
-function ProgramOutput({ record, stringWrapping, onOpen, t }: {
+function ProgramOutput({ record, stringWrapping, onOpen, renderSlot, loadImage, t }: {
   record: TableRecord
   stringWrapping: JsonTreeProps['stringWrapping']
   onOpen?: () => void
+  renderSlot: PropsRenderSlots<'conversation.trajectory.images'>['renderSlot']
+  loadImage: MessageImageLoader
   t: TrajectoryTranslate
 }) {
   const output = record.cell.outputDetail
+  const images = record.cell.outputBlocks?.some(block => block.attachment !== undefined) === true
   const json = output === undefined || record.cell.isError === true ? undefined : parseJsonContainer(output)
-  const actions = output === undefined ? undefined : (
+  const actions = output === undefined || images && !record.cell.outputBlocks?.some(block => block.type === 'text' && block.content !== '') ? undefined : (
     <span className={css.programActions}>
       <InspectorCopyButton text={output} label={t('code.copyOutput')} t={t} />
     </span>
   )
   const body = (
     <div className={css.programContent}>
-      {output === undefined || output === ''
+      {images
+        ? <ToolOutputBlocks blocks={record.cell.outputBlocks!} error={record.cell.isError === true}
+          errorDetail={record.cell.isError ? output : undefined} preview={onOpen !== undefined}
+          renderSlot={renderSlot} loadImage={loadImage} />
+        : output === undefined || output === ''
         ? <p className={css.noPayload}>{t(stateOf(record) === 'running' ? 'code.running' : 'record.noOutput')}</p>
         : json !== undefined
           ? <JsonTree data={json} label={t('record.outputJson')} labels={jsonTreeLabels(t)}
@@ -2800,7 +2808,9 @@ export function TrajectoryTable({
                           summary: record.collapsedSummary,
                         })
                         : isRequestOnly
-                          ? t('request.rowAriaCompaction', { request: request ?? '' })
+                          ? requestInfo?.purpose === 'compaction'
+                            ? t('request.rowAriaCompaction', { request: request ?? '' })
+                            : `${requestLabel ?? t('request.noContent')}，${statusLabel(requestStatus ?? 'running', t)}`
                           : t('request.rowAria', {
                             request: request === undefined ? '' : t('request.rowPrefix', { request }),
                             kind: t(KIND_LABEL_KEY[record.cell.kind]),
@@ -3500,7 +3510,7 @@ export function TrajectoryTable({
                         <ProgramInput key={`preview:${selectedRecordId}`} program={selectedProgram}
                           initialWrapped={codeWrappingOnOpen}
                           stringWrapping={stringWrapping} onOpen={() => { activateTab('input') }} t={t} />
-                        <ProgramOutput record={selected} stringWrapping={stringWrapping}
+                        <ProgramOutput record={selected} stringWrapping={stringWrapping} renderSlot={renderSlot} loadImage={loadImage}
                           onOpen={() => { activateTab('output') }} t={t} />
                       </>
                     )
@@ -3612,7 +3622,7 @@ export function TrajectoryTable({
                     </header>
                     {selectedProgram === undefined
                       ? <RecordPayload record={selected} direction="output" renderSlot={renderSlot} loadImage={loadImage} stringWrapping={stringWrapping} t={t} />
-                      : <ProgramOutput record={selected} stringWrapping={stringWrapping} t={t} />}
+                      : <ProgramOutput record={selected} stringWrapping={stringWrapping} renderSlot={renderSlot} loadImage={loadImage} t={t} />}
                   </section>
                 </div>
                 : <RecordPayload record={selected} direction="output" renderSlot={renderSlot} loadImage={loadImage} stringWrapping={stringWrapping} t={t} />

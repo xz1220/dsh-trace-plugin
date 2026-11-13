@@ -8,4 +8,6 @@ export {StateDot} from './packages/client/ui-primitives/src/StateDot.tsx';
 export {Tooltip} from './packages/client/ui-primitives/src/Tooltip.tsx';
 export {writeClipboard} from './packages/client/ui-primitives/src/clipboard.ts';
 export {ImageLightbox} from './packages/client/ui-primitives/src/ImageLightbox.tsx';
+export {DraggableImage} from './packages/client/ui-primitives/src/DraggableImage.tsx';
+export {IconLoadingOutlineRegular,IconRefreshOutlineRegular} from './packages/client/ui-primitives/src/icons/index.tsx';
 export {ICON_SYMBOLS,IconCheckOutlineRegular,IconChevronRightOutlineRegular,IconCodeOutlineRegular,IconWrapLinesOutlineRegular,IconCopyOutlineRegular,IconSettingsOutlineRegular,IconSparkleRegular,IconUserOutlineRegular,IconSearchOutlineRegular} from './packages/client/ui-primitives/src/icons/index.tsx';

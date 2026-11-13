@@ -19,8 +19,10 @@ const primitives = {
   'Tooltip.tsx': ['Tooltip'],
   'clipboard.ts': ['writeClipboard'],
   'ImageLightbox.tsx': ['ImageLightbox'],
+  'DraggableImage.tsx': ['DraggableImage'],
   'icons/index.tsx': [
     'ICON_SYMBOLS',
+    'IconLoadingOutlineRegular','IconRefreshOutlineRegular',
     'IconCheckOutlineRegular', 'IconChevronRightOutlineRegular',
     'IconCodeOutlineRegular', 'IconWrapLinesOutlineRegular',
     'IconCopyOutlineRegular', 'IconSettingsOutlineRegular',
@@ -35,12 +37,16 @@ await mkdir(path.dirname(temporary), {recursive:true});
 await writeFile(temporary, barrel);
 const trajectory = path.join(upstream, 'packages/client/ui-trajectory/src/client');
 const entry = ['TrajectoryTable.tsx','TrajectoryTimeline.tsx','TrajectoryToolbar.tsx','trajectory-search-index.ts']
-  .map(file => `export * from ${JSON.stringify(path.join(trajectory, file))};`).join('\n');
+  .map(file => `export * from ${JSON.stringify(path.join(trajectory, file))};`).join('\n')
+  + `\nexport {ImageGallery} from ${JSON.stringify(path.join(upstream,'packages/client/ui-attachment/src/MessageImage.tsx'))};`
+  + `\nexport {FileTransfers} from ${JSON.stringify(path.join(upstream,'packages/client/ui-file-drag/src/client/transfers.ts'))};`;
 const aliases = {
   '@deepseek-ai/dsh-client-ui-primitives': temporary,
   '@deepseek-ai/dsh-util-values': path.join(upstream, 'packages/util/values/src/index.ts'),
   '@deepseek-ai/dsh-util-code-language': path.join(upstream, 'packages/util/code-language/src/index.ts'),
   '@deepseek-ai/dsh-util-workspace-path': path.join(upstream, 'packages/util/workspace-path/src/index.ts'),
+  '@deepseek-ai/dsh-util-file-drag': path.join(upstream, 'packages/util/file-drag/src/index.ts'),
+  '@deepseek-ai/dsh-util-crypto': path.join(upstream, 'packages/util/crypto/src/index.ts'),
 };
 const result = await build({
   stdin:{contents:entry, resolveDir:process.cwd(), loader:'ts'}, bundle:true,

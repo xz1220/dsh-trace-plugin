@@ -2,7 +2,7 @@
   "files": [
     {
       "path": "packages/client/ui-trajectory/src/client/TrajectoryTable.tsx",
-      "sha256": "77d47bbcf4439528a5908f5ec5a6a79348e7abc838d10fc026f937cc85300bff"
+      "sha256": "e36dcd06edd2558cf5ab47f892375145c3a9e055e7fa13c9229b50dcfdf16f1a"
     },
     {
       "path": "packages/client/ui-trajectory/src/client/code-program.ts",
@@ -11,6 +11,10 @@
     {
       "path": "packages/client/ui-trajectory/src/client/trajectory-record.ts",
       "sha256": "f3a87578631ece995863b10348905d19debe28dba6de55d694ecf70c7d44cec0"
+    },
+    {
+      "path": "packages/client/ui-attachment/src/MessageImage.tsx",
+      "sha256": "9d73f01aa46e365064d84bf9e8cfe84b34fb18a5037262368d4e25ed92e828af"
     }
   ]
 }

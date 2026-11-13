@@ -1,6 +1,6 @@
 {
   "name": "rollout-viewer",
-  "version": "0.1.3",
+  "version": "0.2.6",
   "description": "Inspect official Codex rollout-trace requests, tool calls, and execution timing.",
   "license": "MIT",
   "mcpServers": "./.mcp.json",
@@ -10,7 +10,12 @@
     "longDescription": "Read recorded client prompts, incremental requests, nested tool calls, and millisecond timing in the current conversation panel. Local-only, incremental indexing, and on-demand details.",
     "developerName": "Local tools",
     "category": "Developer Tools",
-    "capabilities": ["Interactive", "Read"],
-    "defaultPrompt": ["Open the official rollout trace for this task."]
+    "capabilities": [
+      "Interactive",
+      "Read"
+    ],
+    "defaultPrompt": [
+      "Open the official rollout trace for this task."
+    ]
   }
 }

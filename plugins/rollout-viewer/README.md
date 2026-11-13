@@ -4,6 +4,13 @@ A local Codex sidebar app for official `rollout-trace` recordings. The interface
 uses DSH's theme and trajectory styles, with a paged execution ledger, timing
 overview, reconstructed request context, and tool inspectors.
 
+Version 0.2.6 uses the upstream DSH runtime: turn/step grouping, request boundaries,
+three levels of folding, full-content search, interactive timing overview,
+virtualized rows, a resizable inspector, Markdown/code/JSON views, prompt/tool
+diffs, and the original image gallery. Complete Codex context and original request
+and response JSON are additional request tabs. Raw result values remain available
+beside rendered content.
+
 ## Open
 
 In a Codex conversation's right panel, choose **+ → More tools… → Plugins and
@@ -50,9 +57,16 @@ through its empty state or the server's `--register PATH` command.
   pure generation time, or readable hidden reasoning is invented.
 
 Current bounds: schema version 1; 256 MiB event log; 64 MiB individual payload;
-200 records per page, at most 1,000 ledger records retained in the browser. A limit
-error is explicit; content is never silently presented as complete after truncation.
-The parser has bounded payload/text caches. `state.json` is not rewritten.
+200 execution records per page. Loaded ledger metadata remains resident and only
+visible rows are mounted. Completed detail bodies use a 20-record / 16 MiB cache
+budget apart from active reads and selections. Payload, text, projection and image
+caches are bounded. A limit error is explicit; full content is never silently
+presented as complete after truncation. `state.json` is not rewritten.
+
+Tool content blocks preserve text and image order, including code-cell images.
+Business JSON fields named `value` are retained. Image bytes are loaded only from
+the recording, with shared decoding, retry, original-image preview and browser
+file dragging. Unrecorded image bytes stay unavailable.
 
 ## Runtime
 
@@ -63,6 +77,10 @@ with Codex CLI 0.163.0. Other client versions may require compatibility updates.
 The optional `--preview` server binds only to loopback and requires a random,
 HttpOnly, SameSite cookie. It uses the same frontend and data tools as the native
 app; `/harness` additionally exercises the MCP Apps postMessage handshake.
+
+The current native desktop mount and the latest image-gallery click regression
+are still pending; see the repository's `docs/DSH_PARITY.md` before treating this
+build as fully accepted.
 
 ## Attribution
 
