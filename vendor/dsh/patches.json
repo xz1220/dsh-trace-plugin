@@ -1,0 +1,16 @@
+{
+  "files": [
+    {
+      "path": "packages/client/ui-trajectory/src/client/TrajectoryTable.tsx",
+      "sha256": "77d47bbcf4439528a5908f5ec5a6a79348e7abc838d10fc026f937cc85300bff"
+    },
+    {
+      "path": "packages/client/ui-trajectory/src/client/code-program.ts",
+      "sha256": "111bddb3cb1321e892e9edd73049567c2cad77366132ca08e54b19106a528488"
+    },
+    {
+      "path": "packages/client/ui-trajectory/src/client/trajectory-record.ts",
+      "sha256": "f3a87578631ece995863b10348905d19debe28dba6de55d694ecf70c7d44cec0"
+    }
+  ]
+}
