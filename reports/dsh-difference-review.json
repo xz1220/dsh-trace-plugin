@@ -1,0 +1,194 @@
+{
+  "reviewDate": "2026-11-13",
+  "pluginVersion": "0.2.7",
+  "result": "differences_found",
+  "implementationChanged": false,
+  "reference": {
+    "repository": "deepseek-ai/deepseek-harness",
+    "commit": "e8f7b93a344964de3dca1ace9e72b6e4d6de87cb",
+    "checkoutHeadVerified": true,
+    "unchangedVendoredFiles": 93,
+    "documentedAdapters": 4
+  },
+  "method": {
+    "baseline": "Unmodified upstream TrajectoryView, TrajectoryTable, TrajectoryTimeline and TrajectoryToolbar, with controlled injected state and a synthetic snapshot",
+    "current": "Installed 0.2.7 preview using the same two-request, one-tool facts",
+    "fixture": "review-comparison",
+    "viewport": {
+      "width": 1100,
+      "height": 820
+    },
+    "scope": "Component-level comparison. Baseline omits the complete DSH application shell, composer, gateway and native host. Composer clearance is zero in both views.",
+    "preferenceEvidence": "Current reset reproduced in UI. Upstream persistence verified in its original stores and registration source; the comparison driver itself does not execute the upstream persistence store."
+  },
+  "aligned": {
+    "toolbarHeightPx": 32.5,
+    "timelineHeightPx": 50.5,
+    "rowHeightPx": 30,
+    "ledgerFontPx": 12,
+    "ledgerLineHeightPx": 18,
+    "codeFontPx": 12,
+    "codeLineHeightPx": 16,
+    "inspectorWidthPx": 418.5,
+    "fixtureRows": 5,
+    "searchQuery": "42",
+    "searchMatchesInBoth": 3
+  },
+  "openIssues": [
+    {
+      "id": "D01",
+      "priority": 2,
+      "title": "Changing timeline mode preserves a stale selection",
+      "verification": "browser and source",
+      "status": "open",
+      "reproduction": [
+        "Use recorded-duration mode",
+        "Drag from the beginning of the overview to about 30%",
+        "Switch to equal-width mode"
+      ],
+      "upstream": "Selection cleared (0 selection elements)",
+      "current": "Selection retained (2 overlay elements) and interpreted in the new coordinate domain",
+      "sources": [
+        "src/Trajectory.jsx:161",
+        "local-context/dsh-upstream/packages/client/ui-trajectory/src/client/TrajectoryView.tsx:548"
+      ],
+      "suggestedFix": "Clear the selected range whenever duration or actual-time mode changes."
+    },
+    {
+      "id": "D02",
+      "priority": 2,
+      "title": "Tool-to-assistant navigation depends on previously opening the assistant",
+      "verification": "browser and source",
+      "status": "open",
+      "reproduction": [
+        "Open a fresh recording",
+        "Select its run_code tool directly",
+        "Inspect the hierarchy links",
+        "Select the originating assistant, then select the tool again"
+      ],
+      "upstream": "Assistant message link available on cold tool selection (1 link)",
+      "current": "Cold tool selection has no assistant link (0); link appears after hydrating the assistant (1)",
+      "cause": "Initial assistant metadata carries attachments but omits tool-call IDs. parentRecords resolves links using sourceBlocks.callId; the IDs arrive only when that assistant detail is hydrated.",
+      "sources": [
+        "plugins/rollout-viewer/server/projection.py:329",
+        "plugins/rollout-viewer/server/projection.py:430",
+        "vendor/dsh/packages/client/ui-trajectory/src/client/TrajectoryTable.tsx:959"
+      ],
+      "suggestedFix": "Retain lightweight tool-call references in initial assistant metadata without sending argument bodies."
+    },
+    {
+      "id": "D03",
+      "priority": 2,
+      "title": "Timeline default and preference lifetime differ",
+      "verification": "browser for current resets; upstream source for defaults and persistence",
+      "status": "open",
+      "upstream": "Fresh duration default is false (equal-width); duration and wrapping stores are persisted and shared across session views.",
+      "current": "Duration defaults to true; duration and wrapping are component state. Switching recordings reset duration false to true and wrapping true to false.",
+      "sources": [
+        "src/Trajectory.jsx:20",
+        "src/Trajectory.jsx:24",
+        "src/viewer.jsx:105",
+        "local-context/dsh-upstream/packages/client/ui-trajectory/src/client/duration-store.ts:9",
+        "local-context/dsh-upstream/packages/client/ui-trajectory/src/client/string-wrapping-store.ts:9"
+      ]
+    },
+    {
+      "id": "D04",
+      "priority": 3,
+      "title": "Global host focus CSS adds an inner outline to DSH search",
+      "verification": "browser computed styles and screenshots",
+      "status": "open",
+      "upstream": "Search input outline-style is none; its container supplies the focus border.",
+      "current": "Focused search input receives a solid 2px inner outline with -2px offset, producing a second focus border.",
+      "sources": [
+        "src/viewer.css:7",
+        "vendor/dsh/packages/client/ui-trajectory/src/client/TrajectoryToolbar.module.css:202"
+      ],
+      "suggestedFix": "Scope host focus styles to host-owned controls."
+    }
+  ],
+  "sourceVerifiedCapabilityGaps": [
+    {
+      "id": "G01",
+      "title": "External call-ID deep linking is not connected",
+      "upstream": "viewRequest.focus -> inspectCallId, including automatic history expansion for the target",
+      "current": "The launcher selects a trace/thread; the adapter does not pass inspectCallId or onInspectApplied.",
+      "sources": [
+        "src/Trajectory.jsx:170",
+        "local-context/dsh-upstream/packages/client/ui-trajectory/src/client/TrajectoryView.tsx:611"
+      ],
+      "verification": "source; no claim of native-host click coverage"
+    },
+    {
+      "id": "G02",
+      "title": "Locale selection is fixed to Chinese",
+      "upstream": "Registers zh/en/ja/es/fr/de/ru/pt and follows active locale",
+      "current": "Imports Chinese dictionaries and handles only theme in host context",
+      "sources": [
+        "src/locale.js:1",
+        "src/viewer.jsx:41",
+        "local-context/dsh-upstream/packages/client/ui-trajectory/src/client/index.ts:63"
+      ],
+      "verification": "source"
+    }
+  ],
+  "deliberateAdaptations": [
+    {
+      "id": "A01",
+      "title": "Local recording chrome and search-status row",
+      "currentTopChromePx": 99.5,
+      "currentFooterPx": 25,
+      "currentSearchStatusPx": 22.5,
+      "currentLedgerHeightPx": 612.5,
+      "baselineLedgerHeightPx": 737,
+      "note": "These heights compare the standalone trajectory component with the complete current app surface, not the two complete applications. Recording controls are needed for the local viewer but are absent inside upstream TrajectoryView."
+    },
+    {
+      "id": "A02",
+      "title": "Additional Codex evidence tabs",
+      "upstream": [
+        "概述",
+        "选项",
+        "用量",
+        "计时"
+      ],
+      "current": [
+        "概述",
+        "选项",
+        "用量",
+        "计时",
+        "完整上下文",
+        "原始请求",
+        "原始响应"
+      ]
+    },
+    {
+      "id": "A03",
+      "title": "Recorded data and update transport",
+      "note": "Current integration polls official recording start/end facts at 1.5s and does not pass streamingCells. First-token timing is left unavailable rather than invented. This differs from the upstream live partial-output integration."
+    },
+    {
+      "id": "A04",
+      "title": "Recorded code and image adapters",
+      "note": "functions.exec support, code-cell image blocks and missing image dimensions are documented extensions."
+    }
+  ],
+  "artifacts": [
+    "reports/screenshots/dsh-compare-p2-default.png",
+    "reports/screenshots/dsh-compare-p1-default.png",
+    "reports/screenshots/dsh-compare-p2-code.png",
+    "reports/screenshots/dsh-compare-p1-code.png"
+  ],
+  "lifecycle": {
+    "taskSpace": 22,
+    "finished": true,
+    "finishCalls": 1,
+    "keptPages": [],
+    "temporaryServersStopped": true
+  },
+  "limitations": [
+    "No native Codex sidebar mount or full upstream DSH application was tested in this comparison.",
+    "This review does not prove all combinations of all features are equivalent.",
+    "Previous successful path checks remain evidence for those paths; they did not cover the newly reproduced cases."
+  ]
+}

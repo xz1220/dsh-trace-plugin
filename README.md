@@ -19,6 +19,10 @@ context scopes, navigation, recording settings, rapid switching and narrow/dark
 layouts. They exposed two fixed bugs: missing common Chinese labels and an
 incomplete recording list during cold startup. Native desktop mounting and new
 desktop recording remain unverified; the goal is not marked complete.
+A subsequent same-data comparison found open differences in mode-change range
+handling, cold tool-to-assistant links, preference lifetime and search focus
+styling. External call-ID navigation and locale integration are also incomplete;
+see `reports/dsh-difference-review.json`.
 
 ## Run and install
 

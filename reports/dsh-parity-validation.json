@@ -164,6 +164,10 @@
     "When ready to test desktop recording, fully quit and reopen Codex with the already configured recording environment, then run a new task"
   ],
   "remainingReview": [
+    "Fix and recheck mode-change selection handling",
+    "Fix cold tool-to-assistant navigation without prior assistant hydration",
+    "Align default mode, preference lifetime and scoped focus styles",
+    "Address external call-ID navigation and locale integration gaps",
     "Native sidebar mounting and real host interactions",
     "Native current-thread binding using a newly recorded desktop task after restart"
   ],
@@ -196,7 +200,7 @@
     "consecutiveResumedTurnsWithoutProgress": 0,
     "reason": "Replacement browser permission resolved; native app remains unexpanded. This resumed turn completed meaningful work."
   },
-  "developmentStatus": "native_verification_pending",
+  "developmentStatus": "parity_fixes_and_native_verification_pending",
   "workResumedAfterUserApproval": true,
   "imageReview": {
     "codeCell": true,
@@ -261,5 +265,20 @@
     "keptPages": [],
     "temporaryPreviewProcessesStopped": true
   },
-  "implementationCommit": "072d7d8"
+  "implementationCommit": "072d7d8",
+  "followupComparison": {
+    "report": "reports/dsh-difference-review.json",
+    "result": "differences_found",
+    "openParityIssues": [
+      "D01",
+      "D02",
+      "D03",
+      "D04"
+    ],
+    "sourceVerifiedCapabilityGaps": [
+      "G01",
+      "G02"
+    ],
+    "nativeVerified": false
+  }
 }

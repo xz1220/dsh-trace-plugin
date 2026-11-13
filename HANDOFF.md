@@ -1,8 +1,23 @@
 # 从这里继续：Codex Rollout Viewer
 
-## 2026-11-13：五轮浏览器验收完成，原生验收待继续
+## 2026-11-13：同数据再对照发现未对齐问题
 
 持续目标：完全对照 DSH 轨迹 UI 和完整功能开发，进行多轮 review、实际点击和修复，完成项目。用户最新“我同意”批准替代浏览器窗口；工作已恢复。goal 工具仍保留上次 blocked 状态，不能提交 complete。本段优先于下方历史“仅保存”范围。
+
+### 最新复查结论优先
+
+用户要求“和 dsh 的轨迹再对比看下是否存在不一样”。已将原版未修改 TrajectoryView/Table/Timeline/Toolbar 与 0.2.7 安装版，用同一组受控任务事实在 1100×820 下实点对照。生产代码未改，发现四项开放问题：
+
+1. 拖选后切换时间线模式不清旧选区，DSH 会清除。
+2. 冷开工具时缺少“助手消息”来源链接；先选助手加载详情后才出现。初始助手 metadata 只携带附件，没带 tool-call 的 callId，`parentRecords` 因此无法建立来源链接。
+3. 默认实际时长与 DSH 默认等宽不同；时长/换行偏好仅组件状态，切换 trace 后重置。DSH 原版 store 为共享持久化。
+4. 全局 focus CSS 使搜索 input 多 solid 2px/-2px 内描边，DSH 用外容器焦点边框。
+
+另有源码核实的按 callId 外部定位和 8 语种切换接入缺口。顶部 99.5px 录制栏、底部 25px 统计、搜索时 22.5px 状态及三个 Codex 额外标签属于适配差异。字体、行高、时间线和详情宽度一致。不能再说只剩原生验收。
+
+复现步骤、源码位置和证据：`reports/dsh-difference-review.json`、`docs/DSH_PARITY.md`。对照截图 `dsh-compare-p1-code.png`（当前冷开工具）和 `dsh-compare-p2-code.png`（原版）。原版仅注入受控快照和状态，不代表完整 DSH 应用；驱动没有执行原版持久化 store，持久化结论来自源码。
+
+本次独立比较任务 Ego Space **22** 已完成，`finish({keep:[]})` 成功执行一次；两个临时服务 52448/52447 已停止，不要再次操作已结束的空间。驱动和独立运行状态在 `local-context/review/comparison/`。
 
 ### 已完成与安装
 
@@ -29,7 +44,7 @@
 
 详情见 `docs/DSH_PARITY.md`、`reports/dsh-parity-validation.json`。测试输入均明确标“受控测试”；真实归档和截图不提交 Git。
 
-### 唯一剩余阶段：原生 Codex
+### 原生 Codex（与上述对齐修复一起待完成）
 
 - 已再次调用公开 `show_rollout_trace` 打开归档真实 trace `925371e4-ac04-4311-a063-62a563d04c5d`，并用异步问题请求用户展开到当前聊天右侧栏，尚待观察结果。
 - CUA 的 MCP Apps 浏览器绑定 **`nativeBrowser`，id `2`**，最近 `tabs.list()` 是 `[]`。复用绑定；不要重新选浏览器来恢复空列表。压缩后继续 CUA 必须先 `cua.rewriteDocumentation()`。
