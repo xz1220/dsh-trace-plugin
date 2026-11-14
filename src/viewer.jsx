@@ -14,7 +14,7 @@ import {disposeImageTransfers} from './images.jsx';
 import {LocaleContext} from './locale-context.jsx';
 import {translatorFor,normalizeLocale,supportedLocales} from './locale.js';
 
-const statusNames={running:'进行中',complete:'已结束',error:'失败',cancelled:'已取消'};
+const statusNames={running:'录制中',complete:'已结束',error:'失败',cancelled:'已取消'};
 const timeLabel=value=>typeof value==='number'?new Date(value).toLocaleString(undefined,{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'时间未知';
 const quoteShell=value=>`'${String(value).replaceAll("'", "'\"'\"'")}'`;
 
@@ -24,6 +24,7 @@ function App(){
   const [thread,setThread]=useState('all'),[dark,setDark]=useState(false),[live,setLive]=useState(true),[toast,setToast]=useState('');
   const [directory,setDirectory]=useState(''),[adding,setAdding]=useState(false),[rootPath,setRootPath]=useState('');
   const [focusCallId,setFocusCallId]=useState(null);
+  const [selectionInfo,setSelectionInfo]=useState(null),[catalogInfo,setCatalogInfo]=useState(null);
   const [locale,setLocale]=useState('zh');
   const t=useMemo(()=>translatorFor(locale),[locale]);
   const text=t.text;
@@ -55,15 +56,15 @@ function App(){
     function apply(value){
       if(!active)return;received.current=true;
       if(value.view==='open'){loadTrace(value.trace.id,value.focusCallId||null);return;}
-      if(value.rows){generation.current++;setData(value);setThread('all');setFocusCallId(null);setLoading(false);setError('');return;}
-      if(value.view==='select'){generation.current++;setTraces(value.traces||[]);setRootPath(value.defaultRoot||'');setData(null);setFocusCallId(null);setThread('all');setLoading(false);setError('');}
+      if(value.rows){generation.current++;setData(value);setSelectionInfo(value.currentThreadId?{currentThreadId:value.currentThreadId}:null);setThread('all');setFocusCallId(null);setLoading(false);setError('');return;}
+      if(value.view==='select'){generation.current++;setSelectionInfo(value);setCatalogInfo(value);setTraces(value.traces||[]);setRootPath(value.defaultRoot||'');setData(null);setFocusCallId(null);setThread('all');setLoading(false);setError('');}
     }
     const bridge=createHost({onResult:result=>apply(result.structuredContent||result),onContext:context=>{if(!active)return;if(context.theme)setDark(context.theme==='dark');if(context.locale)setLocale(normalizeLocale(context.locale));},onError:e=>{if(active){setError(e.message);setLoading(false);}}});
     host.current=bridge;
     bridge.start().then(async()=>{
       if(bridge.preview){const result=await bridge.call('show_rollout_trace',bridge.preview.traceId?{traceId:bridge.preview.traceId}:{});apply(result);}
       const list=await bridge.call('list_rollout_traces');if(!active)return;
-      if(!received.current)apply({view:'select',...list});setTraces(list.traces);setRootPath(list.defaultRoot);
+      if(!received.current)apply({view:'select',...list});setTraces(list.traces);setRootPath(list.defaultRoot);setCatalogInfo(list);
     }).catch(e=>{if(active){setError(e.message);setLoading(false);}});
     return()=>{active=false;generation.current++;bridge.dispose();clearTimeout(toastTimer.current);};
   },[loadTrace]);
@@ -100,10 +101,18 @@ function App(){
       return page.rows.length>0;
     }catch(e){if(ticket===generation.current)setError(e.message);return false;}finally{earlierBusy.current=false;}
   },[data,call]);
-  async function refresh(){try{const list=await call('list_rollout_traces',{refresh:true});setTraces(list.traces);if(data)await loadTrace(data.trace.id);else setError('');}catch(e){setError(e.message);}}
+  async function refresh(){try{
+    const list=await call('list_rollout_traces',{refresh:true});setTraces(list.traces);setCatalogInfo(list);
+    if(data)await loadTrace(data.trace.id);
+    else if(selectionInfo?.currentThreadId){
+      const match=list.traces.find(trace=>trace.threadId===selectionInfo.currentThreadId);
+      if(match)await loadTrace(match.id);
+      else{const issue=list.issues?.find(item=>item.threadId===selectionInfo.currentThreadId);setSelectionInfo(current=>({...current,unavailableReason:issue?.message}));setError('');}
+    }else setError('');
+  }catch(e){setError(e.message);}}
   async function register(){
     if(!directory.trim())return;setAdding(true);setError('');
-    try{await call('add_rollout_directory',{path:directory.trim()});const list=await call('list_rollout_traces',{refresh:true});setTraces(list.traces);setDirectory('');notify(text('录制目录已添加','Recording directory added'));}
+    try{await call('add_rollout_directory',{path:directory.trim()});const list=await call('list_rollout_traces',{refresh:true});setTraces(list.traces);setCatalogInfo(list);setDirectory('');notify(text('录制目录已添加','Recording directory added'));}
     catch(e){setError(e.message);}finally{setAdding(false);}
   }
   const stats=data?`${data.rows.length} / ${data.totalRows} ${text('条执行记录','records')} · ${data.requestCount} ${text('次模型请求','requests')} · ${data.toolCount} ${text('次工具执行','tools')}${data.codeCellCount?` · ${data.codeCellCount} ${text('个代码调用','code calls')}`:''}`:'';
@@ -113,9 +122,10 @@ function App(){
     <button type="submit" className="app-button" disabled={adding||!directory.trim()}>{adding?text('正在添加…','Adding…'):text('添加目录','Add directory')}</button>
     <label htmlFor="interface-locale">{text('界面语言','Interface language')}</label><select id="interface-locale" value={locale} onChange={e=>setLocale(e.target.value)}>{supportedLocales.map(value=><option key={value} value={value}>{languages[value]}</option>)}</select>
     {data&&<output className="app-recording-stats" aria-label={text('录制统计','Recording statistics')}>{stats}</output>}
+    {catalogInfo?.unreadableCount>0&&<p className="app-note">{text(`${catalogInfo.unreadableCount} 份录制无法读取：`,`${catalogInfo.unreadableCount} recordings could not be read: `)}{catalogInfo.issues?.map(issue=>issue.message).filter((value,index,list)=>list.indexOf(value)===index).join(' · ')}</p>}
   </form>;
   return <LocaleContext.Provider value={t}><main className={`${view.root} app-frame`} aria-label="Rollout Viewer">
-    <header className="app-header"><h1 title={data?.trace.label}>{data?.trace.label||'Rollout Viewer'}</h1><span className="app-status" title={stats} data-status={data?.status}>{data?text(statusNames[data.status]||data.status,{running:'Running',complete:'Complete',error:'Failed',cancelled:'Cancelled'}[data.status]||data.status):text('本地录制','Local recordings')}</span>
+    <header className="app-header"><h1 title={data?.trace.label}>{data?.trace.label||'Rollout Viewer'}</h1><span className="app-status" title={stats} data-status={data?.status}>{data?text(statusNames[data.status]||data.status,{running:'Recording',complete:'Complete',error:'Failed',cancelled:'Cancelled'}[data.status]||data.status):text('本地录制','Local recordings')}</span>
       {data&&<button type="button" className="app-button app-live" aria-label={text('跟随录制','Follow recording')} aria-pressed={live} onClick={()=>setLive(!live)} title={text('跟随正在录制的任务','Follow a running recording')}>{text('实时','Live')}</button>}
       <button type="button" className="app-button app-theme" onClick={()=>setDark(!dark)} aria-label={dark?text('切换浅色','Use light theme'):text('切换深色','Use dark theme')}>{dark?text('浅色','Light'):text('深色','Dark')}</button></header>
     <div className="app-source-bar"><span className="app-view-name" aria-current="page">{t('view.trajectory')}</span><select aria-label={text('选择录制任务','Select recording')} value={data?.trace.id||''} onChange={e=>loadTrace(e.target.value)}><option value="" disabled>{text('选择已录制任务…','Select a recording…')}</option>
@@ -123,9 +133,13 @@ function App(){
       {data?.threads?.length>1&&<select className="app-agent-select" aria-label={text('筛选代理','Filter agents')} value={thread} onChange={e=>setThread(e.target.value)}><option value="all">{text('全部代理','All agents')}</option>{data.threads.map(agent=><option key={agent.id} value={agent.id}>{agent.label}</option>)}</select>}
       <button type="button" className="app-button" onClick={refresh}>{text('刷新','Refresh')}</button><details className="app-source-settings"><summary aria-label={text('录制设置','Recording settings')}>{text('目录','Directory')}</summary>{directoryForm}</details></div>
     {error&&<Failure error={error} retry={()=>data?loadTrace(data.trace.id):location.reload()}/>}
-    {loading?<Skeleton/>:!data?<section className="app-empty"><h2>{text('选择一份录制开始查看','Choose a recording')}</h2><p>{text('在上方选择已录制任务，或通过「目录」添加录制位置。','Select a recording above, or add a recording directory.')}</p>
-      <p>{text('官方 rollout-trace 需要在 Codex 启动前开启，现有聊天无法补录。','Enable official rollout-trace before starting Codex. Existing chats cannot be recorded retroactively.')}</p><button type="button" className="app-button" onClick={()=>copy(`CODEX_ROLLOUT_TRACE_ROOT=${quoteShell(rootPath)} codex`)}>{text('复制 CLI 录制命令','Copy CLI recording command')}</button>
-      <span>{traces.length?text(`找到 ${traces.length} 份录制`,`${traces.length} recordings found`):text('尚未找到录制','No recordings found')} · {text('数据保存在本机','Stored locally')}</span></section>:<>
+    {loading?<Skeleton/>:!data?<section className="app-empty"><h2>{selectionInfo?.unavailableReason?text('当前聊天的录制无法读取','Unable to read this chat recording'):selectionInfo?.currentThreadId?text('当前聊天暂无可读取轨迹','No readable recording for this chat'):text('选择一份录制开始查看','Choose a recording')}</h2>
+      {selectionInfo?.unavailableReason?<p role="alert">{selectionInfo.unavailableReason}</p>:<p>{text('在上方选择已录制任务，或通过「目录」添加录制位置。','Select a recording above, or add a recording directory.')}</p>}
+      {catalogInfo?.recordingConfigured?<p>{text('录制路径已配置。点击「刷新」重新匹配当前聊天；已经发生的请求无法补录。','The recording path is configured. Refresh to match this chat again; past requests cannot be recorded retroactively.')}</p>:<>
+        <p>{text('需要在录制引擎启动前开启官方 rollout-trace；已经发生的请求无法补录。','Enable official rollout-trace before starting the recording engine; past requests cannot be recorded retroactively.')}</p>
+        <button type="button" className="app-button" onClick={()=>copy(!host.current?.preview&&catalogInfo?.platform==='darwin'?`launchctl setenv CODEX_ROLLOUT_TRACE_ROOT ${quoteShell(rootPath)}`:`CODEX_ROLLOUT_TRACE_ROOT=${quoteShell(rootPath)} codex`)}>{!host.current?.preview&&catalogInfo?.platform==='darwin'?text('复制桌面录制配置命令','Copy desktop recording setup'):text('复制 CLI 录制命令','Copy CLI recording command')}</button>
+      </>}
+      <span>{traces.length?text(`找到 ${traces.length} 份可读取录制`,`${traces.length} readable recordings found`):text('尚未找到可读取录制','No readable recordings found')}{catalogInfo?.unreadableCount?text(` · ${catalogInfo.unreadableCount} 份无法读取`,` · ${catalogInfo.unreadableCount} unreadable`):''} · {text('数据保存在本机','Stored locally')}</span></section>:<>
       <Trajectory key={`${data.trace.id}:${data.revision.split(':')[0]}`} {...{data,call,earlier,copy,thread,focusCallId}} onFocusApplied={()=>setFocusCallId(null)}/>
     </>}
     <div className={`app-toast ${toast?'visible':''}`} role="status">{toast}</div>

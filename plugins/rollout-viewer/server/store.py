@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import re
+import sys
 import threading
 import time
 from collections import OrderedDict
@@ -13,12 +14,20 @@ from pathlib import Path
 MAX_LOG = 256 * 1024 * 1024
 MAX_PAYLOAD = 64 * 1024 * 1024
 CHUNK = 48000
+SUPPORTED_SCHEMAS = (1, 2)
 ID_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,200}$")
 PAYLOAD_RE = re.compile(r"^payloads/[A-Za-z0-9_.-]+\.json$")
 
 
 class TraceError(ValueError):
     pass
+
+
+class TraceFormatError(TraceError):
+    def __init__(self, trace_id, thread_id, version):
+        label=str(version) if type(version) is int else '未知'
+        super().__init__(f'录制格式版本 {label} 暂不支持，请更新 Rollout Viewer。')
+        self.info={'traceId':trace_id,'threadId':thread_id,'schemaVersion':version if type(version) is int else None,'message':str(self)}
 
 
 def identifier(value):
@@ -68,6 +77,7 @@ class Catalog:
         self.default_root = codex / 'rollout-traces'
         self.lock = threading.RLock()
         self.cache = {}
+        self.issues = []
         self.last_scan = None
 
     def config(self):
@@ -106,11 +116,15 @@ class Catalog:
 
     def manifest(self, path, labels=None):
         data = read_json(safe_file(path, 'manifest.json'), 1024 * 1024)
-        if data.get('schema_version') != 1 or data.get('raw_event_log') != 'trace.jsonl':
-            raise TraceError("该录制格式尚不受支持。")
         trace_id = identifier(data.get('trace_id'))
         thread_id = identifier(data.get('root_thread_id'))
+        version=data.get('schema_version')
+        if type(version) is not int or version not in SUPPORTED_SCHEMAS:
+            raise TraceFormatError(trace_id,thread_id,version)
+        if data.get('raw_event_log') != 'trace.jsonl':
+            raise TraceError('该录制的事件文件布局尚不受支持。')
         return {'id': trace_id, 'threadId': thread_id, 'startedAt': data.get('started_at_unix_ms'),
+                'schemaVersion':version,
                 'label': (self.config().get('labels', {}) if labels is None else labels).get(trace_id, f'任务 {thread_id[:8]}'),
                 '_path': path}
 
@@ -133,14 +147,20 @@ class Catalog:
         with self.lock:
             if force or self.last_scan is None or time.monotonic() - self.last_scan > 5:
                 found = {}
+                issues = []
                 labels = self.config().get('labels', {})
                 for path in self.candidates():
                     try:
                         item = self.manifest(path, labels)
                         found[item['id']] = item
-                    except (OSError, TraceError):
+                    except TraceFormatError as exc:
+                        issues.append(exc.info)
+                    except TraceError as exc:
+                        issues.append({'name':path.name,'message':str(exc)})
+                    except OSError:
                         continue
                 self.cache = found
+                self.issues = issues
                 self.last_scan = time.monotonic()
             return sorted(self.cache.values(), key=lambda x: x['startedAt'] or 0, reverse=True)
 
@@ -239,7 +259,7 @@ class BundleIndex:
                     if not line.strip():
                         continue
                     event = json.loads(line)
-                    if event.get('schema_version') != 1 or event.get('seq') != self.last_seq + 1:
+                    if type(event.get('schema_version')) is not int or event.get('schema_version') != self.meta.get('schemaVersion',1) or event.get('seq') != self.last_seq + 1:
                         raise TraceError("事件版本或顺序不一致，请检查录制是否完整。")
                     self.apply(event)
                     self.last_seq = event['seq']
@@ -546,6 +566,8 @@ class Store:
         with self.lock:
             meta = self.catalog.find(trace_id=trace_id)
             if not meta:
+                problem=next((item for item in self.catalog.issues if item.get('traceId')==trace_id),None)
+                if problem:raise TraceError(problem['message'])
                 raise TraceError("未找到该录制。请添加其所在目录。")
             if trace_id not in self.indexes:
                 self.indexes[trace_id] = BundleIndex(meta)
@@ -557,13 +579,18 @@ class Store:
     def list(self, force=False):
         traces = self.catalog.list(force)
         return {'traces': [{k: v for k, v in x.items() if not k.startswith('_')} for x in traces[:100]],
-                'moreAvailable': len(traces) > 100, 'defaultRoot': str(self.catalog.default_root)}
+                'moreAvailable': len(traces) > 100, 'defaultRoot': str(self.catalog.default_root),
+                'issues':self.catalog.issues[:20],'unreadableCount':len(self.catalog.issues),
+                'recordingConfigured':bool(os.environ.get('CODEX_ROLLOUT_TRACE_ROOT')),'platform':sys.platform}
 
     def open(self, trace_id=None, thread_id=None):
         meta = self.catalog.find(trace_id, thread_id) if trace_id or thread_id else None
         if not meta:
-            return {'view': 'select', 'currentThreadId': thread_id, **self.list()}
-        return {'view': 'trace', **self.index(meta['id']).overview()}
+            result={'view': 'select', 'currentThreadId': thread_id, **self.list()}
+            problem=next((item for item in self.catalog.issues if trace_id and item.get('traceId')==trace_id or thread_id and item.get('threadId')==thread_id),None)
+            if problem:result['unavailableReason']=problem['message']
+            return result
+        return {'view': 'trace', 'currentThreadId':thread_id, **self.index(meta['id']).overview()}
 
     def projection(self, trace_id):
         from projection import Projection

@@ -11,10 +11,11 @@ from store import Store, TraceError, CHUNK
 
 
 class Fixture:
-    def __init__(self, root):
+    def __init__(self, root, schema_version=1):
         self.root = root
+        self.schema_version = schema_version
         (root/'payloads').mkdir(parents=True)
-        (root/'manifest.json').write_text(json.dumps({'schema_version':1,'trace_id':'trace-test',
+        (root/'manifest.json').write_text(json.dumps({'schema_version':schema_version,'trace_id':'trace-test',
             'rollout_id':'rollout-test','root_thread_id':'thread-root','started_at_unix_ms':1000,
             'raw_event_log':'trace.jsonl','payloads_dir':'payloads'}))
         (root/'trace.jsonl').touch()
@@ -27,14 +28,14 @@ class Fixture:
         (self.root/name).write_text(json.dumps(data, ensure_ascii=False))
         return {'raw_payload_id':f'raw_payload:{self.payloads}','kind':{'type':kind},'path':name}
 
-    def event(self, event_type, **values):
+    def event(self, record_type, **values):
         self.seq += 1
-        return {'schema_version':1,'seq':self.seq,'wall_time_unix_ms':1000+self.seq*10,
+        return {'schema_version':self.schema_version,'seq':self.seq,'wall_time_unix_ms':1000+self.seq*10,
                 'rollout_id':'rollout-test','thread_id':'thread-root','codex_turn_id':'turn-1',
-                'payload':{'type':event_type,**values}}
+                'payload':{'type':record_type,**values}}
 
-    def append(self, event_type, **values):
-        event = self.event(event_type, **values)
+    def append(self, record_type, **values):
+        event = self.event(record_type, **values)
         with (self.root/'trace.jsonl').open('a') as f:
             f.write(json.dumps(event)+'\n')
         return event
@@ -64,6 +65,8 @@ class StoreTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory()
         self.root=Path(self.temp.name)
+        isolated=patch.dict(os.environ,{'CODEX_ROLLOUT_TRACE_ROOT':str(self.root/'environment-root')})
+        isolated.start();self.addCleanup(isolated.stop)
         self.fixture=Fixture(self.root/'bundle')
         self.store=Store(self.root/'config.json')
         self.store.catalog.default_root=self.root/'default'
@@ -82,6 +85,36 @@ class StoreTests(unittest.TestCase):
         self.assertTrue(index.delta(overview['revision'])['unchanged'])
         index.overview()
         self.assertEqual(index.metrics,before)
+
+    def test_schema_two_live_session_preserves_context_and_auxiliary_events(self):
+        self.fixture.schema_version=2
+        path=self.fixture.root/'manifest.json';manifest=json.loads(path.read_text());manifest['schema_version']=2;path.write_text(json.dumps(manifest))
+        self.fixture.conversation()
+        response=self.fixture.payload({'output_items':[{'type':'message','role':'assistant','content':[{'type':'output_text','text':'V2 final reply.'}]}]},'inference_response')
+        self.fixture.append('inference_completed',inference_call_id='second',response_id='resp-second',response_payload=response)
+        self.fixture.append('history_item_accepted',item_id='recorded-item-1')
+        protocol=self.fixture.payload({'type':'task_complete','turn_id':'turn-1','duration_ms':150,'time_to_first_token_ms':30},'protocol_event')
+        self.fixture.append('protocol_event_observed',event_type='turn_complete',event_payload=protocol)
+        self.fixture.append('codex_turn_ended',codex_turn_id='turn-1',status='completed')
+        opened=self.store.open(thread_id='thread-root')
+        self.assertEqual(opened['view'],'trace');self.assertEqual(opened['trace']['schemaVersion'],2)
+        self.assertEqual(opened['requestCount'],2);self.assertEqual(opened['codeCellCount'],1);self.assertEqual(opened['toolCount'],1)
+        self.assertTrue(self.store.details('trace-test','request:second')['context']['complete'])
+        self.assertIn('V2 final reply.',self.store.text('trace-test','request:second','response')['text'])
+
+    def test_future_schema_is_reported_instead_of_disappearing_as_missing_recording(self):
+        path=self.fixture.root/'manifest.json';manifest=json.loads(path.read_text());manifest['schema_version']=99;path.write_text(json.dumps(manifest))
+        listed=self.store.list(True)
+        self.assertEqual(listed['traces'],[]);self.assertEqual(listed['unreadableCount'],1)
+        self.assertEqual(listed['issues'][0]['threadId'],'thread-root')
+        opened=self.store.open(thread_id='thread-root')
+        self.assertIn('版本 99',opened['unavailableReason'])
+        with self.assertRaisesRegex(TraceError,'版本 99'):self.store.index('trace-test')
+
+    def test_event_schema_must_match_its_manifest(self):
+        self.fixture.conversation()
+        path=self.fixture.root/'manifest.json';manifest=json.loads(path.read_text());manifest['schema_version']=2;path.write_text(json.dumps(manifest))
+        with self.assertRaises(TraceError):self.store.index('trace-test').overview()
 
     def test_catalog_scans_before_caching_when_monotonic_clock_starts_near_zero(self):
         self.fixture.conversation()

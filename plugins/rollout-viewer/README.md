@@ -4,14 +4,14 @@ A local Codex sidebar app for official `rollout-trace` recordings. The interface
 uses DSH's theme and trajectory styles, with a paged execution ledger, timing
 overview, reconstructed request context, and tool inspectors.
 
-Version 0.2.8 uses the upstream DSH runtime: turn/step grouping, request boundaries,
+Version 0.2.9 uses the upstream DSH runtime: turn/step grouping, request boundaries,
 three levels of folding, full-content search, interactive timing overview,
 virtualized rows, a resizable inspector, Markdown/code/JSON views, prompt/tool
 diffs, and the original image gallery. Complete Codex context and original request
 and response JSON are additional request tabs. Raw result values remain available
 beside rendered content.
 
-Version 0.2.8 follows the supplied running DSH Web reference with a compact title
+Version 0.2.9 follows the supplied running DSH Web reference with a compact title
 and trajectory navigation, conditional nested-call controls, and recording
 statistics in the directory menu. It clears ranges on timeline-mode changes,
 retains shared duration/wrapping preferences, and keeps tool-to-assistant links
@@ -19,6 +19,11 @@ available before loading the assistant body. The launcher accepts an optional
 `callId` and loads the required history before selecting it. Core DSH controls
 follow the host locale in all eight upstream languages; Codex-specific panels
 use Chinese or English fallback.
+
+Version 0.2.9 reads the schema-2 recordings produced by the current desktop
+runtime and reports unsupported formats instead of silently hiding them. An
+unbound chat refreshes against its own root thread when a recording appears;
+existing history is never substituted automatically.
 
 ## Open
 
@@ -65,7 +70,7 @@ through its empty state or the server's `--register PATH` command.
 - Request durations are recorded wall-clock boundaries. No token-level latency,
   pure generation time, or readable hidden reasoning is invented.
 
-Current bounds: schema version 1; 256 MiB event log; 64 MiB individual payload;
+Current bounds: schema versions 1 and 2; 256 MiB event log; 64 MiB individual payload;
 200 execution records per page. Loaded ledger metadata remains resident and only
 visible rows are mounted. Completed detail bodies use a 20-record / 16 MiB cache
 budget apart from active reads and selections. Payload, text, projection and image
@@ -88,7 +93,7 @@ HttpOnly, SameSite cookie. It uses the same frontend and data tools as the nativ
 app; `/harness` additionally exercises the MCP Apps postMessage handshake.
 
 Browser reviews cover the image gallery, tool/code/assistant images, actual file
-dragging, copying, navigation and narrow/dark layouts. Version 0.2.8 additionally
+dragging, copying, navigation and narrow/dark layouts. Version 0.2.9 additionally
 repairs the mode-selection, cold parent-link, shared preference and focus-style
 differences found by direct upstream comparison. Its installed UI has been
 clicked through, including early-call navigation across 301 history records and

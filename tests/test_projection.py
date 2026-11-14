@@ -1,5 +1,6 @@
 """Behavior checks for the real Codex → upstream DSH adapter."""
 import json
+import os
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -13,6 +14,8 @@ class ProjectionTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
+        isolated=patch.dict(os.environ,{'CODEX_ROLLOUT_TRACE_ROOT':str(self.root/'environment-root')})
+        isolated.start();self.addCleanup(isolated.stop)
         self.fixture = Fixture(self.root/'bundle')
         self.store = Store(self.root/'config.json')
         self.store.catalog.default_root = self.root/'unused'
