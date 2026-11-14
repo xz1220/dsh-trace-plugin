@@ -58,8 +58,10 @@ try:
     projection=call('get_rollout_projection',a)
     assert projection['cells'] and all(cell['recordId'] for cell in projection['cells'])
     assert len(projection['requestNumbers'])==len(requests)
-    private_names={'get_rollout_projection','get_rollout_cell_detail','read_rollout_cell_text','get_rollout_request_info','search_rollout_cells'}
+    private_names={'get_rollout_projection','get_rollout_cell_detail','read_rollout_cell_text','get_rollout_request_info','search_rollout_cells','get_rollout_binding'}
     assert all(tool['_meta']['ui']['visibility']==['app'] for tool in tools if tool['name'] in private_names)
+    binding=call('get_rollout_binding',{'threadId':data['trace']['threadId']})
+    assert set(binding)=={'currentThreadId','trace'} and binding['trace']['threadId']==data['trace']['threadId']
     info=call('get_rollout_request_info',{**a,'rowId':row})['request']
     assert info['cumulativeUsage'] and info['status']=='complete'
     first_cell=projection['cells'][0]
@@ -99,6 +101,7 @@ try:
                   fullContextSha256=hashlib.sha256(content.encode()).hexdigest(),exactRootBindingRpc=True,
                   callIdLaunchMetadataOnly=bool(toolrows),callIdLookup=bool(toolrows),
                   recordingSchemaVersion=data['trace'].get('schemaVersion',1))
+    report['threadBindingMetadataOnly']=True
     if args.out:args.out.write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps(report,indent=2))
 finally:

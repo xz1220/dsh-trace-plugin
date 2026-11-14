@@ -19,7 +19,7 @@ from urllib.parse import urlparse
 from store import Store, TraceError, identifier
 
 PLUGIN = Path(__file__).resolve().parents[1]
-VERSION = '0.2.10'
+VERSION = '0.2.11'
 URI = 'ui://rollout-viewer/viewer.html'
 STORE = Store()
 
@@ -48,6 +48,7 @@ TOOLS = [
     definition('list_rollout_traces', 'List official rollout recordings', {'refresh': {'type': 'boolean'}}),
     definition('show_rollout_trace', 'Show an official rollout trace', {**TRACE, 'threadId': STRING, 'callId': STRING}, ui=True),
     definition('open_rollout_viewer', 'Rollout Viewer', app=True, ui=True, entry=True),
+    definition('get_rollout_binding', 'Resolve the current chat recording without reading message bodies', {'threadId':STRING}, ['threadId'], app=True),
     definition('get_rollout_overview', 'Read paged execution records', {**TRACE, 'beforeSeq': {'type': 'integer'}, 'limit': {'type': 'integer', 'minimum': 1, 'maximum': 500}}, ['traceId'], app=True),
     definition('get_rollout_delta', 'Read new execution events', {**TRACE, 'revision': STRING}, ['traceId', 'revision'], app=True),
     definition('get_rollout_detail', 'Inspect the selected request or tool', ROW, ['traceId', 'rowId'], app=True),
@@ -92,12 +93,16 @@ def call(name, args, metadata=None):
         if first and second and first != second:
             thread_id = None
         return STORE.open(thread_id=thread_id)
+    if name == 'get_rollout_binding':
+        return STORE.binding(args['threadId'])
     if name == 'show_rollout_trace':
         result = STORE.open(args.get('traceId'), args.get('threadId'))
         # Public model calls only launch the UI; detailed metadata stays in app-only calls.
         if result.get('view')!='trace':
             return result
         launch={'view':'open','trace':result['trace']}
+        if args.get('threadId') and not args.get('traceId'):
+            launch['currentThreadId']=result['currentThreadId']
         if args.get('callId') is not None:
             launch['focusCallId']=identifier(args['callId'])
         return launch
@@ -235,14 +240,17 @@ def preview_server(port, trace_id=None):
                 self.send(200, (PLUGIN/'assets/viewer.html').read_text(), 'text/html')
             elif path == '/harness' and self.authorized():
                 selected = json.dumps(trace_id).replace('<','\\u003c')
+                meta=STORE.catalog.find(trace_id=trace_id) if trace_id else None
+                bound=json.dumps(meta['threadId'] if meta else None).replace('<','\\u003c')
+                cold='true' if urlparse(self.path).query=='cold=1' else 'false'
                 html = '''<!doctype html><html><head><meta charset="utf-8"><title>MCP Apps handshake validation</title></head><body style="margin:0"><iframe title="Rollout Viewer native bridge" src="/native-frame" style="border:0;width:100vw;height:100vh"></iframe><script>
 const frame=document.querySelector('iframe');window.bridgeCalls=[];
-async function invoke(name,args){const response=await fetch('/api',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,arguments:args})});return response.json();}
+async function invoke(name,args){const response=await fetch('/api',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,arguments:args,_meta:{threadId:BOUND_THREAD}})});return response.json();}
 addEventListener('message',async event=>{if(event.source!==frame.contentWindow||event.data?.jsonrpc!=='2.0')return;const m=event.data;const send=value=>frame.contentWindow.postMessage({jsonrpc:'2.0',...value},location.origin);
 if(m.method==='ui/initialize'){window.bridgeCalls.push(m.method);send({id:m.id,result:{protocolVersion:'2026-01-26',hostInfo:{name:'local-validation',version:'1'},hostCapabilities:{},hostContext:{theme:'light',locale:'zh-CN',displayMode:'fullscreen'}}});}
-else if(m.method==='ui/notifications/initialized'){window.bridgeCalls.push(m.method);const result=await invoke('show_rollout_trace',{traceId:TRACE_ID});send({method:'ui/notifications/tool-result',params:result});}
+else if(m.method==='ui/notifications/initialized'){window.bridgeCalls.push(m.method);if(!COLD_START){const result=await invoke('show_rollout_trace',{traceId:TRACE_ID});send({method:'ui/notifications/tool-result',params:result});}}
 else if(m.method==='tools/call'){window.bridgeCalls.push(m.params.name);const result=await invoke(m.params.name,m.params.arguments||{});send({id:m.id,result});}});
-</script></body></html>'''.replace('TRACE_ID', selected)
+</script></body></html>'''.replace('TRACE_ID', selected).replace('BOUND_THREAD',bound).replace('COLD_START',cold)
                 self.send(200, html, 'text/html')
             else:
                 self.send(403, '{"error":"Preview access required"}')
@@ -258,7 +266,7 @@ else if(m.method==='tools/call'){window.bridgeCalls.push(m.params.name);const re
                 return
             try:
                 request = json.loads(self.rfile.read(length))
-                result = envelope(request['name'], call(request['name'], request.get('arguments', {})))
+                result = envelope(request['name'], call(request['name'], request.get('arguments', {}), request.get('_meta')))
                 self.send(200, json.dumps(result, ensure_ascii=False))
             except (ValueError, OSError, KeyError) as exc:
                 message = str(exc) if isinstance(exc, TraceError) else '请求失败'

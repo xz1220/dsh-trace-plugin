@@ -252,8 +252,34 @@ class ProjectionTests(unittest.TestCase):
         path=later.root/'manifest.json';meta=json.loads(path.read_text())
         meta.update(trace_id='trace-later',started_at_unix_ms=2000);path.write_text(json.dumps(meta))
         self.store.catalog.register(str(later.root))
+        self.assertEqual(self.store.open(thread_id='thread-root')['trace']['id'],'trace-test')
+        self.assertEqual(self.store.open(trace_id='trace-later')['rows'],[])
+        later.conversation()
         self.assertEqual(self.store.open(thread_id='thread-root')['trace']['id'],'trace-later')
         self.assertEqual(self.store.open(thread_id='unrelated-root')['view'],'select')
+
+    def test_live_binding_uses_exact_root_and_returns_only_metadata(self):
+        self.fixture.conversation()
+        resolved=self.store.binding('thread-root')
+        self.assertEqual(set(resolved),{'currentThreadId','trace'})
+        self.assertEqual(resolved['trace']['id'],'trace-test')
+        self.assertNotIn('_path',resolved['trace'])
+        self.assertEqual(self.store.index('trace-test').metrics['payloadReads'],0)
+        self.assertIsNone(self.store.binding('unrelated-root')['trace'])
+
+    def test_restarted_empty_recording_preserves_history_until_first_new_request(self):
+        self.fixture.conversation()
+        later=Fixture(self.root/'resumed')
+        manifest=later.root/'manifest.json';meta=json.loads(manifest.read_text())
+        meta.update(trace_id='trace-resumed',started_at_unix_ms=3000);manifest.write_text(json.dumps(meta))
+        self.store.catalog.register(str(later.root))
+        later.append('rollout_started',trace_id='trace-resumed',root_thread_id='thread-root')
+        later.append('thread_started',thread_id='thread-root',agent_path='/root')
+        self.assertEqual(self.store.binding('thread-root')['trace']['id'],'trace-test')
+        request=later.payload({'input':[{'type':'message','role':'user','content':[{'type':'input_text','text':'New turn after resume'}]}]},'inference_request')
+        later.append('inference_started',inference_call_id='resumed-first',thread_id='thread-root',request_payload=request)
+        self.assertEqual(self.store.binding('thread-root')['trace']['id'],'trace-resumed')
+        self.assertEqual(self.store.open(thread_id='thread-root')['requestCount'],1)
 
     def test_explicit_trace_cannot_silently_bind_a_different_root(self):
         self.fixture.conversation()

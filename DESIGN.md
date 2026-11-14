@@ -1,5 +1,18 @@
 # Design system
 
+## Startup and live following, 2026-11-15
+
+Version 0.2.11 reads the native entry after initializing its bridge when the host
+has not provided a valid launch result. Display the most recent nonempty official
+recording for the exact chat while a resumed bundle is empty. Live mode keeps
+checking the chat binding after completion, follows new nonempty recordings,
+and catches up when the view becomes visible again. Manually selected archives
+stay pinned; the menu offers a return to the current chat. Its footer reports the
+frontend version so reload state can be checked without another model message.
+
+Preserve the current selection and reading position for ordinary deltas. Revalidate
+late host snapshots through the active connection rather than replacing newer data.
+
 ## Top navigation alignment, 2026-11-15
 
 Version 0.2.10 removes the sidebar's extra task-title row. The default chrome is

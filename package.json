@@ -1,10 +1,10 @@
 {
   "name": "codex-rollout-viewer",
   "private": true,
-  "version": "0.2.10",
+  "version": "0.2.11",
   "scripts": {
     "build": "node scripts/build-plugin.mjs",
-    "test": "python3 -m unittest discover -s tests -v && node --test tests/test_file_drag.mjs tests/test_locale.mjs tests/test_preferences.mjs",
+    "test": "python3 -m unittest discover -s tests -v && node --test tests/test_file_drag.mjs tests/test_host.mjs tests/test_locale.mjs tests/test_preferences.mjs",
     "build:design": "node design/build.mjs",
     "build:analysis": "node design/build-analysis.mjs",
     "build:mock": "node design/build-dsh-mock.mjs"

@@ -583,8 +583,23 @@ class Store:
                 'issues':self.catalog.issues[:20],'unreadableCount':len(self.catalog.issues),
                 'recordingConfigured':bool(os.environ.get('CODEX_ROLLOUT_TRACE_ROOT')),'platform':sys.platform}
 
+    def thread_recording(self, thread_id):
+        identifier(thread_id)
+        candidates=[meta for meta in self.catalog.list(force=True) if meta['threadId']==thread_id]
+        # Resuming the engine creates an empty bundle before the first new request.
+        # Keep existing history readable until that bundle has an execution record.
+        for meta in candidates:
+            index=self.index(meta['id']);index.refresh()
+            with index.lock:
+                if index.rows:return meta
+        return candidates[0] if candidates else None
+
+    def binding(self, thread_id):
+        meta=self.thread_recording(thread_id)
+        return {'currentThreadId':thread_id,'trace':{k:v for k,v in meta.items() if not k.startswith('_')} if meta else None}
+
     def open(self, trace_id=None, thread_id=None):
-        meta = self.catalog.find(trace_id, thread_id) if trace_id or thread_id else None
+        meta = self.thread_recording(thread_id) if thread_id and not trace_id else self.catalog.find(trace_id, thread_id) if trace_id or thread_id else None
         if not meta:
             result={'view': 'select', 'currentThreadId': thread_id, **self.list()}
             problem=next((item for item in self.catalog.issues if trace_id and item.get('traceId')==trace_id or thread_id and item.get('threadId')==thread_id),None)
