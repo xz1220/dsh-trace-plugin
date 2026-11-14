@@ -6,7 +6,7 @@ Native Codex sidebar plugin for official rollout-trace, using the approved
 DSH-style interface. It shows complete recorded client context, original
 incremental requests, tool input/output and caller relationships, and timing.
 
-The current implementation is **0.2.8**, aligned against the user's running DSH
+The current implementation is **0.2.9**, aligned against the user's running DSH
 Web screenshot. It uses the pinned upstream trajectory table, timeline, toolbar,
 inspectors and image gallery. Core component CSS remains unchanged; local
 adapters are documented in `vendor/dsh/PATCHES.md` and verified during builds.
@@ -18,14 +18,17 @@ out of the DSH search field. Call-ID launch requests load the necessary history;
 core controls follow all eight upstream locales. Local Codex extensions use
 Chinese or English fallback.
 
-**53 automated checks pass.** The installed app was also clicked through with
+**56 automated checks pass.** The installed app was also clicked through with
 real archived and controlled recordings, including 301-record call navigation,
 copying, image export, locale notifications and 360px dark layouts.
 [The current acceptance ledger](docs/DSH_PARITY.md) and
-`reports/dsh-alignment-028.json` record the evidence. Native Codex sidebar mounting
-and a newly recorded desktop task remain pending; the user has deferred opening
-the native panel. Local preview and bridge-harness checks do not establish those
-host results.
+`reports/dsh-alignment-028.json` record the evidence. The native panel has now been observed live, and real new desktop recordings
+are present. They use schema 2, which 0.2.8 silently skipped. Version 0.2.9 fixes
+that compatibility bug and reports unreadable formats explicitly. The open
+native panel still holds an old backend connection; current-chat display on the
+updated native connection remains pending. See
+`reports/native-schema2-validation.json`; local preview does not establish that
+remaining native result.
 
 ## Run and install
 

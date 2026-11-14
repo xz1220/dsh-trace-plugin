@@ -1,5 +1,27 @@
 # 从这里继续：Codex Rollout Viewer
 
+## 最新：0.2.9 修复真实 schema 2 录制被忽略，等待连接重载
+
+用户最新问原生面板停在录制选择页是否符合预期。结论：不符合即开即看的最终目标。已查明并修复核心兼容性 Bug，而不是继续归因于没有开启录制。
+
+- 磁盘已经存在 schema 2 的新录制，包括 `Respond to greeting`（thread `01a1d896-2de2-79c1-a75b-baded8aacc6d`，trace `031a1e3a-5456-4e23-86bc-b9c5c31ba97f`）及本聊天。旧 Catalog 只认 1，静默过滤了 2；前文“未找到录制”的索引结论需要据此勘误。
+- GUI 环境及桌面程序/相关后台进程的 CODEX_ROLLOUT_TRACE_ROOT 都存在。不要因 sandbox 内 launchctl getenv 空输出就判断 GUI 没配置；已用 gui/uid 环境及目标进程单变量检查核实。
+- 当前源码/安装 **0.2.9**，修复代码提交 `2994128`。支持 schema 1/2；事件版本必须匹配清单；未知格式显示原因和数量；空的已绑定聊天可通过刷新重新匹配；桌面引导和“录制中”状态已澄清。
+- **46 Python + 10 Node = 56 项通过**。官方 0.169 reducer 接受真实问候录制；本机安装 RPC/文件一致通过，1 请求、0 工具、8 项输入（含工具声明）、138362 字符，3 块上下文。还抽查本聊天 schema2 三个请求，排除 additional_tools 后数量与官方一致。
+- 本地安装版实际点击已显示真实 `hi` 和 `Hi! What would you like to work on?`；不支持格式提示及刷新精确重绑通过。截图 `reports/screenshots/schema2-029-greeting-preview.png` 是实际录制的本地预览，不能冒称新版原生截图。
+
+**原生当前仍是旧连接，未完成新版最终验收。** 已在原生 DOM 确认挂载及目录读取（仍旧 1 条）。模型工具的 live catalog 也仍为旧解析器。已调用官方 `config/mcpServer/reload` 并收到 `{}`，当前打开面板仍未切到新后端；不要把 RPC 确认当作已刷新成功。没有停止或重启桌面/daemon。
+
+CLI `app-server proxy` 是原始字节代理，控制 socket 上要用标准 HTTP Upgrade 的 WebSocket，不能直接发 JSONL；直接 JSONL 的两次超时已清理自己的代理进程。官方方法已用正确 WebSocket 调用成功。`mcpServerStatus/list` 对该问候 thread 返回 not found（未加载状态），不等于磁盘没有录制。
+
+CUA 截图接口超时并 **kernel reset**，之前所有 JS handles 已失效。用户后续重载后，第一次 CUA 调用仅执行选择 MCP Apps 浏览器（例如 `let nativeBrowser = await cua.getBrowser({id:'mcpapps'})`），读完返回文档再 list/get 新 tab；不要用以前的 browser id 或 tab id。新一轮 CUA 原生验证在等待用户重载，尚未提交最终 completion_summary。早先“选择页已打开”的只读诊断部分已总结过，不等于新版验收。
+
+本轮独立 Ego Space **26** 已 finish 一次，keep=[]；预览 PTY session18705 已 Ctrl-C 退出。勿再操作已结束空间。运行/点击记录与官方私有 reducer dump 在 `local-context/review/native-schema2/`（Git 忽略）。当前报告：`reports/native-schema2-validation.json`。
+
+接下来需在用户方便时重载插件连接；最稳妥在本轮结束、其他任务空闲时重开桌面应用，再在测试聊天发一条消息并打开 Viewer。录制配置已经存在，原始录制也存在，不要让用户反复配置/重录来掩盖版本问题。不能自动关闭用户桌面或重启后台引擎。先验证自动匹配、请求/消息/上下文，再更新全项目 goal；不要提前 complete。
+
+下方 0.2.8 为前一轮记录，当前状态以本段为准。
+
 ## 2026-11-14：实机图对齐修复及浏览器复验已完成
 
 持续目标仍是完整 DSH 轨迹对齐和原生插件验收。用户最新要求：“按这张实机图继续对齐，把之前发现的交互问题都修复，再实际点击验证一遍。”本轮已完成已知问题修复和安装版 Web 实点；原生侧栏/新桌面录制仍待验收，不能把整体 goal 标 complete。goal 工具沿用此前 blocked 状态，本轮有实质进展，不新增阻塞计数。

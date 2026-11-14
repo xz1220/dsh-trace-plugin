@@ -1,5 +1,5 @@
 {
-  "version": "0.2.8",
+  "version": "0.2.9",
   "tools": 14,
   "installedFilesMatchSource": true,
   "mcpInitialization": true,
@@ -10,7 +10,7 @@
   "promptCharacters": 81919,
   "promptChunks": 2,
   "verifiedToolNextRequestLinks": 2,
-  "appResourceBytes": 6206592,
+  "appResourceBytes": 6208497,
   "dshCells": 10,
   "lazyHydrationChunks": 2,
   "fullBodySearch": true,
@@ -31,5 +31,6 @@
   "fullContextSha256": "6f4c7f2bfb58f43a7e2f00f39acc2f6999b62f9d2980164ff3d2fc14154bd043",
   "exactRootBindingRpc": true,
   "callIdLaunchMetadataOnly": true,
-  "callIdLookup": true
+  "callIdLookup": true,
+  "recordingSchemaVersion": 1
 }

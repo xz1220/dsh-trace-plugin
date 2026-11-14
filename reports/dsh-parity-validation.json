@@ -1,5 +1,5 @@
 {
-  "pluginVersion": "0.2.8",
+  "pluginVersion": "0.2.9",
   "goalStatus": "blocked",
   "overallAcceptance": "incomplete",
   "reference": {
@@ -11,11 +11,11 @@
     "coreCssChanged": false
   },
   "unitChecks": {
-    "pythonTests": 43,
+    "pythonTests": 46,
     "browserTransferContractTests": 3,
     "passed": true,
     "realBrowserClicksAreSeparate": true,
-    "total": 53,
+    "total": 56,
     "localeRegressionTests": 4,
     "preferenceTests": 3
   },
@@ -163,18 +163,21 @@
     "expandedAppTabsObserved": 0,
     "desktopMountVerified": false,
     "mainAppComputerUse": "denied for safety reasons",
-    "currentChatRecordingFound": false,
+    "currentChatRecordingFound": true,
     "desktopRecordingEnvironmentConfigured": true,
     "afterRestartRecordingVerified": false,
-    "deferredByUser": true
+    "deferredByUser": true,
+    "desktopMountObservedByLiveDom": true,
+    "desktopRecordingProduced": true,
+    "updatedNativeDisplayVerified": false,
+    "recordingDiscoveryErratum": "Previous false came from a schema-1-only catalog; raw schema-2 recordings were already present."
   },
   "pendingUserActions": [
     "Side-panel expansion deferred by user (稍后打开)",
     "Desktop restart/new recording check when the user is ready"
   ],
   "remainingReview": [
-    "Native sidebar mounting and actual host interactions when the user opens the app",
-    "New desktop recording after restart and exact current-chat binding"
+    "Reload stale desktop plugin connection and verify current-chat automatic matching and real native interactions"
   ],
   "artifacts": [
     "reports/screenshots/parity-round1.png",
@@ -207,7 +210,7 @@
     "consecutiveResumedTurnsWithoutProgress": 0,
     "reason": "Replacement browser permission resolved; native app remains unexpanded. This resumed turn completed meaningful work."
   },
-  "developmentStatus": "native_verification_pending",
+  "developmentStatus": "native_connection_reload_pending",
   "workResumedAfterUserApproval": true,
   "imageReview": {
     "codeCell": true,
@@ -272,7 +275,7 @@
     "keptPages": [],
     "temporaryPreviewProcessesStopped": true
   },
-  "implementationCommit": "08b349d",
+  "implementationCommit": "2994128",
   "followupComparison": {
     "report": "reports/dsh-difference-review.json",
     "result": "recorded_differences_resolved_in_0.2.8",
@@ -280,5 +283,6 @@
     "sourceVerifiedCapabilityGaps": [],
     "nativeVerified": false,
     "resolutionReport": "reports/dsh-alignment-028.json"
-  }
+  },
+  "schema2CompatibilityReport": "reports/native-schema2-validation.json"
 }
