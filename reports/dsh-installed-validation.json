@@ -1,5 +1,5 @@
 {
-  "version": "0.2.7",
+  "version": "0.2.8",
   "tools": 14,
   "installedFilesMatchSource": true,
   "mcpInitialization": true,
@@ -10,7 +10,7 @@
   "promptCharacters": 81919,
   "promptChunks": 2,
   "verifiedToolNextRequestLinks": 2,
-  "appResourceBytes": 6112568,
+  "appResourceBytes": 6206592,
   "dshCells": 10,
   "lazyHydrationChunks": 2,
   "fullBodySearch": true,
@@ -21,6 +21,7 @@
     "server/main.py",
     "server/store.py",
     "server/projection.py",
+    "server/trajectory-locales.json",
     "assets/viewer.html",
     ".mcp.json",
     ".codex-plugin/plugin.json",
@@ -28,5 +29,7 @@
   ],
   "codeCellsInRecording": 2,
   "fullContextSha256": "6f4c7f2bfb58f43a7e2f00f39acc2f6999b62f9d2980164ff3d2fc14154bd043",
-  "exactRootBindingRpc": true
+  "exactRootBindingRpc": true,
+  "callIdLaunchMetadataOnly": true,
+  "callIdLookup": true
 }

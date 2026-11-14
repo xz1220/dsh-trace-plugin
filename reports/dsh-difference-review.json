@@ -1,7 +1,7 @@
 {
   "reviewDate": "2026-11-13",
   "pluginVersion": "0.2.7",
-  "result": "differences_found",
+  "result": "differences_found_at_0.2.7_resolved_in_0.2.8",
   "implementationChanged": false,
   "reference": {
     "repository": "deepseek-ai/deepseek-harness",
@@ -40,7 +40,7 @@
       "priority": 2,
       "title": "Changing timeline mode preserves a stale selection",
       "verification": "browser and source",
-      "status": "open",
+      "status": "fixed_and_click_verified",
       "reproduction": [
         "Use recorded-duration mode",
         "Drag from the beginning of the overview to about 30%",
@@ -52,14 +52,15 @@
         "src/Trajectory.jsx:161",
         "local-context/dsh-upstream/packages/client/ui-trajectory/src/client/TrajectoryView.tsx:548"
       ],
-      "suggestedFix": "Clear the selected range whenever duration or actual-time mode changes."
+      "suggestedFix": "Clear the selected range whenever duration or actual-time mode changes.",
+      "resolvedIn": "0.2.8"
     },
     {
       "id": "D02",
       "priority": 2,
       "title": "Tool-to-assistant navigation depends on previously opening the assistant",
       "verification": "browser and source",
-      "status": "open",
+      "status": "fixed_and_click_verified",
       "reproduction": [
         "Open a fresh recording",
         "Select its run_code tool directly",
@@ -74,14 +75,15 @@
         "plugins/rollout-viewer/server/projection.py:430",
         "vendor/dsh/packages/client/ui-trajectory/src/client/TrajectoryTable.tsx:959"
       ],
-      "suggestedFix": "Retain lightweight tool-call references in initial assistant metadata without sending argument bodies."
+      "suggestedFix": "Retain lightweight tool-call references in initial assistant metadata without sending argument bodies.",
+      "resolvedIn": "0.2.8"
     },
     {
       "id": "D03",
       "priority": 2,
       "title": "Timeline default and preference lifetime differ",
       "verification": "browser for current resets; upstream source for defaults and persistence",
-      "status": "open",
+      "status": "fixed_and_click_verified",
       "upstream": "Fresh duration default is false (equal-width); duration and wrapping stores are persisted and shared across session views.",
       "current": "Duration defaults to true; duration and wrapping are component state. Switching recordings reset duration false to true and wrapping true to false.",
       "sources": [
@@ -90,21 +92,23 @@
         "src/viewer.jsx:105",
         "local-context/dsh-upstream/packages/client/ui-trajectory/src/client/duration-store.ts:9",
         "local-context/dsh-upstream/packages/client/ui-trajectory/src/client/string-wrapping-store.ts:9"
-      ]
+      ],
+      "resolvedIn": "0.2.8"
     },
     {
       "id": "D04",
       "priority": 3,
       "title": "Global host focus CSS adds an inner outline to DSH search",
       "verification": "browser computed styles and screenshots",
-      "status": "open",
+      "status": "fixed_and_click_verified",
       "upstream": "Search input outline-style is none; its container supplies the focus border.",
       "current": "Focused search input receives a solid 2px inner outline with -2px offset, producing a second focus border.",
       "sources": [
         "src/viewer.css:7",
         "vendor/dsh/packages/client/ui-trajectory/src/client/TrajectoryToolbar.module.css:202"
       ],
-      "suggestedFix": "Scope host focus styles to host-owned controls."
+      "suggestedFix": "Scope host focus styles to host-owned controls.",
+      "resolvedIn": "0.2.8"
     }
   ],
   "sourceVerifiedCapabilityGaps": [
@@ -117,7 +121,9 @@
         "src/Trajectory.jsx:170",
         "local-context/dsh-upstream/packages/client/ui-trajectory/src/client/TrajectoryView.tsx:611"
       ],
-      "verification": "source; no claim of native-host click coverage"
+      "verification": "source; no claim of native-host click coverage",
+      "status": "implemented_and_harness_verified",
+      "resolvedIn": "0.2.8"
     },
     {
       "id": "G02",
@@ -129,7 +135,9 @@
         "src/viewer.jsx:41",
         "local-context/dsh-upstream/packages/client/ui-trajectory/src/client/index.ts:63"
       ],
-      "verification": "source"
+      "verification": "source",
+      "status": "implemented_and_harness_verified",
+      "resolvedIn": "0.2.8"
     }
   ],
   "deliberateAdaptations": [
@@ -190,5 +198,13 @@
     "No native Codex sidebar mount or full upstream DSH application was tested in this comparison.",
     "This review does not prove all combinations of all features are equivalent.",
     "Previous successful path checks remain evidence for those paths; they did not cover the newly reproduced cases."
-  ]
+  ],
+  "resolution": {
+    "date": "2026-11-14",
+    "version": "0.2.8",
+    "implementationCommit": "08b349d",
+    "report": "reports/dsh-alignment-028.json",
+    "nativeStillPending": true
+  },
+  "remainingOpenIssueIds": []
 }

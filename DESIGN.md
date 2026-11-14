@@ -1,5 +1,25 @@
 # Design system
 
+## Running-web alignment, 2026-11-14
+
+Version 0.2.8 uses the user's real DSH Web screenshot as a visual reference. Keep
+the 40px task header, 36px trajectory navigation, original 32.5px toolbar,
+50.5px timeline and 30px ledger rows. Recording selection is compact on the right;
+statistics live in the directory menu. Search announcements do not consume a row.
+Show the nested-call fold control only when nested calls exist.
+
+Preserve the original core CSS and scope host focus rules to host-owned controls.
+Duration starts with equal-width blocks and shares its saved preference with
+code/JSON expansion wrapping. Every mode change clears range selection, including
+updates from another app view. Call references must be available in metadata so
+cold tool inspection never depends on first reading an assistant body.
+
+The screenshot's full-app chat tabs and account controls belong to the host.
+Local recording controls remain available. The default inspector sizing stays
+upstream; the final review image used its keyboard resizer to approximate the
+reference split. Missing timing values remain unavailable. See
+`docs/DSH_PARITY.md` for verification and remaining native-host work.
+
 ## Production update, 2026-11-13
 
 The production UI now imports the original DSH runtime from `vendor/dsh`, including

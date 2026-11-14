@@ -1,24 +1,25 @@
 {
-  "pluginVersion": "0.2.7",
+  "pluginVersion": "0.2.8",
   "goalStatus": "blocked",
   "overallAcceptance": "incomplete",
   "reference": {
     "repository": "deepseek-ai/deepseek-harness",
     "commit": "e8f7b93a344964de3dca1ace9e72b6e4d6de87cb",
-    "runtimeFiles": 97,
-    "unchangedFiles": 93,
-    "documentedAdapters": 4,
+    "runtimeFiles": 104,
+    "unchangedFiles": 99,
+    "documentedAdapters": 5,
     "coreCssChanged": false
   },
   "unitChecks": {
-    "pythonTests": 39,
+    "pythonTests": 43,
     "browserTransferContractTests": 3,
     "passed": true,
     "realBrowserClicksAreSeparate": true,
-    "total": 44,
-    "localeRegressionTests": 2
+    "total": 53,
+    "localeRegressionTests": 4,
+    "preferenceTests": 3
   },
-  "completedBrowserReviews": 5,
+  "completedBrowserReviews": 6,
   "reviewRounds": [
     {
       "round": 1,
@@ -109,6 +110,13 @@
         "Installed build: recording selector, context scopes, code wrap, assistant image, lightbox/focus and dark 360px drawer",
         "Installed MCP Apps harness initialization and lazy loading"
       ]
+    },
+    {
+      "round": 6,
+      "date": "2026-11-14",
+      "scope": "Running-web screenshot alignment and repair of D01-D04, G01-G02",
+      "status": "passed_for_exercised_web_paths",
+      "report": "reports/dsh-alignment-028.json"
     }
   ],
   "realClipboard": {
@@ -157,19 +165,16 @@
     "mainAppComputerUse": "denied for safety reasons",
     "currentChatRecordingFound": false,
     "desktopRecordingEnvironmentConfigured": true,
-    "afterRestartRecordingVerified": false
+    "afterRestartRecordingVerified": false,
+    "deferredByUser": true
   },
   "pendingUserActions": [
-    "Expand Rollout Viewer into the Codex side panel",
-    "When ready to test desktop recording, fully quit and reopen Codex with the already configured recording environment, then run a new task"
+    "Side-panel expansion deferred by user (稍后打开)",
+    "Desktop restart/new recording check when the user is ready"
   ],
   "remainingReview": [
-    "Fix and recheck mode-change selection handling",
-    "Fix cold tool-to-assistant navigation without prior assistant hydration",
-    "Align default mode, preference lifetime and scoped focus styles",
-    "Address external call-ID navigation and locale integration gaps",
-    "Native sidebar mounting and real host interactions",
-    "Native current-thread binding using a newly recorded desktop task after restart"
+    "Native sidebar mounting and actual host interactions when the user opens the app",
+    "New desktop recording after restart and exact current-chat binding"
   ],
   "artifacts": [
     "reports/screenshots/parity-round1.png",
@@ -185,7 +190,9 @@
     "reports/screenshots/parity-final-dark-360.png",
     "reports/screenshots/parity-installed-027-code.png",
     "reports/screenshots/parity-installed-027-images.png",
-    "reports/screenshots/parity-installed-027-dark-360.png"
+    "reports/screenshots/parity-installed-027-dark-360.png",
+    "reports/screenshots/aligned-028-web-reference.png",
+    "reports/screenshots/aligned-028-dark-360.png"
   ],
   "notes": [
     "No raw prompts or real trace bundles are committed.",
@@ -200,7 +207,7 @@
     "consecutiveResumedTurnsWithoutProgress": 0,
     "reason": "Replacement browser permission resolved; native app remains unexpanded. This resumed turn completed meaningful work."
   },
-  "developmentStatus": "parity_fixes_and_native_verification_pending",
+  "developmentStatus": "native_verification_pending",
   "workResumedAfterUserApproval": true,
   "imageReview": {
     "codeCell": true,
@@ -265,20 +272,13 @@
     "keptPages": [],
     "temporaryPreviewProcessesStopped": true
   },
-  "implementationCommit": "072d7d8",
+  "implementationCommit": "08b349d",
   "followupComparison": {
     "report": "reports/dsh-difference-review.json",
-    "result": "differences_found",
-    "openParityIssues": [
-      "D01",
-      "D02",
-      "D03",
-      "D04"
-    ],
-    "sourceVerifiedCapabilityGaps": [
-      "G01",
-      "G02"
-    ],
-    "nativeVerified": false
+    "result": "recorded_differences_resolved_in_0.2.8",
+    "openParityIssues": [],
+    "sourceVerifiedCapabilityGaps": [],
+    "nativeVerified": false,
+    "resolutionReport": "reports/dsh-alignment-028.json"
   }
 }

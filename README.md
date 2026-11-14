@@ -6,23 +6,26 @@ Native Codex sidebar plugin for official rollout-trace, using the approved
 DSH-style interface. It shows complete recorded client context, original
 incremental requests, tool input/output and caller relationships, and timing.
 
-The current implementation is **0.2.7**. It uses DSH's actual trajectory table,
-timeline, toolbar, inspectors, Markdown, JSON/code components and image gallery,
-not the earlier mock stylesheet. Upstream source is pinned and checked with
-`node scripts/verify-dsh.mjs`; local extensions are documented in
-`vendor/dsh/PATCHES.md`.
+The current implementation is **0.2.8**, aligned against the user's running DSH
+Web screenshot. It uses the pinned upstream trajectory table, timeline, toolbar,
+inspectors and image gallery. Core component CSS remains unchanged; local
+adapters are documented in `vendor/dsh/PATCHES.md` and verified during builds.
 
-Development and verification status is tracked in [the DSH parity ledger](docs/DSH_PARITY.md).
-Five browser review rounds and 44 automated checks have passed. Final clicks
-cover tool/code/assistant images, decode retry, file dragging, JSON copy menus,
-context scopes, navigation, recording settings, rapid switching and narrow/dark
-layouts. They exposed two fixed bugs: missing common Chinese labels and an
-incomplete recording list during cold startup. Native desktop mounting and new
-desktop recording remain unverified; the goal is not marked complete.
-A subsequent same-data comparison found open differences in mode-change range
-handling, cold tool-to-assistant links, preference lifetime and search focus
-styling. External call-ID navigation and locale integration are also incomplete;
-see `reports/dsh-difference-review.json`.
+The follow-up comparison findings are repaired: timeline-mode changes clear
+selection, cold tool inspection links to its assistant, duration/wrapping
+preferences survive recording switches and reloads, and host focus styles stay
+out of the DSH search field. Call-ID launch requests load the necessary history;
+core controls follow all eight upstream locales. Local Codex extensions use
+Chinese or English fallback.
+
+**53 automated checks pass.** The installed app was also clicked through with
+real archived and controlled recordings, including 301-record call navigation,
+copying, image export, locale notifications and 360px dark layouts.
+[The current acceptance ledger](docs/DSH_PARITY.md) and
+`reports/dsh-alignment-028.json` record the evidence. Native Codex sidebar mounting
+and a newly recorded desktop task remain pending; the user has deferred opening
+the native panel. Local preview and bridge-harness checks do not establish those
+host results.
 
 ## Run and install
 
@@ -72,7 +75,7 @@ Use `launchctl unsetenv CODEX_ROLLOUT_TRACE_ROOT` and restart Codex to turn it o
 The optional local preview uses the installed MCP App frontend and backend,
 with a private loopback cookie. It is not a mock data implementation.
 
-## Current interactive mock
+## Earlier interactive mock
 
 Open `design/codex-trajectory-dsh.html` for the DSH-style Codex sidebar prototype.
 The three guided paths inspect full prompts, trace tool calls, and select timing
@@ -86,7 +89,7 @@ source cache used for the analysis. The generated HTML is self-contained.
 
 ## Source design-system analysis
 
-The current review deliverable is `design/dsh-design-system.html`: a self-contained,
+The earlier design-system study is `design/dsh-design-system.html`: a self-contained,
 source-backed decomposition of the DSH trajectory design system. It includes
 original CSS specimens, theme tokens, type/size specifications, conditional detail
 tabs, interactions, responsive behavior, performance mechanisms, and pinned source

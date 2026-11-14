@@ -1,65 +1,55 @@
 # 从这里继续：Codex Rollout Viewer
 
-## 2026-11-13：同数据再对照发现未对齐问题
+## 2026-11-14：实机图对齐修复及浏览器复验已完成
 
-持续目标：完全对照 DSH 轨迹 UI 和完整功能开发，进行多轮 review、实际点击和修复，完成项目。用户最新“我同意”批准替代浏览器窗口；工作已恢复。goal 工具仍保留上次 blocked 状态，不能提交 complete。本段优先于下方历史“仅保存”范围。
+持续目标仍是完整 DSH 轨迹对齐和原生插件验收。用户最新要求：“按这张实机图继续对齐，把之前发现的交互问题都修复，再实际点击验证一遍。”本轮已完成已知问题修复和安装版 Web 实点；原生侧栏/新桌面录制仍待验收，不能把整体 goal 标 complete。goal 工具沿用此前 blocked 状态，本轮有实质进展，不新增阻塞计数。
 
-### 最新复查结论优先
+### 当前代码与安装
 
-用户要求“和 dsh 的轨迹再对比看下是否存在不一样”。已将原版未修改 TrajectoryView/Table/Timeline/Toolbar 与 0.2.7 安装版，用同一组受控任务事实在 1100×820 下实点对照。生产代码未改，发现四项开放问题：
+- 源码及本机安装 **0.2.8**，代码提交 `08b349d`；分支 `codex/design-prototype`，没有远端。
+- 安装根 `/Users/danielxing/.codex/plugins/cache/rollout-local/rollout-viewer/0.2.8`。
+- DSH 固定提交 `e8f7b93a344964de3dca1ace9e72b6e4d6de87cb`。104 文件：99 原样、5 个有说明及哈希的适配；核心 CSS 未改。
+- **43 Python + 10 Node = 53 项检查通过**。构建、8 个关键安装文件一致、14 工具及入口/RPC/调用定位/81,919 字符上下文检查通过。
+- 新增后端运行文件 `server/trajectory-locales.json`，由构建时 `scripts/sync-trajectory-locales.mjs` 从同一前端词典生成，安装必须包含它。前端核心词典 8 语种，Codex 自定义面板为中文/英文回退。
 
-1. 拖选后切换时间线模式不清旧选区，DSH 会清除。
-2. 冷开工具时缺少“助手消息”来源链接；先选助手加载详情后才出现。初始助手 metadata 只携带附件，没带 tool-call 的 callId，`parentRecords` 因此无法建立来源链接。
-3. 默认实际时长与 DSH 默认等宽不同；时长/换行偏好仅组件状态，切换 trace 后重置。DSH 原版 store 为共享持久化。
-4. 全局 focus CSS 使搜索 input 多 solid 2px/-2px 内描边，DSH 用外容器焦点边框。
+### 已修复并实际点击
 
-另有源码核实的按 callId 外部定位和 8 语种切换接入缺口。顶部 99.5px 录制栏、底部 25px 统计、搜索时 22.5px 状态及三个 Codex 额外标签属于适配差异。字体、行高、时间线和详情宽度一致。不能再说只剩原生验收。
+- D01：模式切换清除选区，双向及跨页面共享偏好更新均通过。
+- D02：初始助手 metadata 保留空正文的 tool-call 引用；冷开工具即有“助手消息”链接，没先读助手正文。真实与受控录制均回跳成功。
+- D03：默认等宽；时长及代码/JSON 展开换行偏好共享、持久化，跨录制/刷新/两页面同步通过。宿主不提供存储时为内存回退，不冒充可跨刷新保存。
+- D04：宿主焦点 CSS 不再覆盖 DSH 搜索 input，内描边为 none。
+- G01：`show_rollout_trace` 接受可选 callId；`get_rollout_record` 接受 rowId/callId 二选一。按调用定位会自动补历史并连接 inspectCallId；301 条历史中打开最早工具通过，DOM 37 行。公开入口仍只返回启动元数据。
+- G02：8 语种宿主通知/回退、文档 lang、手动语言切换均通过。后端分组搜索使用同一词典，英文 Step、日文 ステップ 及切换时撤销旧匹配均通过。
+- 宿主选择页会作废旧加载，350ms 迟到启动结果没有覆盖新空状态。
+- 360px 目录入口竖排问题已修正；弹层、代理选择及深色抽屉通过。
 
-复现步骤、源码位置和证据：`reports/dsh-difference-review.json`、`docs/DSH_PARITY.md`。对照截图 `dsh-compare-p1-code.png`（当前冷开工具）和 `dsh-compare-p2-code.png`（原版）。原版仅注入受控快照和状态，不代表完整 DSH 应用；驱动没有执行原版持久化 store，持久化结论来自源码。
+顶部采用用户实机参照的标题/轨迹导航层级；当前 40px 标题 + 36px 导航。没有嵌套时仅显示时长/轮次/调用三项；有嵌套仍显示子调用。统计放目录菜单，搜索播报不增加布局行。保留本地录制功能和 Codex 三个附加请求标签，未知 TTFT 等数据不补造。
 
-本次独立比较任务 Ego Space **22** 已完成，`finish({keep:[]})` 成功执行一次；两个临时服务 52448/52447 已停止，不要再次操作已结束的空间。驱动和独立运行状态在 `local-context/review/comparison/`。
+本轮还点击了真实归档三类折叠、完整上下文 11 项、受控完整/增量/角色过滤/目录、原样代码复制（真实剪贴板转发）、工具/代码/助手图片、灯箱/焦点、损坏重试、实际指针导出 114B SVG、键盘调宽、时间线点击定位及 1100/900/745/520/360px。无已观察到的运行时异常。详细范围见报告，不能扩大为所有状态组合都已验证。
 
-### 已完成与安装
+### 证据与本机资料
 
-- 当前源码及安装版本 **0.2.7**，修复提交 `072d7d8`，安装目录 `/Users/danielxing/.codex/plugins/cache/rollout-local/rollout-viewer/0.2.7`。分支 `codex/design-prototype`，无远端。
-- 直接使用 DSH 固定提交 `e8f7b93a344964de3dca1ace9e72b6e4d6de87cb` 的运行时。97 文件：93 原样、4 个有说明和哈希的适配；核心 CSS 未改。构建自动验证来源。
-- 表格、时间线、工具栏、分组/折叠、全文搜索、虚拟化、拖宽详情、Markdown/代码/JSON、指令/工具 diff、原版画廊/灯箱/文件拖动均接入。Codex 完整/已知/增量上下文及原始请求/响应为附加页。
-- 本次修复公共中文词典缺失（界面曾显示 copy.json/expand），以及单调时钟接近零时首次目录扫描被误跳过。中文词典直接来自同版上游；新增相应回归测试。
-- **39 项 Python + 3 项拖动协议 + 2 项词典检查共 44 项通过**。构建、0.2.7 安装文件逐项一致、14 工具/私有可见性、MCP 初始化、精确 root RPC、81,919 字符上下文和资源检查通过。
-- 真实上下文 SHA-256 为 `6f4c7f2bfb58f43a7e2f00f39acc2f6999b62f9d2980164ff3d2fc14154bd043`。完整复制已实际转发系统剪贴板验证。纯 Unicode 专项使用截获处理器，不能说该项也读取了系统剪贴板。
-- 0.2.7 后端 1 万事件：首索引 123.498ms、首批投影 19.602ms，无变化轮询额外读取 0；不代表原生宿主耗时。
+- 当前验收：`docs/DSH_PARITY.md`、`reports/dsh-alignment-028.json`。
+- 安装/RPC：`reports/dsh-installed-validation.json`；性能：`reports/dsh-performance.json`。
+- 旧差异报告 `reports/dsh-difference-review.json` 已注明 0.2.8 解决结果，旧 0.2.7 复现记录保留。
+- 用户真实参考图：`local-context/review/reference/dsh-user-web.png`（Git 忽略）。它是用户实际 DSH Web，不是先前组件驱动；其运行 commit 未核实。
+- 当前展示图：`reports/screenshots/aligned-028-web-reference.png`、`aligned-028-dark-360.png`（受控数据，已人工查看；Git 忽略）。宽屏 1224×727 CSS px，详情手动调宽 508.5px；不能声称与参考图逐像素一致。
+- UI 检查脚本/逐项记录及运行状态：`local-context/review/alignment-028/`。新增受控 bundle 为 review-comparison、review-focus、review-web-alignment，原数据都在本机。现有九场景生成器全量运行会重置实时场景，不要无故重建。
+- 真实归档 trace `925371e4-ac04-4311-a063-62a563d04c5d`，root `01a1cfc4-5d25-7233-a749-66100b86a903`。完整上下文 SHA-256 `6f4c7f2bfb58f43a7e2f00f39acc2f6999b62f9d2980164ff3d2fc14154bd043`。
 
-### 五轮真实 UI 操作
+### 原生部分等用户方便时继续
 
-前四轮覆盖归档真实请求/代码/提示词、全局折叠和键盘、折叠内容搜索、原样复制、参数/结果/Schema/diff、用户附件/0B、窄屏/深色、长历史、时间线、实时追加、错误重试、缺失前序、取消、压缩、多代理和 Unicode。
+用户对展开侧栏的异步问题明确回复 **“稍后打开”**，本轮没有重复询问。原生挂载和交互、重启后新桌面录制及当前聊天绑定仍待验收。2026-11-14 元数据检查仍未发现当前聊天 `01a1d380-bb59-77b2-911c-57041de56dd3` 的官方录制；没有重新运行模型实验来替代它。
 
-第五轮在获准的 **Ego TaskSpace 21（DSH final acceptance）** 完成：
+CUA 先前明确禁止直接控制 Codex 主窗口，不能用系统脚本/CDP 绕过，不能自动退出 Codex。用户展开后复用 MCP Apps 绑定 `nativeBrowser`（id 2），先 tabs.list 再 tabs.get，不重选浏览器恢复空列表。压缩后继续 CUA 先 `cua.rewriteDocumentation()`；真正观察到 CUA 部分结果后，下一工具调用必须为只含 completion_summary 的 CUA 调用，恰好一次。当前 CUA 等待还未结束，不提前总结成完成。
 
-- 工具/代码/助手图片、共享解码、未知尺寸、损坏图片重试、48px 缩略图控件、灯箱 Escape 和焦点恢复。
-- 真实指针拖动导出 114 字节 SVG 与源一致。透明观察原版 DownloadURL；这是浏览器导出，不是原生 OS 拖动验收。
-- 换行偏好、JSON 节点/复制路径/格式化和紧凑复制、本地/Unix 时间戳、完整 6 项/增量 1 项、角色过滤、工具目录、调用者和结果跳转。
-- 350ms 延迟旧返回不能覆盖最新详情或录制选择；有效/无效目录、实时开关、harness 未录制空状态和 CLI 命令复制。
-- 等待请求 #141 占位行；完成后已打开原始响应自动刷新；1100/900/745/520/360px 无页面横向溢出，无 composer 底部 padding 为 0。
-- 0.2.7 安装版重复检查上下文、换行、助手图片/灯箱、360px 深色、MCP Apps 握手。图片/代码截图已人工查看。
+安装不等于当前宿主进程已重载新资源；必要时让用户在方便时重新打开插件/聊天或重启，再验收。先前设置过桌面录制环境，届时复核继承情况。浏览器/harness 通过不能替代原生。
 
-详情见 `docs/DSH_PARITY.md`、`reports/dsh-parity-validation.json`。测试输入均明确标“受控测试”；真实归档和截图不提交 Git。
+### 临时资源已清理
 
-### 原生 Codex（与上述对齐修复一起待完成）
+本轮 Ego Space **23**（DSH screenshot alignment QA）已成功 finish 一次，keep=[]；不要再次操作已结束空间。两个预览端口 62911/55768 均无监听。Space 21/22 也已在此前结束，不能复用。Ego 提示有更新，本轮未升级。
 
-- 已再次调用公开 `show_rollout_trace` 打开归档真实 trace `925371e4-ac04-4311-a063-62a563d04c5d`，并用异步问题请求用户展开到当前聊天右侧栏，尚待观察结果。
-- CUA 的 MCP Apps 浏览器绑定 **`nativeBrowser`，id `2`**，最近 `tabs.list()` 是 `[]`。复用绑定；不要重新选浏览器来恢复空列表。压缩后继续 CUA 必须先 `cua.rewriteDocumentation()`。
-- 直接操作 Codex 主窗口被安全规则禁止。不能用系统脚本、CDP 或其他技术绕过。用户展开后通过 MCP Apps DOM 检查实际挂载、正确数据和交互；若宿主仍加载旧资源，要让用户重新打开插件/聊天，不伪称新安装已经生效。
-- 当前聊天 `01a1d380-bb59-77b2-911c-57041de56dd3` 无官方录制。已配置 `launchctl` 环境 `/Users/danielxing/.codex/rollout-traces`，但重启后桌面新任务产录制及当前 thread 绑定仍需验证。不能自动退出 Codex，也不能用 CLI/harness 替代桌面端证据。
-- 原生 CUA 部分正在等待用户展开，尚未提交最终 completion summary。真正观察到 CUA 部分结果后，下一工具调用必须是仅含 completion_summary 的 CUA 调用，恰好一次。
-- 本次恢复有实质进展。若以后同一阻塞在连续三个恢复后的 goal turn 都重现且无有意义工作，再按系统规则 blocked；不要继承之前三轮计数立即停工。
-
-### 临时资源与续接
-
-`local-context/review/runtime.json` 保存最新状态。开发和安装版两个预览进程已停止，端口 62490/51661 均无监听。不要依赖历史端口。
-
-Ego 21 的浏览器验收已结束，`finish({keep:[]})` 已成功执行恰好一次，未保留页面。不要再次操作或自行接管已结束的空间。原生等待使用独立的 CUA MCP Apps 绑定；不要新建浏览器绕过。CLI 提示可更新，本轮未升级。
-
-改动使用明确路径暂存，按任务保存本地提交；无远端不创建公开仓库。不要再做 mock。九份受控 fixture 在 `local-context/review/recordings`，全量重建会重置实时场景；只用 `--reset-live` / `--advance-live` 操作实时场景。
+后续保护现有修改，只按明确文件名暂存；无远端不创建公开仓库。不要再做 mock，也不要把旧“仅保存”历史范围覆盖本段。若恢复后同一原生阻塞连续三个 goal turn 重现且无其他有意义工作，再遵守 blocked 规则；本轮修复不算无进展。
 
 ---
 
