@@ -6,8 +6,11 @@ Native Codex sidebar plugin for official rollout-trace, using the approved
 DSH-style interface. It shows complete recorded client context, original
 incremental requests, tool input/output and caller relationships, and timing.
 
-The current implementation is **0.2.9**, aligned against the user's running DSH
-Web screenshot. It uses the pinned upstream trajectory table, timeline, toolbar,
+The current implementation is **0.2.10**. Its compact trajectory navigation
+follows the user's running DSH Web screenshot: “轨迹 / ···”, followed directly by
+the toolbar and timeline. Recording selection, refresh, live updates, theme,
+directories, language, agent filtering and statistics are in the “···” menu.
+There is no extra task-title row inside the sidebar. It uses the pinned upstream trajectory table, timeline, toolbar,
 inspectors and image gallery. Core component CSS remains unchanged; local
 adapters are documented in `vendor/dsh/PATCHES.md` and verified during builds.
 
@@ -22,13 +25,12 @@ Chinese or English fallback.
 real archived and controlled recordings, including 301-record call navigation,
 copying, image export, locale notifications and 360px dark layouts.
 [The current acceptance ledger](docs/DSH_PARITY.md) and
-`reports/dsh-alignment-028.json` record the evidence. The native panel has now been observed live, and real new desktop recordings
-are present. They use schema 2, which 0.2.8 silently skipped. Version 0.2.9 fixes
-that compatibility bug and reports unreadable formats explicitly. The open
-native panel still holds an old backend connection; current-chat display on the
-updated native connection remains pending. See
-`reports/native-schema2-validation.json`; local preview does not establish that
-remaining native result.
+`reports/dsh-alignment-028.json` record the earlier interaction evidence. The native
+panel has been observed live, and after the user's restart the connected backend
+reads schema 1/2 recordings. Version 0.2.9 fixed the schema-2 compatibility bug
+and explicitly reports unreadable formats. The 0.2.10 top-navigation acceptance
+and native verification are recorded separately in `reports/topbar-0210-validation.json`;
+local preview is not evidence of an updated native panel.
 
 ## Run and install
 
@@ -46,7 +48,7 @@ Newly installed plugins may require reopening the conversation or restarting the
 desktop app before their entrypoints appear.
 
 Record a new CLI task with `python3 scripts/record.py -- exec --ephemeral "task"`.
-For existing recordings, add their directory in the viewer. Recording must be
+For existing recordings, open “···” to choose a recording or add its directory. Recording must be
 enabled before a task starts; ordinary session logs are not silently substituted.
 See [plugin documentation](plugins/rollout-viewer/README.md) for runtime and limits.
 
@@ -71,9 +73,9 @@ Use `launchctl unsetenv CODEX_ROLLOUT_TRACE_ROOT` and restart Codex to turn it o
 - Current DSH integration checks and backend timings are in
   `reports/dsh-installed-validation.json` and `reports/dsh-performance.json`.
   Browser evidence and remaining UI gates are in `reports/dsh-parity-validation.json`.
-- Native desktop mounting still needs verification after the app reloads the newly
-  installed plugin. The same installed UI is verified in a browser and MCP Apps
-  handshake harness; these checks do not substitute for that final host check.
+- Native 0.2.9 mounting and schema-2 reading have been observed. The 0.2.10
+  navigation still needs verification after the desktop reloads its old plugin
+  connection. Installed preview checks do not substitute for that host result.
 
 The optional local preview uses the installed MCP App frontend and backend,
 with a private loopback cookie. It is not a mock data implementation.

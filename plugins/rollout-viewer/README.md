@@ -4,16 +4,20 @@ A local Codex sidebar app for official `rollout-trace` recordings. The interface
 uses DSH's theme and trajectory styles, with a paged execution ledger, timing
 overview, reconstructed request context, and tool inspectors.
 
-Version 0.2.9 uses the upstream DSH runtime: turn/step grouping, request boundaries,
+Version 0.2.10 uses the upstream DSH runtime: turn/step grouping, request boundaries,
 three levels of folding, full-content search, interactive timing overview,
 virtualized rows, a resizable inspector, Markdown/code/JSON views, prompt/tool
 diffs, and the original image gallery. Complete Codex context and original request
 and response JSON are additional request tabs. Raw result values remain available
 beside rendered content.
 
-Version 0.2.9 follows the supplied running DSH Web reference with a compact title
-and trajectory navigation, conditional nested-call controls, and recording
-statistics in the directory menu. It clears ranges on timeline-mode changes,
+Version 0.2.10 follows the supplied running DSH Web reference with one 36px
+trajectory navigation row and a “···” menu. Recording selection, refresh, live
+updates, theme, directories, language, agent filtering and statistics are inside
+that menu. The toolbar and timeline follow directly; there is no extra task-title
+row. Escape, outside clicks and keyboard exit dismiss the menu; explicit close
+and recording selection restore focus to its button. Nested-call controls remain
+conditional. The viewer clears ranges on timeline-mode changes,
 retains shared duration/wrapping preferences, and keeps tool-to-assistant links
 available before loading the assistant body. The launcher accepts an optional
 `callId` and loads the required history before selecting it. Core DSH controls
@@ -30,7 +34,8 @@ existing history is never substituted automatically.
 In a Codex conversation's right panel, choose **+ → More tools… → Plugins and
 MCPs → Rollout Viewer**. The native entry only selects a recording whose root
 thread ID matches the caller. Otherwise it offers an explicit recording selector.
-It never substitutes the latest task.
+It never substitutes the latest task. Open “···” for recording selection and
+directory management.
 
 The model-facing `show_rollout_trace` tool can also open an explicit trace ID.
 It returns only launch metadata. Prompt and tool bodies are loaded through
@@ -54,7 +59,7 @@ An already-running desktop process does not inherit a new shell variable.
 Desktop recording requires launching that process with the environment variable;
 reopening the viewer alone does not enable recording. Existing history cannot be
 retroactively captured. The plugin also accepts a recording directory configured
-through its empty state or the server's `--register PATH` command.
+through “···” or the server's `--register PATH` command.
 
 ## Data and performance
 
@@ -97,9 +102,11 @@ dragging, copying, navigation and narrow/dark layouts. Version 0.2.9 additionall
 repairs the mode-selection, cold parent-link, shared preference and focus-style
 differences found by direct upstream comparison. Its installed UI has been
 clicked through, including early-call navigation across 301 history records and
-all eight host locale notifications. Native desktop mounting and new desktop
-recordings remain pending; the local preview and bridge harness are separate
-evidence. See the repository's `docs/DSH_PARITY.md`.
+all eight host locale notifications. The native panel and schema-2 desktop
+recordings have since been observed live. The new top-navigation checks and
+native update result are recorded separately in `reports/topbar-0210-validation.json`;
+the local preview and bridge harness remain separate evidence. See the
+repository's `docs/DSH_PARITY.md`.
 
 ## Attribution
 

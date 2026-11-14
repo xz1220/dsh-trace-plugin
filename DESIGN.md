@@ -1,5 +1,22 @@
 # Design system
 
+## Top navigation alignment, 2026-11-15
+
+Version 0.2.10 removes the sidebar's extra task-title row. The default chrome is
+one 36px row containing the active trajectory label and the original DSH ellipsis
+icon, followed directly by the unchanged trajectory toolbar and timeline.
+Recording selection, refresh, live updates, theme, directory management, language,
+agent filtering and statistics belong in the ellipsis popover. Task title and
+recording status are visible inside that popover rather than permanently above
+the trace. Codex continues to own the conversation surface.
+
+The nonmodal popover supports Escape, outside clicks, keyboard exit, explicit
+close and focus restoration. It stays within the viewport and scrolls when the
+side panel is short. Directory errors appear inside the open menu. Do not add a
+nonfunctional conversation tab to imitate the full DSH chat application.
+
+The 0.2.8 layout description below is historical and is superseded here.
+
 ## Running-web alignment, 2026-11-14
 
 Version 0.2.8 uses the user's real DSH Web screenshot as a visual reference. Keep

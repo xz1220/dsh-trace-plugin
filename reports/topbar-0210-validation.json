@@ -1,0 +1,185 @@
+{
+  "version": "0.2.10",
+  "date": "2026-11-15",
+  "scope": "Top navigation alignment to the user-supplied running DSH Web screenshot",
+  "layout": {
+    "navigationHeight": 36,
+    "removedTaskTitleRowHeight": 40,
+    "defaultTopControls": [
+      "Trajectory",
+      "More trajectory actions"
+    ],
+    "auxiliaryOperationsInMenu": [
+      "recording selection",
+      "refresh",
+      "live updates",
+      "theme",
+      "directory management",
+      "language",
+      "agent filtering",
+      "statistics"
+    ]
+  },
+  "automatedChecks": {
+    "python": 46,
+    "node": 10,
+    "passed": 56,
+    "build": true,
+    "upstreamFilesUnchanged": 99,
+    "documentedAdapters": 5,
+    "coreDshCssChanged": false
+  },
+  "actualBrowserClicks": {
+    "collapsedLayoutAndEscapeFocus": {
+      "headerHeight": 36,
+      "toolbarTop": 36,
+      "headerText": "轨迹",
+      "buttons": [
+        "更多轨迹操作"
+      ],
+      "oldTitleRow": false,
+      "recordingPickerVisible": false
+    },
+    "toggleCloseButtonInitialFocusAndOutsideClick": true,
+    "liveAndThemeActionsStayInMenu": true,
+    "refreshActions": [
+      "list_rollout_traces",
+      "get_rollout_overview",
+      "get_rollout_projection"
+    ],
+    "directoryFailureAndSuccessWithinIsolatedConfig": true,
+    "localeChangesAndKeyboardExit": true,
+    "recordingSwitchAndColdParentNavigation": {
+      "menuClosed": true,
+      "focusRestored": true,
+      "selectionAndScrollPreserved": true
+    },
+    "searchDurationAndTurnControls": true,
+    "agentFilterFromMenu": true,
+    "responsiveMenus": [
+      {
+        "viewport": 1224,
+        "header": 36,
+        "overflow": false,
+        "menu": {
+          "left": 8,
+          "right": 368,
+          "bottom": 416
+        }
+      },
+      {
+        "viewport": 900,
+        "header": 36,
+        "overflow": false,
+        "menu": {
+          "left": 8,
+          "right": 368,
+          "bottom": 416
+        }
+      },
+      {
+        "viewport": 745,
+        "header": 36,
+        "overflow": false,
+        "menu": {
+          "left": 8,
+          "right": 368,
+          "bottom": 416
+        }
+      },
+      {
+        "viewport": 520,
+        "header": 36,
+        "overflow": false,
+        "menu": {
+          "left": 8,
+          "right": 368,
+          "bottom": 416
+        }
+      },
+      {
+        "viewport": 360,
+        "header": 36,
+        "overflow": false,
+        "menu": {
+          "left": 8,
+          "right": 352,
+          "bottom": 416
+        }
+      }
+    ],
+    "shortViewportScrollableMenu": {
+      "bottom": 251.5,
+      "scrollable": true,
+      "overflow": false
+    },
+    "runtimeErrors": []
+  },
+  "installedPackageRpc": {
+    "version": "0.2.10",
+    "tools": 14,
+    "installedFilesMatchSource": true,
+    "mcpInitialization": true,
+    "nativeEntryMetadata": true,
+    "requests": 3,
+    "toolsInRecording": 2,
+    "expectedTextChecks": 0,
+    "promptCharacters": 81919,
+    "promptChunks": 2,
+    "verifiedToolNextRequestLinks": 2,
+    "appResourceBytes": 6210620,
+    "dshCells": 10,
+    "lazyHydrationChunks": 2,
+    "fullBodySearch": true,
+    "requestCumulativeUsage": true,
+    "newToolsAppOnly": true,
+    "nativeDesktopMountVerified": false,
+    "checkedInstalledFiles": [
+      "server/main.py",
+      "server/store.py",
+      "server/projection.py",
+      "server/trajectory-locales.json",
+      "assets/viewer.html",
+      ".mcp.json",
+      ".codex-plugin/plugin.json",
+      "README.md"
+    ],
+    "codeCellsInRecording": 2,
+    "fullContextSha256": "6f4c7f2bfb58f43a7e2f00f39acc2f6999b62f9d2980164ff3d2fc14154bd043",
+    "exactRootBindingRpc": true,
+    "callIdLaunchMetadataOnly": true,
+    "callIdLookup": true,
+    "recordingSchemaVersion": 1
+  },
+  "installedPackageBrowser": {
+    "version": "0.2.10",
+    "source": "installed plugin preview",
+    "recording": "real archived task",
+    "realToolOutput": true,
+    "coldParentNavigation": true,
+    "completeContextItemCount": 11,
+    "originalRequestTab": true,
+    "originalResponseTab": true,
+    "finalScreenshotSource": "installed package with labelled controlled recording"
+  },
+  "native": {
+    "mounted": true,
+    "runningBackendVersion": "0.2.9",
+    "newMoreActionsMenuVisible": false,
+    "oldTaskTitleVisible": true,
+    "toolbarTop": 76,
+    "currentRootRecordingDisplayed": true,
+    "schemaTwoRecordingsReadable": true,
+    "officialMcpReloadAcknowledged": true,
+    "topbar0210Verified": false,
+    "remainingAction": "After this turn is saved, fully reopen the desktop app, open Rollout Viewer, then verify the new menu in the native side panel."
+  },
+  "screenshots": {
+    "installedPreviewControlledData": "reports/screenshots/topbar-0210-reference.png",
+    "darkMenu360": "reports/screenshots/topbar-0210-menu-dark-360.png"
+  },
+  "limits": [
+    "The DSH conversation tab belongs to its full chat surface; this sidebar provides trajectory navigation next to the Codex conversation.",
+    "The new navigation is verified in the built and installed local preview, not in the still-cached native 0.2.9 page."
+  ]
+}
