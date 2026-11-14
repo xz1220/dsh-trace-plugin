@@ -1,27 +1,42 @@
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore} from 'react';
 import {TrajectoryTable} from '../vendor/dsh/packages/client/ui-trajectory/src/client/TrajectoryTable.tsx';
 import {TrajectoryTimeline} from '../vendor/dsh/packages/client/ui-trajectory/src/client/TrajectoryTimeline.tsx';
 import {TrajectoryToolbar} from '../vendor/dsh/packages/client/ui-trajectory/src/client/TrajectoryToolbar.tsx';
 import {trajectoryTimelineFocusIndexes} from '../vendor/dsh/packages/client/ui-trajectory/src/client/timeline.ts';
-import {t} from './locale.js';
+import {useTranslation} from './locale-context.jsx';
 import {renderImageSlot as renderSlot,loadImage} from './images.jsx';
 import {Failure, Skeleton, RequestContent, readComplete} from './content.jsx';
 import view from '../vendor/dsh/packages/client/ui-trajectory/src/client/views.module.css';
+import {durationPreference,wrappingPreference} from './preferences.js';
 
-export {t};
+export {t} from './locale.js';
 const toggle=(set,key)=>set(current=>{const next=new Set(current);next.has(key)?next.delete(key):next.add(key);return next;});
 const toggleAll=(set,ids,collapsed)=>set(current=>{const next=new Set(current);for(const id of ids)collapsed?next.delete(id):next.add(id);return next;});
 
-export default function Trajectory({data,call,earlier,copy,thread}) {
+export default function Trajectory({data,call,earlier,copy,thread,focusCallId,onFocusApplied}) {
+  const t=useTranslation();
+  const groupOf=cell=>cell.cellKey==='compaction'||cell.purpose==='compaction'?t('group.compaction',{seq:cell.seq}):cell.step>0?t('group.step',{step:cell.step}):cell.group;
+  const captionOf=cell=>{
+    if(cell.kind==='system'&&cell.cellKey==='prompt')return t.text(cell.text,cell.previousPromptDetail?'Instructions and tools updated':'Instructions and tool catalog');
+    if(cell.kind==='compacted')return t.text(cell.text,'Context compaction');
+    if(cell.kind==='message'&&cell.text==='（仅工具调用）')return `（${t('layout.toolCallOnly')}）`;
+    if(['user','context','message'].includes(cell.kind)&&/^(图片|文件) ×/.test(cell.text)){
+      const images=cell.sourceBlocks?.filter(block=>block.attachment).length??0,files=cell.sourceBlocks?.filter(block=>block.file).length??0;
+      return [images?t('layout.imageCount',{count:images}):'',files?t('layout.fileAttachments',{count:files}):''].filter(Boolean).join(' · ');
+    }
+    return cell.text;
+  };
   const traceId=data.trace.id;
   const [cells,setCells]=useState(new Map()),[requests,setRequests]=useState(new Map());
   const [loading,setLoading]=useState(true),[error,setError]=useState(''),[retry,setRetry]=useState(0);
   const [collapsedTurns,setCollapsedTurns]=useState(new Set()),[collapsedAssistants,setCollapsedAssistants]=useState(new Set()),[collapsedTools,setCollapsedTools]=useState(new Set());
-  const [duration,setDuration]=useState(true),[actualTime,setActualTime]=useState(false);
+  const duration=useSyncExternalStore(durationPreference.subscribe,durationPreference.getSnapshot);
+  const [actualTime,setActualTime]=useState(false);
   const [query,setQuery]=useState(''),[matches,setMatches]=useState(null),[searchBusy,setSearchBusy]=useState(false);
   const [range,setRange]=useState(null),[selectedIndex,setSelectedIndex]=useState(null);
+  useEffect(()=>{setRange(null);},[duration,actualTime]);
   const [selection,setSelection]=useState(null),[focus,setFocus]=useState(null);
-  const [wrapped,setWrapped]=useState(false);
+  const wrapped=useSyncExternalStore(wrappingPreference.subscribe,wrappingPreference.getSnapshot);
   const versions=useRef(new Map()),inflight=useRef(new Map()),requestInflight=useRef(new Set()),live=useRef(true);
   const templates=useRef(new Map()),hydrated=useRef(new Map()),activeRecord=useRef(null);
   const api=useCallback((name,args)=>call(name,{traceId,...args}),[traceId,call]);
@@ -52,7 +67,7 @@ export default function Trajectory({data,call,earlier,copy,thread}) {
   },[api,data.rows,retry]);
 
   const visibleCells=useMemo(()=>[...cells.values()].filter(cell=>thread==='all'||cell.threadId===thread)
-    .sort((a,b)=>a.seq-b.seq||a.slot-b.slot).map((cell,index)=>({...cell,index:index+1})),[cells,thread]);
+    .sort((a,b)=>a.seq-b.seq||a.slot-b.slot).map((cell,index)=>({...cell,index:index+1,group:groupOf(cell),text:captionOf(cell)})),[cells,thread,t]);
   const turns=useMemo(()=>{
     const sections=new Map();
     for(const cell of visibleCells){
@@ -65,7 +80,7 @@ export default function Trajectory({data,call,earlier,copy,thread}) {
     }
     return [...sections.values()].map(({turn,groups})=>({turn,groups}));
   },[visibleCells]);
-  const requestNumbers=useMemo(()=>{const visible=new Set(visibleCells.map(cell=>cell.rowId));return [...requests.values()].filter(request=>visible.has(request.rowId)).sort((a,b)=>a.seq-b.seq);},[requests,visibleCells]);
+  const requestNumbers=useMemo(()=>{const visible=new Set(visibleCells.map(cell=>cell.rowId));return [...requests.values()].filter(request=>visible.has(request.rowId)).sort((a,b)=>a.seq-b.seq).map(request=>({...request,group:groupOf(request)}));},[requests,visibleCells,t]);
 
   const hydrate=useCallback(async(cell,force=false)=>{
     if(!cell||(!cell.detailsPending&&!force))return;
@@ -124,12 +139,12 @@ export default function Trajectory({data,call,earlier,copy,thread}) {
     const timer=setTimeout(async()=>{
       try{
         const found=[];
-        for(let offset=0;offset<rowIds.length;offset+=200){const result=await api('search_rollout_cells',{query,rowIds:rowIds.slice(offset,offset+200)});if(!active)return;found.push(...result.matches);}
+        for(let offset=0;offset<rowIds.length;offset+=200){const result=await api('search_rollout_cells',{query,rowIds:rowIds.slice(offset,offset+200),locale:t.locale});if(!active)return;found.push(...result.matches);}
         if(active){setMatches(new Set(found));setError('');}
       }catch(e){if(active)setError(e.message);}finally{if(active)setSearchBusy(false);}
     },200);
     return()=>{active=false;clearTimeout(timer);};
-  },[api,query,rowKey,data.revision,retry]);
+  },[api,query,rowKey,data.revision,retry,t]);
   const searchIndexes=useMemo(()=>matches===null?null:new Set(visibleCells.filter(cell=>matches.has(cell.recordId)).map(cell=>cell.index)),[visibleCells,matches]);
   const mode=duration?(actualTime?'actual':'duration'):(actualTime?'time':'sequence');
   const timelineFocus=useMemo(()=>range===null?null:trajectoryTimelineFocusIndexes(turns,range,mode),[turns,range,mode]);
@@ -139,7 +154,7 @@ export default function Trajectory({data,call,earlier,copy,thread}) {
   const allTurns=turnIds.length>0&&turnIds.every(id=>collapsedTurns.has(id));
   const allAssistants=assistantIds.length>0&&assistantIds.every(id=>collapsedAssistants.has(id));
   const allTools=toolIds.length>0&&toolIds.every(id=>collapsedTools.has(id));
-  const wrapping=useMemo(()=>({getDefault:()=>wrapped,setDefault:setWrapped,label:'自动换行'}),[wrapped]);
+  const wrapping=useMemo(()=>({getDefault:wrappingPreference.getSnapshot,setDefault:wrappingPreference.set,label:t('record.wrapLines')}),[wrapped,t]);
   const watchToolResult=useCallback((seq,receive)=>{
     let active=true;
     const row=data.rows.find(value=>value.seq===seq);
@@ -158,16 +173,17 @@ export default function Trajectory({data,call,earlier,copy,thread}) {
   if(loading)return <Skeleton/>;
   return <>
     {error&&<Failure error={error} retry={()=>setRetry(value=>value+1)}/>}
-    <TrajectoryToolbar actualDuration={duration} onActualDurationChange={setDuration} actualTime={actualTime} onActualTimeChange={setActualTime}
+    <TrajectoryToolbar actualDuration={duration} onActualDurationChange={value=>{setRange(null);durationPreference.set(value);}} actualTime={actualTime} onActualTimeChange={value=>{setRange(null);setActualTime(value);}}
       allTurnsCollapsed={allTurns} onToggleAllTurns={()=>toggleAll(setCollapsedTurns,turnIds,allTurns)}
       allAssistantsCollapsed={allAssistants} onToggleAllAssistants={()=>toggleAll(setCollapsedAssistants,assistantIds,allAssistants)}
-      allSubCallsCollapsed={allTools} onToggleAllSubCalls={()=>toggleAll(setCollapsedTools,toolIds,allTools)} searchQuery={query} onSearchQueryChange={setQuery} t={t}/>
+      allSubCallsCollapsed={allTools} showSubCalls={toolIds.length>0} onToggleAllSubCalls={()=>toggleAll(setCollapsedTools,toolIds,allTools)} searchQuery={query} onSearchQueryChange={setQuery} t={t}/>
     <TrajectoryTimeline turns={turns} mode={mode} range={range} onRangeChange={setRange} hasEarlierRecords={data.hasEarlier}
       onLoadEarlier={earlier} selectedIndex={selectedIndex} searchMatchIndexes={searchIndexes} onRecordSelect={index=>{setRange(null);setSelection({index});}}
       onRecordFocus={index=>setFocus({index})} t={t}/>
-    {query&&<div className="app-search-status" role="status">{searchBusy?'正在搜索已加载记录的完整内容…':`${matches?.size||0} 条匹配 · 搜索已加载记录`}</div>}
+    {query&&<div className="app-search-status" role="status">{searchBusy?t.text('正在搜索已加载记录的完整内容…','Searching the full content of loaded records…'):t.text(`${matches?.size||0} 条匹配 · 搜索已加载记录`,`${matches?.size||0} matches in loaded records`)}</div>}
     <div className={`${view.ledger} app-ledger-region`}>
       <TrajectoryTable turns={turns} requestNumbers={requestNumbers} t={t} renderSlot={renderSlot} loadImage={loadImage} watchToolResult={watchToolResult}
+        inspectCallId={focusCallId} onInspectApplied={onFocusApplied}
         stringWrapping={wrapping} collapsedTurns={collapsedTurns} onToggleTurn={id=>toggle(setCollapsedTurns,id)}
         collapsedAssistants={collapsedAssistants} onToggleAssistant={id=>toggle(setCollapsedAssistants,id)}
         collapsedTools={collapsedTools} onToggleTool={id=>toggle(setCollapsedTools,id)}

@@ -4,12 +4,21 @@ A local Codex sidebar app for official `rollout-trace` recordings. The interface
 uses DSH's theme and trajectory styles, with a paged execution ledger, timing
 overview, reconstructed request context, and tool inspectors.
 
-Version 0.2.7 uses the upstream DSH runtime: turn/step grouping, request boundaries,
+Version 0.2.8 uses the upstream DSH runtime: turn/step grouping, request boundaries,
 three levels of folding, full-content search, interactive timing overview,
 virtualized rows, a resizable inspector, Markdown/code/JSON views, prompt/tool
 diffs, and the original image gallery. Complete Codex context and original request
 and response JSON are additional request tabs. Raw result values remain available
 beside rendered content.
+
+Version 0.2.8 follows the supplied running DSH Web reference with a compact title
+and trajectory navigation, conditional nested-call controls, and recording
+statistics in the directory menu. It clears ranges on timeline-mode changes,
+retains shared duration/wrapping preferences, and keeps tool-to-assistant links
+available before loading the assistant body. The launcher accepts an optional
+`callId` and loads the required history before selecting it. Core DSH controls
+follow the host locale in all eight upstream languages; Codex-specific panels
+use Chinese or English fallback.
 
 ## Open
 
@@ -78,11 +87,14 @@ The optional `--preview` server binds only to loopback and requires a random,
 HttpOnly, SameSite cookie. It uses the same frontend and data tools as the native
 app; `/harness` additionally exercises the MCP Apps postMessage handshake.
 
-Five browser review rounds cover the image gallery, tool/code/assistant images,
-file dragging, copying, navigation and narrow/dark layouts. Version 0.2.7 also
-fixes missing common Chinese labels and incomplete recording lists during cold
-startup. Native desktop mounting and new desktop recordings still need final
-verification; see the repository's `docs/DSH_PARITY.md`.
+Browser reviews cover the image gallery, tool/code/assistant images, actual file
+dragging, copying, navigation and narrow/dark layouts. Version 0.2.8 additionally
+repairs the mode-selection, cold parent-link, shared preference and focus-style
+differences found by direct upstream comparison. Its installed UI has been
+clicked through, including early-call navigation across 301 history records and
+all eight host locale notifications. Native desktop mounting and new desktop
+recordings remain pending; the local preview and bridge harness are separate
+evidence. See the repository's `docs/DSH_PARITY.md`.
 
 ## Attribution
 

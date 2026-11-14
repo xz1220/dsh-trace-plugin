@@ -1,4 +1,4 @@
-import React,{useState,useEffect,useRef,useCallback} from 'react';
+import React,{useState,useEffect,useRef,useCallback,useMemo} from 'react';
 import {createRoot} from 'react-dom/client';
 import '../vendor/dsh/packages/client/ui-theme/src/styles/base.css';
 import '../vendor/dsh/packages/client/ui-theme/src/styles/design-platform.css';
@@ -11,6 +11,8 @@ import {Failure,Skeleton} from './content.jsx';
 import Trajectory from './Trajectory.jsx';
 import {installIconSprite} from '../vendor/dsh/packages/client/ui-theme/src/client/icon-sprite.ts';
 import {disposeImageTransfers} from './images.jsx';
+import {LocaleContext} from './locale-context.jsx';
+import {translatorFor,normalizeLocale,supportedLocales} from './locale.js';
 
 const statusNames={running:'进行中',complete:'已结束',error:'失败',cancelled:'已取消'};
 const timeLabel=value=>typeof value==='number'?new Date(value).toLocaleString(undefined,{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'时间未知';
@@ -21,24 +23,42 @@ function App(){
   const [data,setData]=useState(null),[traces,setTraces]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState('');
   const [thread,setThread]=useState('all'),[dark,setDark]=useState(false),[live,setLive]=useState(true),[toast,setToast]=useState('');
   const [directory,setDirectory]=useState(''),[adding,setAdding]=useState(false),[rootPath,setRootPath]=useState('');
+  const [focusCallId,setFocusCallId]=useState(null);
+  const [locale,setLocale]=useState('zh');
+  const t=useMemo(()=>translatorFor(locale),[locale]);
+  const text=t.text;
   const call=useCallback((name,args={})=>host.current?host.current.call(name,args):Promise.reject(new Error('面板正在连接。')),[]);
   const notify=useCallback(text=>{setToast(text);clearTimeout(toastTimer.current);toastTimer.current=setTimeout(()=>setToast(''),2200);},[]);
-  const copy=useCallback(async text=>{try{await navigator.clipboard.writeText(text);notify('已复制完整内容');}catch{notify('复制失败，请选择文本复制');}},[notify]);
-  const loadTrace=useCallback(async id=>{
+  const copy=useCallback(async value=>{try{await navigator.clipboard.writeText(value);notify(text('已复制完整内容','Complete content copied'));}catch{notify(text('复制失败，请选择文本复制','Copy failed; select the text to copy'));}},[notify,text]);
+  const loadTrace=useCallback(async(id,focus=null)=>{
     if(!id)return;
     const ticket=++generation.current;setLoading(true);setError('');
-    try{const value=await call('get_rollout_overview',{traceId:id});if(ticket!==generation.current)return;setData(value);setThread('all');setLoading(false);}
+    try{
+      let value=await call('get_rollout_overview',{traceId:id});
+      if(focus){
+        const {row}=await call('get_rollout_record',{traceId:id,callId:focus});
+        focus=row.callId;
+        while(value.hasEarlier&&value.beforeSeq>row.seq){
+          if(ticket!==generation.current)return;
+          const page=await call('get_rollout_overview',{traceId:id,beforeSeq:value.beforeSeq,limit:200});
+          if(!page.rows.length||page.beforeSeq>=value.beforeSeq)throw new Error('历史分页没有前进，请重试。');
+          const rows=new Map([...page.rows,...value.rows].map(record=>[record.id,record]));
+          value={...value,rows:[...rows.values()].sort((a,b)=>a.seq-b.seq),beforeSeq:page.beforeSeq,hasEarlier:page.hasEarlier};
+        }
+      }
+      if(ticket!==generation.current)return;setData(value);setThread('all');setFocusCallId(focus);setLoading(false);
+    }
     catch(e){if(ticket===generation.current){setError(e.message);setLoading(false);}}
   },[call]);
   useEffect(()=>{
     let active=true;
     function apply(value){
       if(!active)return;received.current=true;
-      if(value.view==='open'){loadTrace(value.trace.id);return;}
-      if(value.rows){generation.current++;setData(value);setThread('all');setLoading(false);setError('');return;}
-      if(value.view==='select'){setTraces(value.traces||[]);setRootPath(value.defaultRoot||'');setData(null);setLoading(false);}
+      if(value.view==='open'){loadTrace(value.trace.id,value.focusCallId||null);return;}
+      if(value.rows){generation.current++;setData(value);setThread('all');setFocusCallId(null);setLoading(false);setError('');return;}
+      if(value.view==='select'){generation.current++;setTraces(value.traces||[]);setRootPath(value.defaultRoot||'');setData(null);setFocusCallId(null);setThread('all');setLoading(false);setError('');}
     }
-    const bridge=createHost({onResult:result=>apply(result.structuredContent||result),onContext:context=>{if(active&&context.theme)setDark(context.theme==='dark');},onError:e=>{if(active){setError(e.message);setLoading(false);}}});
+    const bridge=createHost({onResult:result=>apply(result.structuredContent||result),onContext:context=>{if(!active)return;if(context.theme)setDark(context.theme==='dark');if(context.locale)setLocale(normalizeLocale(context.locale));},onError:e=>{if(active){setError(e.message);setLoading(false);}}});
     host.current=bridge;
     bridge.start().then(async()=>{
       if(bridge.preview){const result=await bridge.call('show_rollout_trace',bridge.preview.traceId?{traceId:bridge.preview.traceId}:{});apply(result);}
@@ -48,6 +68,7 @@ function App(){
     return()=>{active=false;generation.current++;bridge.dispose();clearTimeout(toastTimer.current);};
   },[loadTrace]);
   useEffect(()=>{document.body.toggleAttribute('data-ds-dark-theme',dark);document.documentElement.style.colorScheme=dark?'dark':'light';},[dark]);
+  useEffect(()=>{document.documentElement.lang=locale;},[locale]);
   useEffect(()=>{const notice=event=>notify(event.detail);window.addEventListener('rollout-viewer:notice',notice);return()=>window.removeEventListener('rollout-viewer:notice',notice);},[notify]);
   useEffect(()=>{const cleanup=[];installIconSprite({effect:setup=>cleanup.push(setup()),on:()=>{}},undefined);return()=>cleanup.forEach(dispose=>dispose?.());},[]);
   useEffect(()=>()=>disposeImageTransfers(),[]);
@@ -82,30 +103,32 @@ function App(){
   async function refresh(){try{const list=await call('list_rollout_traces',{refresh:true});setTraces(list.traces);if(data)await loadTrace(data.trace.id);else setError('');}catch(e){setError(e.message);}}
   async function register(){
     if(!directory.trim())return;setAdding(true);setError('');
-    try{await call('add_rollout_directory',{path:directory.trim()});const list=await call('list_rollout_traces',{refresh:true});setTraces(list.traces);setDirectory('');notify('录制目录已添加');}
+    try{await call('add_rollout_directory',{path:directory.trim()});const list=await call('list_rollout_traces',{refresh:true});setTraces(list.traces);setDirectory('');notify(text('录制目录已添加','Recording directory added'));}
     catch(e){setError(e.message);}finally{setAdding(false);}
   }
+  const stats=data?`${data.rows.length} / ${data.totalRows} ${text('条执行记录','records')} · ${data.requestCount} ${text('次模型请求','requests')} · ${data.toolCount} ${text('次工具执行','tools')}${data.codeCellCount?` · ${data.codeCellCount} ${text('个代码调用','code calls')}`:''}`:'';
+  const languages={zh:'中文',en:'English',ja:'日本語',es:'Español',fr:'Français',de:'Deutsch',ru:'Русский',pt:'Português'};
   const directoryForm=<form className="app-directory-form" onSubmit={e=>{e.preventDefault();register();}}>
-    <label htmlFor="recording-directory">录制目录</label><input id="recording-directory" value={directory} onChange={e=>setDirectory(e.target.value)} placeholder="包含 manifest.json 的目录或其父目录"/>
-    <button type="submit" className="app-button" disabled={adding||!directory.trim()}>{adding?'正在添加…':'添加目录'}</button>
+    <label htmlFor="recording-directory">{text('录制目录','Recording directory')}</label><input id="recording-directory" value={directory} onChange={e=>setDirectory(e.target.value)} placeholder={text('包含 manifest.json 的目录或其父目录','Directory containing manifest.json, or its parent')}/>
+    <button type="submit" className="app-button" disabled={adding||!directory.trim()}>{adding?text('正在添加…','Adding…'):text('添加目录','Add directory')}</button>
+    <label htmlFor="interface-locale">{text('界面语言','Interface language')}</label><select id="interface-locale" value={locale} onChange={e=>setLocale(e.target.value)}>{supportedLocales.map(value=><option key={value} value={value}>{languages[value]}</option>)}</select>
+    {data&&<output className="app-recording-stats" aria-label={text('录制统计','Recording statistics')}>{stats}</output>}
   </form>;
-  return <main className={`${view.root} app-frame`} aria-label="Rollout Viewer">
-    <header className="app-header"><h1>Rollout Viewer</h1><span className="app-status" data-status={data?.status}>{data?statusNames[data.status]||data.status:'本地录制'}</span>
-      <button type="button" className="app-button app-theme" onClick={()=>setDark(!dark)} aria-label={dark?'切换浅色':'切换深色'}>{dark?'浅色':'深色'}</button></header>
-    <div className="app-source-bar"><select aria-label="选择录制任务" value={data?.trace.id||''} onChange={e=>loadTrace(e.target.value)}><option value="" disabled>选择已录制任务…</option>
+  return <LocaleContext.Provider value={t}><main className={`${view.root} app-frame`} aria-label="Rollout Viewer">
+    <header className="app-header"><h1 title={data?.trace.label}>{data?.trace.label||'Rollout Viewer'}</h1><span className="app-status" title={stats} data-status={data?.status}>{data?text(statusNames[data.status]||data.status,{running:'Running',complete:'Complete',error:'Failed',cancelled:'Cancelled'}[data.status]||data.status):text('本地录制','Local recordings')}</span>
+      {data&&<button type="button" className="app-button app-live" aria-label={text('跟随录制','Follow recording')} aria-pressed={live} onClick={()=>setLive(!live)} title={text('跟随正在录制的任务','Follow a running recording')}>{text('实时','Live')}</button>}
+      <button type="button" className="app-button app-theme" onClick={()=>setDark(!dark)} aria-label={dark?text('切换浅色','Use light theme'):text('切换深色','Use dark theme')}>{dark?text('浅色','Light'):text('深色','Dark')}</button></header>
+    <div className="app-source-bar"><span className="app-view-name" aria-current="page">{t('view.trajectory')}</span><select aria-label={text('选择录制任务','Select recording')} value={data?.trace.id||''} onChange={e=>loadTrace(e.target.value)}><option value="" disabled>{text('选择已录制任务…','Select a recording…')}</option>
       {traces.map(trace=><option key={trace.id} value={trace.id}>{timeLabel(trace.startedAt)} · {trace.label}</option>)}</select>
-      <button type="button" className="app-button" onClick={refresh}>刷新</button><details className="app-source-settings"><summary aria-label="录制设置">目录</summary>{directoryForm}</details></div>
+      {data?.threads?.length>1&&<select className="app-agent-select" aria-label={text('筛选代理','Filter agents')} value={thread} onChange={e=>setThread(e.target.value)}><option value="all">{text('全部代理','All agents')}</option>{data.threads.map(agent=><option key={agent.id} value={agent.id}>{agent.label}</option>)}</select>}
+      <button type="button" className="app-button" onClick={refresh}>{text('刷新','Refresh')}</button><details className="app-source-settings"><summary aria-label={text('录制设置','Recording settings')}>{text('目录','Directory')}</summary>{directoryForm}</details></div>
     {error&&<Failure error={error} retry={()=>data?loadTrace(data.trace.id):location.reload()}/>}
-    {loading?<Skeleton/>:!data?<section className="app-empty"><h2>选择一份录制开始查看</h2><p>在上方选择已录制任务，或通过「目录」添加录制位置。</p>
-      <p>官方 rollout-trace 需要在 Codex 启动前开启，现有聊天无法补录。</p><button type="button" className="app-button" onClick={()=>copy(`CODEX_ROLLOUT_TRACE_ROOT=${quoteShell(rootPath)} codex`)}>复制 CLI 录制命令</button>
-      <span>{traces.length?`找到 ${traces.length} 份录制`:'尚未找到录制'} · 数据保存在本机</span></section>:<>
-      <div className="app-session-bar"><span title={data.trace.threadId}>{data.trace.label}</span>
-        {data.threads?.length>1&&<select aria-label="筛选代理" value={thread} onChange={e=>setThread(e.target.value)}><option value="all">全部代理</option>{data.threads.map(agent=><option key={agent.id} value={agent.id}>{agent.label}</option>)}</select>}
-        <button type="button" className="app-button" aria-pressed={live} onClick={()=>setLive(!live)} title="跟随正在录制的任务">{live?'实时已开':'实时已关'}</button></div>
-      <Trajectory key={`${data.trace.id}:${data.revision.split(':')[0]}`} {...{data,call,earlier,copy,thread}}/>
-      <footer className="app-footer"><span>{data.rows.length} / {data.totalRows} 条执行记录</span><span>{data.requestCount} 次模型请求 · {data.toolCount} 次工具执行{data.codeCellCount>0&&` · ${data.codeCellCount} 个代码调用`}</span></footer>
+    {loading?<Skeleton/>:!data?<section className="app-empty"><h2>{text('选择一份录制开始查看','Choose a recording')}</h2><p>{text('在上方选择已录制任务，或通过「目录」添加录制位置。','Select a recording above, or add a recording directory.')}</p>
+      <p>{text('官方 rollout-trace 需要在 Codex 启动前开启，现有聊天无法补录。','Enable official rollout-trace before starting Codex. Existing chats cannot be recorded retroactively.')}</p><button type="button" className="app-button" onClick={()=>copy(`CODEX_ROLLOUT_TRACE_ROOT=${quoteShell(rootPath)} codex`)}>{text('复制 CLI 录制命令','Copy CLI recording command')}</button>
+      <span>{traces.length?text(`找到 ${traces.length} 份录制`,`${traces.length} recordings found`):text('尚未找到录制','No recordings found')} · {text('数据保存在本机','Stored locally')}</span></section>:<>
+      <Trajectory key={`${data.trace.id}:${data.revision.split(':')[0]}`} {...{data,call,earlier,copy,thread,focusCallId}} onFocusApplied={()=>setFocusCallId(null)}/>
     </>}
     <div className={`app-toast ${toast?'visible':''}`} role="status">{toast}</div>
-  </main>;
+  </main></LocaleContext.Provider>;
 }
 createRoot(document.getElementById('root')).render(<App/>);

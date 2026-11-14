@@ -2,6 +2,7 @@
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from test_store import Fixture
@@ -50,6 +51,36 @@ class ProjectionTests(unittest.TestCase):
         prompt=json.loads(''.join(chunks))
         self.assertIn(expected,prompt['system'])
         self.assertEqual(projector.index.metrics['payloadReads'],reads)
+
+    def test_tool_parent_references_are_available_without_assistant_hydration(self):
+        self.fixture.conversation()
+        page=self.project().page()
+        assistant=next(cell for cell in page['cells'] if cell['recordId']=='request:first:assistant')
+        calls=[block for block in assistant['sourceBlocks'] if block['type']=='tool-call']
+        self.assertEqual([block['callId'] for block in calls],['call-1'])
+        self.assertTrue(assistant['detailsPending'])
+        self.assertTrue(all(block['content']=='' for block in calls))
+        self.assertNotIn('read()',json.dumps(assistant))
+
+    def test_call_lookup_uses_recorded_identity_without_reading_bodies(self):
+        self.fixture.conversation()
+        index=self.store.index('trace-test');index.overview();reads=index.metrics['payloadReads']
+        self.assertEqual(self.store.locate_call('trace-test','call-1')['id'],'cell:thread-root:1')
+        self.assertEqual(self.store.locate_call('trace-test','cell:thread-root:1')['callId'],'call-1')
+        self.assertEqual(self.store.locate_call('trace-test','tool-one')['id'],'tool:tool-one')
+        self.assertEqual(index.metrics['payloadReads'],reads)
+        with self.assertRaises(TraceError):self.store.locate_call('trace-test','missing-call')
+
+    def test_call_launcher_returns_only_metadata_and_locator_rejects_ambiguous_arguments(self):
+        import main
+        self.fixture.conversation()
+        with patch.object(main,'STORE',self.store):
+            launched=main.call('show_rollout_trace',{'traceId':'trace-test','callId':'call-1'})
+            self.assertEqual(set(launched),{'view','trace','focusCallId'})
+            self.assertEqual(launched['focusCallId'],'call-1')
+            self.assertEqual(main.call('get_rollout_record',{'traceId':'trace-test','callId':'call-1'})['row']['id'],'cell:thread-root:1')
+            with self.assertRaises(TraceError):main.call('get_rollout_record',{'traceId':'trace-test'})
+            with self.assertRaises(TraceError):main.call('get_rollout_record',{'traceId':'trace-test','rowId':'tool:tool-one','callId':'call-1'})
 
     def test_token_buckets_and_cumulative_usage_do_not_double_count_cache(self):
         self.fixture.conversation()
@@ -128,6 +159,13 @@ class ProjectionTests(unittest.TestCase):
         self.assertNotIn('UNIQUE_DEEP_BODY',json.dumps(page))
         found=projector.search('unique_deep_body',page['rowIds'])
         self.assertIn('request:first:prompt',found)
+
+    def test_search_includes_the_displayed_locale_group_labels(self):
+        self.fixture.conversation();projector=self.project();page=projector.page()
+        expected={cell['recordId'] for cell in page['cells'] if not cell.get('requestOnly')}
+        self.assertEqual(projector.search('step',page['rowIds']),[])
+        self.assertEqual(set(projector.search('step',page['rowIds'],'en')),expected)
+        self.assertEqual(set(projector.search('ステップ',page['rowIds'],'ja')),expected)
 
     def test_search_excludes_hidden_row_flags_but_keeps_actual_boolean_values(self):
         self.fixture.conversation();projector=self.project();page=projector.page()

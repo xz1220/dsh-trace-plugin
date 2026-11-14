@@ -1,11 +1,10 @@
 import React from 'react';
 import {ImageGallery} from '../vendor/dsh/packages/client/ui-attachment/src/MessageImage.tsx';
 import {FileTransfers} from '../vendor/dsh/packages/client/ui-file-drag/src/client/transfers.ts';
+import {useTranslation} from './locale-context.jsx';
 
 // Labels match the pinned conversation image dictionary. Only the byte loader
 // and browser drag transport differ from DSH's Gateway-backed attachment store.
-const labels={image:'图片',open:'查看原图',openNamed:label=>`${label}，点击查看原图`,
-  loading:'图片加载中…',loadFailed:'图片加载失败，点击重试',lightbox:{dialog:'原图预览',close:'关闭原图预览'}};
 const cache=new Map();let cachedBytes=0;
 export const loadImage=attachment=>{
   const id=attachment.attachmentId,existing=cache.get(id);
@@ -45,4 +44,10 @@ const fileDrag={
 };
 export function disposeImageTransfers(){transfers?.dispose();transfers=undefined;}
 const getTriggerProps=()=>({});
-export function renderImageSlot(_,props){return <ImageGallery {...props} load={loadImage} labels={labels} fileDrag={fileDrag} getTriggerProps={getTriggerProps}/>;}
+function RecordedGallery(props){
+  const t=useTranslation(),text=t.text;
+  const labels={image:text('图片','Image'),open:text('查看原图','View original image'),openNamed:label=>text(`${label}，点击查看原图`,`${label}, view original image`),
+    loading:text('图片加载中…','Loading image…'),loadFailed:text('图片加载失败，点击重试','Image failed to load; retry'),lightbox:{dialog:text('原图预览','Original image preview'),close:text('关闭原图预览','Close original image preview')}};
+  return <ImageGallery {...props} load={loadImage} labels={labels} fileDrag={fileDrag} getTriggerProps={getTriggerProps}/>;
+}
+export function renderImageSlot(_,props){return <RecordedGallery {...props}/>;}

@@ -2,6 +2,7 @@ import {build} from 'esbuild';
 import {readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import './verify-dsh.mjs';
+import './sync-trajectory-locales.mjs';
 const root=path.resolve('vendor/dsh');
 const result=await build({entryPoints:['src/viewer.jsx'],bundle:true,write:false,minify:true,format:'iife',jsx:'automatic',outfile:'plugins/rollout-viewer/assets/viewer.js',
  alias:{'@deepseek-ai/dsh-client-ui-primitives':path.join(root,'primitives.ts'),

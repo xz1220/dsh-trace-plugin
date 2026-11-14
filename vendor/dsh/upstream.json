@@ -3,6 +3,34 @@
   "commit": "e8f7b93a344964de3dca1ace9e72b6e4d6de87cb",
   "files": [
     {
+      "path": "packages/client/locale/src/locales/de.ts",
+      "sha256": "be0c48b4330d726b1ba3670bfc93ee41ae44e1248c879e534ad6ea19856838f1"
+    },
+    {
+      "path": "packages/client/locale/src/locales/en.ts",
+      "sha256": "8a8c556971f2cf336cd1efe36c3fae13971bc0e328fb52b04d6c3ae255dde2e8"
+    },
+    {
+      "path": "packages/client/locale/src/locales/es.ts",
+      "sha256": "9b400ccb326f53e954fe957064db91b8e9b171418277cc89a83f833fce84c3ed"
+    },
+    {
+      "path": "packages/client/locale/src/locales/fr.ts",
+      "sha256": "ca92cc28bbfaafd5c3d7b9785c139406476469d52907c8d16f2658730a56c038"
+    },
+    {
+      "path": "packages/client/locale/src/locales/ja.ts",
+      "sha256": "af75b140054ea05279059acc6c765b02d68895334a73cb506c24c8f902b6db90"
+    },
+    {
+      "path": "packages/client/locale/src/locales/pt.ts",
+      "sha256": "649e526f1f8fde35e6facbae6a6f43bf989bc83595a6058675fa90d35ed29993"
+    },
+    {
+      "path": "packages/client/locale/src/locales/ru.ts",
+      "sha256": "8e73a1f680eba0b2db99257401d12e3d137f9f20c09ea0984a3f61e11ce8a8af"
+    },
+    {
       "path": "packages/client/locale/src/locales/zh.ts",
       "sha256": "df60768badc3c483478f5a57e48aee8219bd48f51764876a1d722432140d0e26"
     },

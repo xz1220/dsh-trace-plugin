@@ -10,6 +10,10 @@ used by this application. External dependencies are pinned in the root lockfile.
 
 The following local additions are deliberate and listed in `patches.json`:
 
+- `TrajectoryToolbar.tsx`: the host may omit the nested-call control when the
+  current recording contains no nested calls, matching the supplied running-web
+  reference while retaining nested folding where it is relevant.
+
 - `TrajectoryTable.tsx`: callbacks for selecting requests, a loading/error slot
   for lazy local payloads, and three Codex evidence tabs (complete context, raw
   request, raw response). Skip image dimensions absent from the recording and

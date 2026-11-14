@@ -15,6 +15,10 @@
     {
       "path": "packages/client/ui-attachment/src/MessageImage.tsx",
       "sha256": "9d73f01aa46e365064d84bf9e8cfe84b34fb18a5037262368d4e25ed92e828af"
+    },
+    {
+      "path": "packages/client/ui-trajectory/src/client/TrajectoryToolbar.tsx",
+      "sha256": "8ea584fd6e01c96b725e438253adc3c56e44586b9f4d0660736afd492bd98e82"
     }
   ]
 }

@@ -24,6 +24,8 @@ export interface TrajectoryToolbarProps {
   onToggleAllAssistants: () => void
   /** Whether every tool's nested calls are currently folded. */
   allSubCallsCollapsed: boolean
+  /** Local recording adapter: omit this control when no nested calls exist. */
+  showSubCalls?: boolean
   /** Fold or expand nested calls under every tool. */
   onToggleAllSubCalls: () => void
   /** Current live ledger search query. */
@@ -49,6 +51,7 @@ export function TrajectoryToolbar({
   allAssistantsCollapsed,
   onToggleAllAssistants,
   allSubCallsCollapsed,
+  showSubCalls = true,
   onToggleAllSubCalls,
   searchQuery,
   onSearchQueryChange,
@@ -116,7 +119,7 @@ export function TrajectoryToolbar({
             </span>
             {t('toolbar.calls')}
           </button>
-          <button
+          {showSubCalls && <button
             type="button"
             className={css.action}
             aria-label={allSubCallsCollapsed ? t('toolbar.expandSubCalls') : t('toolbar.collapseSubCalls')}
@@ -128,7 +131,7 @@ export function TrajectoryToolbar({
               {allSubCallsCollapsed ? '⊞' : '⊟'}
             </span>
             {t('toolbar.subCalls')}
-          </button>
+          </button>}
         </div>
         <div className={css.search}>
           <IconSearchOutlineRegular size={11} className={css.searchIcon} />

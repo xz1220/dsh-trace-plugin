@@ -16,10 +16,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
-from store import Store, TraceError
+from store import Store, TraceError, identifier
 
 PLUGIN = Path(__file__).resolve().parents[1]
-VERSION = '0.2.7'
+VERSION = '0.2.8'
 URI = 'ui://rollout-viewer/viewer.html'
 STORE = Store()
 
@@ -46,17 +46,17 @@ ROW = {**TRACE, 'rowId': STRING}
 CELL = {**ROW, 'cellKey': STRING}
 TOOLS = [
     definition('list_rollout_traces', 'List official rollout recordings', {'refresh': {'type': 'boolean'}}),
-    definition('show_rollout_trace', 'Show an official rollout trace', {**TRACE, 'threadId': STRING}, ui=True),
+    definition('show_rollout_trace', 'Show an official rollout trace', {**TRACE, 'threadId': STRING, 'callId': STRING}, ui=True),
     definition('open_rollout_viewer', 'Rollout Viewer', app=True, ui=True, entry=True),
     definition('get_rollout_overview', 'Read paged execution records', {**TRACE, 'beforeSeq': {'type': 'integer'}, 'limit': {'type': 'integer', 'minimum': 1, 'maximum': 500}}, ['traceId'], app=True),
     definition('get_rollout_delta', 'Read new execution events', {**TRACE, 'revision': STRING}, ['traceId', 'revision'], app=True),
     definition('get_rollout_detail', 'Inspect the selected request or tool', ROW, ['traceId', 'rowId'], app=True),
-    definition('get_rollout_record', 'Locate one execution record', ROW, ['traceId', 'rowId'], app=True),
+    definition('get_rollout_record', 'Locate one execution record', {**ROW,'callId':STRING}, ['traceId'], app=True),
     definition('get_rollout_projection', 'Read DSH trajectory records', {**TRACE, 'rowIds':{'type':'array','items':STRING,'maxItems':500}, 'beforeSeq': {'type':'integer'}, 'afterSeq': {'type':'integer'}, 'limit': {'type':'integer','minimum':1,'maximum':500}}, ['traceId'], app=True),
     definition('get_rollout_cell_detail', 'Inspect a DSH trajectory record', CELL, ['traceId','rowId','cellKey'], app=True),
     definition('read_rollout_cell_text', 'Read DSH record content in chunks', {**CELL, 'field':STRING, 'offset':{'type':'integer','minimum':0},'version':{'type':'integer','minimum':0}}, ['traceId','rowId','cellKey','field'], app=True),
     definition('get_rollout_request_info', 'Read complete request statistics', ROW, ['traceId','rowId'], app=True),
-    definition('search_rollout_cells', 'Search loaded trajectory bodies', {**TRACE,'query':STRING,'rowIds':{'type':'array','items':STRING,'maxItems':1000}}, ['traceId','query','rowIds'], app=True),
+    definition('search_rollout_cells', 'Search loaded trajectory bodies', {**TRACE,'query':STRING,'rowIds':{'type':'array','items':STRING,'maxItems':1000},'locale':{'type':'string','enum':['zh','en','ja','es','fr','de','ru','pt']}}, ['traceId','query','rowIds'], app=True),
     definition('read_rollout_text', 'Read complete recorded content in chunks', {**ROW, 'section': {'type': 'string', 'enum': ['message','message_json','full_context','raw_request','response','tools','code','arguments','result','raw_result','runtime']}, 'itemIndex': {'type': 'integer'}, 'offset': {'type': 'integer', 'minimum': 0}}, ['traceId','rowId','section'], app=True),
     definition('add_rollout_directory', 'Add a local recording directory', {'path': STRING, 'label': STRING}, ['path'], app=True, write=True),
 ]
@@ -95,7 +95,12 @@ def call(name, args, metadata=None):
     if name == 'show_rollout_trace':
         result = STORE.open(args.get('traceId'), args.get('threadId'))
         # Public model calls only launch the UI; detailed metadata stays in app-only calls.
-        return {'view': 'open', 'trace': result['trace']} if result.get('view') == 'trace' else result
+        if result.get('view')!='trace':
+            return result
+        launch={'view':'open','trace':result['trace']}
+        if args.get('callId') is not None:
+            launch['focusCallId']=identifier(args['callId'])
+        return launch
     if name == 'get_rollout_overview':
         return STORE.index(args['traceId']).overview(args.get('limit', 200), args.get('beforeSeq'))
     if name == 'get_rollout_delta':
@@ -103,6 +108,10 @@ def call(name, args, metadata=None):
     if name == 'get_rollout_detail':
         return STORE.details(args['traceId'], args['rowId'])
     if name == 'get_rollout_record':
+        if ('rowId' in args)==('callId' in args):
+            raise TraceError('请选择记录标识或调用标识之一。')
+        if 'callId' in args:
+            return {'row':STORE.locate_call(args['traceId'],args['callId'])}
         index = STORE.index(args['traceId'])
         return {'row': index.public_row(index.get_row(args['rowId']))}
     if name == 'get_rollout_projection':
@@ -121,7 +130,7 @@ def call(name, args, metadata=None):
     if name == 'search_rollout_cells':
         projector = STORE.projection(args['traceId'])
         with projector.index.lock:
-            return {'matches':projector.search(args['query'],args['rowIds'])}
+            return {'matches':projector.search(args['query'],args['rowIds'],args.get('locale','zh'))}
     if name == 'read_rollout_text':
         return STORE.text(args['traceId'], args['rowId'], args['section'], args.get('itemIndex'), args.get('offset', 0))
     if name == 'add_rollout_directory':

@@ -1,0 +1,34 @@
+{
+  "zh": {
+    "step": "第 {step} 步",
+    "compaction": "压缩 {seq}"
+  },
+  "en": {
+    "step": "Step {step}",
+    "compaction": "Compaction {seq}"
+  },
+  "ja": {
+    "step": "ステップ {step}",
+    "compaction": "圧縮 {seq}"
+  },
+  "es": {
+    "step": "Paso {step}",
+    "compaction": "Compactación {seq}"
+  },
+  "fr": {
+    "step": "Étape {step}",
+    "compaction": "Compactage {seq}"
+  },
+  "de": {
+    "step": "Schritt {step}",
+    "compaction": "Verdichtung {seq}"
+  },
+  "ru": {
+    "step": "Шаг {step}",
+    "compaction": "Уплотнение {seq}"
+  },
+  "pt": {
+    "step": "Etapa {step}",
+    "compaction": "Compactação {seq}"
+  }
+}

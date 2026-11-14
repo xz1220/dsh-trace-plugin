@@ -6,8 +6,11 @@ import base64
 import json
 from collections import OrderedDict
 from itertools import islice
+from pathlib import Path
 
 from store import TraceError, item_text, preview, unpack
+
+GROUP_LABELS=json.loads(Path(__file__).with_name('trajectory-locales.json').read_text(encoding='utf-8'))
 
 
 def json_text(value):
@@ -318,6 +321,10 @@ class Projection:
             returned_text = '\n\n'.join(message_text(item) for item in messages)
             publicly_returned = '\n\n'.join(public_reasoning(item) for item in reasoning)
             attachments=[block for item in messages for block in source_blocks(item,row['id'],'output',metadata_only=True) if 'attachment' in block or 'file' in block]
+            # Parent navigation must work before this assistant's body is hydrated.
+            calls=[{'type':'tool-call','content':'','callId':item['call_id'],'toolName':item.get('name')}
+                   for item in outputs if isinstance(item,dict)
+                   and item.get('type') in ('function_call','custom_tool_call') and isinstance(item.get('call_id'),str)]
             image_count=sum('attachment' in block for block in attachments)
             file_count=sum('file' in block for block in attachments)
             caption=' · '.join(part for part in [f'图片 ×{image_count}' if image_count else '',f'文件 ×{file_count}' if file_count else ''] if part)
@@ -326,7 +333,7 @@ class Projection:
             cells.append({**base, 'cellKey': 'assistant', 'kind': 'message', 'text': caption or ('（仅工具调用）' if tool_only else ''),
                           **({'requestOnly':True} if not outputs else {}),
                           **({'previewMarkdown':(returned_text or publicly_returned)[:2048]} if returned_text or publicly_returned else {}),
-                          **({'sourceBlocks':attachments} if attachments else {}),
+                          **({'sourceBlocks':[*attachments,*calls]} if attachments or calls else {}),
                           'outputDetail': ' ' if messages else '', 'thinkingDetail': ' ' if publicly_returned else '',
                           'assistantMetrics': {'timingRecorded': True, 'stepStartTime': row['start'], 'firstTokenTime': None,
                                                'completedTime': row.get('end'), 'usageProvided': bool(facts), 'outputTokens': facts.get('output')},
@@ -464,8 +471,9 @@ class Projection:
                 data['programLanguage'] = 'javascript'
         return data
 
-    def search(self, query, rows):
+    def search(self, query, rows, locale='zh'):
         terms = query.casefold().split()
+        labels=GROUP_LABELS.get(locale,GROUP_LABELS['en'])
         matches = []
         for row_id in rows:
             row = self.index.get_row(row_id)
@@ -474,6 +482,10 @@ class Projection:
                     continue
                 value = self.detail(row_id, cell['cellKey'])
                 sources=[f'turn {value["turn"]}' if value['turn'] is not None else 'between turns',value['group'],value['kind']]
+                if value.get('cellKey')=='compaction':
+                    sources.append(labels['compaction'].format(seq=value['seq']))
+                elif isinstance(value.get('step'),int) and value['step']>0:
+                    sources.append(labels['step'].format(step=value['step']))
                 if value['kind']=='message':sources.append('assistant')
                 for key in ('text','previewMarkdown','inputDetail','outputDetail','thinkingDetail','schemaDetail','result','resultPreviewMarkdown','callId','toolName'):
                     if isinstance(value.get(key),str):sources.append(value[key])

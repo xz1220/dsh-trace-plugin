@@ -61,7 +61,7 @@ for (const file of ['base.css','design-platform.css','focus.css','gradient-shado
 }
 for (const file of ['locales.ts', 'views.module.css']) files.push(path.join(trajectory,file));
 files.push(path.join(upstream,'packages/client/ui-theme/src/client/icon-sprite.ts'));
-files.push(path.join(upstream,'packages/client/locale/src/locales/zh.ts'));
+for (const language of ['zh','en','ja','es','fr','de','ru','pt']) files.push(path.join(upstream,`packages/client/locale/src/locales/${language}.ts`));
 const manifest = {repository:'deepseek-ai/deepseek-harness', commit, files:[]};
 for (const source of [...new Set(files)].sort()) {
   const relative = path.relative(upstream, source);

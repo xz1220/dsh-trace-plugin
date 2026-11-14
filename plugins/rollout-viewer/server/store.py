@@ -574,6 +574,18 @@ class Store:
                 index.projection = Projection(index)
             return index.projection
 
+    def locate_call(self, trace_id, call_id):
+        identifier(call_id)
+        index=self.index(trace_id)
+        index.refresh()
+        with index.lock:
+            matches=[row for row in index.rows.values() if row.get('type') in ('tool','code')
+                     and (row.get('_modelCallId')==call_id or row['id']==call_id or row['id']=='tool:'+call_id)]
+            if len(matches)!=1:
+                raise TraceError('没有找到唯一对应的工具调用。请检查调用标识。')
+            row=matches[0]
+            return {**index.public_row(row),'callId':row.get('_modelCallId') or row['id']}
+
     def cell_detail(self, trace_id, row_id, cell_key):
         projector = self.projection(trace_id)
         with projector.index.lock:
