@@ -11,12 +11,13 @@ from store import Store, TraceError, CHUNK
 
 
 class Fixture:
-    def __init__(self, root, schema_version=1):
+    def __init__(self, root, schema_version=1, started_at=1000):
         self.root = root
         self.schema_version = schema_version
+        self.started_at=started_at
         (root/'payloads').mkdir(parents=True)
         (root/'manifest.json').write_text(json.dumps({'schema_version':schema_version,'trace_id':'trace-test',
-            'rollout_id':'rollout-test','root_thread_id':'thread-root','started_at_unix_ms':1000,
+            'rollout_id':'rollout-test','root_thread_id':'thread-root','started_at_unix_ms':started_at,
             'raw_event_log':'trace.jsonl','payloads_dir':'payloads'}))
         (root/'trace.jsonl').touch()
         self.seq = 0
@@ -30,7 +31,7 @@ class Fixture:
 
     def event(self, record_type, **values):
         self.seq += 1
-        return {'schema_version':self.schema_version,'seq':self.seq,'wall_time_unix_ms':1000+self.seq*10,
+        return {'schema_version':self.schema_version,'seq':self.seq,'wall_time_unix_ms':self.started_at+self.seq*10,
                 'rollout_id':'rollout-test','thread_id':'thread-root','codex_turn_id':'turn-1',
                 'payload':{'type':record_type,**values}}
 

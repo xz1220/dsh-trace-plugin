@@ -179,13 +179,34 @@ class Projection:
         self.previous_requests = {}
         self.turn_numbers = {}
         self.locations = {}
+        self.history_turn_key = None
+        self.history_turn_ids = []
 
     def requests(self):
         stamp = (self.index.epoch, self.index.last_seq)
         if stamp != self.structure_stamp:
+            if self.structure_stamp is not None and self.structure_stamp[0]!=self.index.epoch:
+                self.cache.clear();self.detail_cache.clear();self.detail_bytes=0
+                self.history_turn_key=None;self.history_turn_ids=[]
             self.request_rows = [row for row in self.index.rows.values() if row.get('type') in ('request','compaction')]
             self.request_numbers = {row['id']:number+1 for number,row in enumerate(self.request_rows)}
-            self.turn_numbers = {key:number+1 for number,key in enumerate(self.index.turns)}
+            first=next((row for row in self.request_rows if row.get('type')=='request'),None)
+            first_ref=first.get('_request') if first else None
+            history_key=(first['id'],first_ref.get('path')) if first and first_ref else None
+            if history_key!=self.history_turn_key:
+                raw=self.index.payload(first_ref) or {}
+                history_turns={}
+                for item in raw.get('input',[]):
+                    if not isinstance(item,dict) or item.get('type') not in ('message','input_message') or item.get('role') not in ('user','assistant'):
+                        continue
+                    metadata=item.get('internal_chat_message_metadata_passthrough')
+                    turn_id=metadata.get('turn_id') if isinstance(metadata,dict) else None
+                    if isinstance(turn_id,str) and turn_id:history_turns.setdefault(turn_id,None)
+                self.history_turn_ids=list(history_turns)
+                self.history_turn_key=history_key
+            # A resumed bundle carries earlier conversation turns in its first full input.
+            turn_ids=dict.fromkeys([*self.history_turn_ids,*self.index.turns])
+            self.turn_numbers = {key:number+1 for number,key in enumerate(turn_ids)}
             self.request_steps = {}
             self.previous_requests = {}
             self.locations = {}
@@ -278,6 +299,7 @@ class Projection:
         return {'system': system, 'tools': list(effective.values()), 'config': self.request_info(row)['requestConfig']}
 
     def cells(self, row):
+        self.requests()
         key = (row['id'], row.get('_updated'))
         if key in self.cache:
             self.cache.move_to_end(key)
@@ -316,7 +338,7 @@ class Projection:
                 prompt = self.prompt(row)
                 prior = self.prompt(previous) if previous else None
                 if prior is None or prompt['system'] != prior['system'] or prompt['tools'] != prior['tools']:
-                    cells.append({**base, 'sourceSeq':None, 'cellKey': 'prompt', 'kind': 'system', 'text': '指令与工具更新' if prior else '指令与工具目录',
+                    cells.append({**base, **({'turn':None} if previous is None else {}), 'sourceSeq':None, 'cellKey': 'prompt', 'kind': 'system', 'text': '指令与工具更新' if prior else '指令与工具目录',
                                   'timeSeconds': 0, 'promptDetail': {'system': '', 'tools': [], 'config': {}},
                                   **({'previousPromptDetail': {'system': '', 'tools': [], 'config': {}}} if prior else {})})
             for position, item in introduced:
@@ -327,6 +349,8 @@ class Projection:
                 context = not assistant and (item.get('role') != 'user' or text.lstrip().startswith(('<environment_context>', '<turn_aborted>', '<codex_internal_context')))
                 metadata=item.get('internal_chat_message_metadata_passthrough')
                 if not isinstance(metadata,dict):metadata={}
+                input_turn_id=metadata.get('turn_id')
+                input_turn=self.turn_numbers.get(input_turn_id,turn) if isinstance(input_turn_id,str) else turn
                 current_user=not context and not assistant and (bool(metadata.get('turn_id')) and metadata['turn_id']==row.get('turnId') or position==last_user)
                 historical=assistant or not context and not current_user
                 blocks = source_blocks(item, row['id'], f'input-{position}',metadata_only=True)
@@ -336,7 +360,7 @@ class Projection:
                 images = sum('attachment' in block for block in attachments)
                 files = sum('file' in block for block in attachments)
                 summary = ' · '.join(part for part in [f'图片 ×{images}' if images else '',f'文件 ×{files}' if files else ''] if part)
-                cells.append({**base, 'sourceSeq':None, 'cellKey': f'input:{position}', 'kind': 'message' if assistant else 'context' if context else 'user',
+                cells.append({**base, 'turn':input_turn, 'sourceSeq':None, 'cellKey': f'input:{position}', 'kind': 'message' if assistant else 'context' if context else 'user',
                               **({'inputHistory':True,'step':0,'group':'历史消息（请求输入）'} if historical else {}),
                               **({'outputDetail':' ','isError':False,'startedAt':None,'assistantMetrics':{'timingRecorded':False,'usageProvided':False}} if assistant else {'inputDetail':' '}),
                               'text': summary, 'previewMarkdown':source[:2048], 'opensTurn': current_user, 'timeSeconds': 0,
@@ -349,7 +373,7 @@ class Projection:
             publicly_returned = '\n\n'.join(public_reasoning(item) for item in reasoning)
             attachments=[block for item in messages for block in source_blocks(item,row['id'],'output',metadata_only=True) if 'attachment' in block or 'file' in block]
             # Parent navigation must work before this assistant's body is hydrated.
-            calls=[{'type':'tool-call','content':'','callId':item['call_id'],'toolName':item.get('name')}
+            calls=[{'type':'tool-call','content':'','callId':self.index.call_identity(row,item['call_id']),'toolName':item.get('name')}
                    for item in outputs if isinstance(item,dict)
                    and item.get('type') in ('function_call','custom_tool_call') and isinstance(item.get('call_id'),str)]
             image_count=sum('attachment' in block for block in attachments)
@@ -388,7 +412,7 @@ class Projection:
             cells.append({**base, 'cellKey': 'tool', 'kind': row.get('kind', 'tool'), 'toolName': name,
                           'isError':base['isError'] or result_error,
                           'qualifiedToolName':qualified,
-                          'callId': row.get('_modelCallId') or row['id'], **({'resultSeq':row['seq']} if row.get('_output') else {}),
+                          'callId': self.index.call_identity(row,row.get('_modelCallId') or row['id']), **({'resultSeq':row['seq']} if row.get('_output') else {}),
                           'text': f'{name} · {preview(row.get("_code") or row.get("_preview"), 100)}',
                           'inputDetail': ' ', 'outputDetail': ' ' if row.get('_output') else '', 'schemaDetail': '',
                           'result': result_preview, 'programSource': ' ' if program or native_program else None})
@@ -419,6 +443,7 @@ class Projection:
 
     def detail(self, row_id, cell_key):
         row = self.index.get_row(row_id)
+        self.requests()
         key = (row_id, cell_key, row.get('_updated'), self.index.last_seq)
         if key in self.detail_cache:
             self.detail_cache.move_to_end(key)
@@ -465,7 +490,7 @@ class Projection:
                     thinking.append(public_reasoning(item))
                 elif item.get('type') in ('function_call', 'custom_tool_call'):
                     blocks.append({'type':'tool-call', 'content': item.get('arguments', item.get('input', '')),
-                                   'callId': item.get('call_id'), 'toolName': item.get('name')})
+                                   'callId': self.index.call_identity(row,item['call_id']) if item.get('call_id') else None, 'toolName': item.get('name')})
             data.update(outputDetail='\n\n'.join(b['content'] for b in blocks if b['type'] == 'text'),
                         sourceBlocks=blocks, thinkingDetail='\n\n'.join(thinking))
         elif cell_key == 'compaction':

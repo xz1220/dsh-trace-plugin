@@ -27,6 +27,38 @@ class ProjectionTests(unittest.TestCase):
     def project(self):
         return self.store.projection('trace-test')
 
+    def greeting_replay(self):
+        def message(role,identity,text,turn):
+            return {'type':'message','role':role,'id':identity,
+                    'internal_chat_message_metadata_passthrough':{'turn_id':turn},
+                    'content':[{'type':'output_text' if role=='assistant' else 'input_text','text':text}]}
+        self.fixture.append('codex_turn_started',codex_turn_id='third-turn',thread_id='thread-root')
+        inputs=[{'type':'message','role':'developer','content':[{'type':'input_text','text':'Instructions'}]},
+            message('user','environment','<environment_context>test workspace</environment_context>','first-turn'),
+            message('user','hi','hi','first-turn'),message('assistant','hi-answer','Hi!','first-turn'),
+            message('user','test','这是测试','second-turn'),message('assistant','test-answer','收到，测试正常。','second-turn'),
+            message('user','continue','继续测试','third-turn')]
+        request=self.fixture.payload({'input':inputs},'inference_request')
+        self.fixture.append('inference_started',inference_call_id='third',thread_id='thread-root',codex_turn_id='third-turn',request_payload=request)
+        response=self.fixture.payload({'output_items':[message('assistant','continue-answer','好，继续测试中。','third-turn')]},'inference_response')
+        self.fixture.append('inference_completed',inference_call_id='third',response_payload=response)
+
+    def test_resumed_third_turn_restores_recorded_history_turn_numbers(self):
+        self.greeting_replay()
+        page=self.project().page();cells=page['cells']
+        self.assertEqual([cell['turn'] for cell in cells],[None,1,1,1,2,2,3,3])
+        self.assertEqual(page['requestNumbers'][0]['turn'],3)
+        self.assertEqual([cell.get('previewMarkdown') for cell in cells if cell['kind'] in ('user','message')],
+                         ['hi','Hi!','这是测试','收到，测试正常。','继续测试','好，继续测试中。'])
+
+    def test_history_turn_numbers_stay_stable_when_later_events_arrive(self):
+        self.greeting_replay();projector=self.project();projector.page()
+        reads=projector.index.metrics['payloadReads']
+        self.fixture.append('codex_turn_started',codex_turn_id='fourth-turn',thread_id='thread-root')
+        self.store.index('trace-test').refresh();projector.requests()
+        self.assertEqual(projector.turn_numbers,{'first-turn':1,'second-turn':2,'third-turn':3,'fourth-turn':4})
+        self.assertEqual(projector.index.metrics['payloadReads'],reads)
+
     def test_replayed_assistant_messages_are_visible_with_request_input_provenance(self):
         history='## Earlier answer\n\n完整保留 🌱\n'
         inputs=[{'type':'message','role':'user','id':'old-user','content':[{'type':'input_text','text':'Earlier question'}]},
@@ -301,41 +333,45 @@ class ProjectionTests(unittest.TestCase):
         self.assertFalse(set(page['rowIds'])&set(earlier['rowIds']))
         with self.assertRaises(TraceError):projector.detail('request:first','not-a-cell')
 
-    def test_native_root_chooses_newest_recording_after_resume(self):
+    def test_native_root_preserves_both_recordings_after_resume(self):
         self.fixture.conversation()
-        self.assertEqual(self.store.open(thread_id='thread-root')['trace']['id'],'trace-test')
-        later=Fixture(self.root/'later')
+        self.assertEqual(self.store.open(thread_id='thread-root')['trace']['id'],'thread@thread-root')
+        later=Fixture(self.root/'later',started_at=2000)
         path=later.root/'manifest.json';meta=json.loads(path.read_text())
         meta.update(trace_id='trace-later',started_at_unix_ms=2000);path.write_text(json.dumps(meta))
         self.store.catalog.register(str(later.root))
-        self.assertEqual(self.store.open(thread_id='thread-root')['trace']['id'],'trace-test')
+        self.assertEqual(self.store.open(thread_id='thread-root')['requestCount'],2)
         self.assertEqual(self.store.open(trace_id='trace-later')['rows'],[])
         later.conversation()
-        self.assertEqual(self.store.open(thread_id='thread-root')['trace']['id'],'trace-later')
+        aggregate=self.store.open(thread_id='thread-root')
+        self.assertEqual(aggregate['trace']['id'],'thread@thread-root')
+        self.assertEqual(aggregate['requestCount'],4)
+        self.assertEqual(aggregate['trace']['recordingCount'],2)
         self.assertEqual(self.store.open(thread_id='unrelated-root')['view'],'select')
 
     def test_live_binding_uses_exact_root_and_returns_only_metadata(self):
         self.fixture.conversation()
         resolved=self.store.binding('thread-root')
         self.assertEqual(set(resolved),{'currentThreadId','trace'})
-        self.assertEqual(resolved['trace']['id'],'trace-test')
+        self.assertEqual(resolved['trace']['id'],'thread@thread-root')
         self.assertNotIn('_path',resolved['trace'])
         self.assertEqual(self.store.index('trace-test').metrics['payloadReads'],0)
         self.assertIsNone(self.store.binding('unrelated-root')['trace'])
 
     def test_restarted_empty_recording_preserves_history_until_first_new_request(self):
         self.fixture.conversation()
-        later=Fixture(self.root/'resumed')
+        later=Fixture(self.root/'resumed',started_at=3000)
         manifest=later.root/'manifest.json';meta=json.loads(manifest.read_text())
         meta.update(trace_id='trace-resumed',started_at_unix_ms=3000);manifest.write_text(json.dumps(meta))
         self.store.catalog.register(str(later.root))
         later.append('rollout_started',trace_id='trace-resumed',root_thread_id='thread-root')
         later.append('thread_started',thread_id='thread-root',agent_path='/root')
-        self.assertEqual(self.store.binding('thread-root')['trace']['id'],'trace-test')
+        self.assertEqual(self.store.binding('thread-root')['trace']['id'],'thread@thread-root')
+        self.assertEqual(self.store.open(thread_id='thread-root')['requestCount'],2)
         request=later.payload({'input':[{'type':'message','role':'user','content':[{'type':'input_text','text':'New turn after resume'}]}]},'inference_request')
         later.append('inference_started',inference_call_id='resumed-first',thread_id='thread-root',request_payload=request)
-        self.assertEqual(self.store.binding('thread-root')['trace']['id'],'trace-resumed')
-        self.assertEqual(self.store.open(thread_id='thread-root')['requestCount'],1)
+        self.assertEqual(self.store.binding('thread-root')['trace']['id'],'thread@thread-root')
+        self.assertEqual(self.store.open(thread_id='thread-root')['requestCount'],3)
 
     def test_explicit_trace_cannot_silently_bind_a_different_root(self):
         self.fixture.conversation()

@@ -92,8 +92,11 @@ try:
             assert target['row']['type']=='request';links+=1
     resource=rpc('resources/read',{'uri':'ui://rollout-viewer/viewer.html'})['contents'][0]
     assert resource['mimeType']=='text/html;profile=mcp-app'
+    current_uri=entry['_meta']['ui']['resourceUri']
+    current_resource=rpc('resources/read',{'uri':current_uri})['contents'][0]
+    assert version in current_uri and current_resource['text']==resource['text']
     source=Path(__file__).resolve().parents[1]/'plugins/rollout-viewer'
-    files=['server/main.py','server/store.py','server/projection.py','server/trajectory-locales.json','assets/viewer.html','.mcp.json','.codex-plugin/plugin.json','README.md']
+    files=['server/main.py','server/store.py','server/thread_index.py','server/projection.py','server/trajectory-locales.json','assets/viewer.html','.mcp.json','.codex-plugin/plugin.json','README.md']
     same=all(hashlib.sha256((source/f).read_bytes()).digest()==hashlib.sha256((root/f).read_bytes()).digest() for f in files)
     assert same,'Installed files differ from the current source'
     report={'version':version,'tools':len(tools),'installedFilesMatchSource':same,'mcpInitialization':True,'nativeEntryMetadata':True,'requests':data['requestCount'],'toolsInRecording':data['toolCount'],'expectedTextChecks':len(args.expect_text),'promptCharacters':len(content),'promptChunks':len(pieces),'verifiedToolNextRequestLinks':links,'appResourceBytes':len(resource['text'].encode()),'dshCells':len(projection['cells']),'lazyHydrationChunks':len(hydration),'fullBodySearch':True,'requestCumulativeUsage':True,'newToolsAppOnly':True,'nativeDesktopMountVerified':False}
@@ -102,6 +105,7 @@ try:
                   callIdLaunchMetadataOnly=bool(toolrows),callIdLookup=bool(toolrows),
                   recordingSchemaVersion=data['trace'].get('schemaVersion',1))
     report['threadBindingMetadataOnly']=True
+    report['versionedResourceAndLegacyAlias']=True
     if args.out:args.out.write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps(report,indent=2))
 finally:

@@ -169,6 +169,7 @@ function App(){
     catch(e){setError(e.message);}finally{setAdding(false);}
   }
   const stats=data?`${data.rows.length} / ${data.totalRows} ${text('条执行记录','records')} · ${data.requestCount} ${text('次模型请求','requests')} · ${data.toolCount} ${text('次工具执行','tools')}${data.codeCellCount?` · ${data.codeCellCount} ${text('个代码调用','code calls')}`:''}`:'';
+  const traceLabel=data?.trace.isThreadAggregate?text('当前聊天','This chat'):data?.trace.label;
   const languages={zh:'中文',en:'English',ja:'日本語',es:'Español',fr:'Français',de:'Deutsch',ru:'Русский',pt:'Português'};
   const directoryForm=<form className="app-directory-form" onSubmit={e=>{e.preventDefault();register();}}>
     <label htmlFor="recording-directory">{text('录制目录','Recording directory')}</label><input id="recording-directory" value={directory} onChange={e=>setDirectory(e.target.value)} placeholder={text('包含 manifest.json 的目录或其父目录','Directory containing manifest.json, or its parent')}/>
@@ -184,8 +185,9 @@ function App(){
         <button ref={menuButton} type="button" className="app-icon app-more" aria-label={text('更多轨迹操作','More trajectory actions')} title={text('更多轨迹操作','More trajectory actions')} aria-haspopup="dialog" aria-expanded={menuOpen} aria-controls="trajectory-actions" onClick={()=>setMenuOpen(!menuOpen)}><IconEllipsisOutlineRegular size={16}/></button>
         {menuOpen&&<section id="trajectory-actions" className="app-source-menu" role="dialog" aria-labelledby="trajectory-actions-title">
           <div className="app-menu-heading"><h2 id="trajectory-actions-title">{text('轨迹操作','Trajectory actions')}</h2><button type="button" className="app-icon" aria-label={text('关闭轨迹操作','Close trajectory actions')} onClick={closeMenu}>×</button></div>
-          <div className="app-recording-title"><strong title={data?.trace.label}>{data?.trace.label||'Rollout Viewer'}</strong><span className="app-status" title={stats} data-status={data?.status}>{data?text(statusNames[data.status]||data.status,{running:'Recording',complete:'Complete',error:'Failed',cancelled:'Cancelled'}[data.status]||data.status):text('本地录制','Local recordings')}</span></div>
+          <div className="app-recording-title"><strong title={traceLabel}>{traceLabel||'Rollout Viewer'}</strong><span className="app-status" title={stats} data-status={data?.status}>{data?text(statusNames[data.status]||data.status,{running:'Recording',complete:'Complete',error:'Failed',cancelled:'Cancelled'}[data.status]||data.status):text('本地录制','Local recordings')}</span></div>
           <div className="app-recording-picker"><label htmlFor="recording-select">{text('选择录制任务','Select recording')}</label><select id="recording-select" data-menu-initial-focus="" value={data?.trace.id||''} onChange={e=>{setFollowingThread(null);loadTrace(e.target.value);closeMenu();}}><option value="" disabled>{text('选择已录制任务…','Select a recording…')}</option>
+            {data?.trace.isThreadAggregate&&<option value={data.trace.id}>{text('当前聊天 · 全部录制','This chat · All recordings')}{` (${data.trace.recordingCount})`}</option>}
             {traces.map(trace=><option key={trace.id} value={trace.id}>{timeLabel(trace.startedAt)} · {trace.label}</option>)}</select>
             {data?.threads?.length>1&&<><label htmlFor="recording-agent">{text('筛选代理','Filter agents')}</label><select id="recording-agent" value={thread} onChange={e=>{setThread(e.target.value);closeMenu();}}><option value="all">{text('全部代理','All agents')}</option>{data.threads.map(agent=><option key={agent.id} value={agent.id}>{agent.label}</option>)}</select></>}
           </div>
@@ -196,7 +198,8 @@ function App(){
             <button type="button" className="app-button" onClick={()=>setDark(!dark)} aria-label={dark?text('切换浅色','Use light theme'):text('切换深色','Use dark theme')}>{dark?text('浅色','Light'):text('深色','Dark')}</button>
           </div>
           {directoryForm}
-          <small className="app-recording-stats" aria-label={text('界面版本','Interface version')}>Rollout Viewer 0.2.12</small>
+          <small className="app-recording-stats" aria-label={text('界面版本','Interface version')}>Rollout Viewer 0.2.14</small>
+          <small className="app-recording-stats" aria-label={text('后台版本','Reader version')}>{text('后台','Reader')} {catalogInfo?.readerVersion||text('未报告','Not reported')}</small>
           {error&&<p className="app-menu-error" role="alert">{error}</p>}
         </section>}
       </div>

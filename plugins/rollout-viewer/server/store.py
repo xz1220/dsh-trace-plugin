@@ -450,6 +450,12 @@ class BundleIndex:
             raise TraceError("没有找到这条执行记录。")
         return row
 
+    def response_row(self, response_id, current):
+        return self.responses.get(response_id)
+
+    def call_identity(self, row, call_id):
+        return call_id
+
     def context(self, row_id, visiting=None):
         # Iterative reconstruction avoids recursion and intermediate full copies.
         row = self.get_row(row_id)
@@ -481,7 +487,7 @@ class BundleIndex:
             previous = raw.get('previous_response_id')
             if not previous:
                 break
-            cursor = self.responses.get(previous)
+            cursor = self.response_row(previous,current)
             if cursor is None:
                 complete, missing = False, previous
                 break
@@ -489,7 +495,7 @@ class BundleIndex:
         tools = base['tools'] if base else None
         for request_id, current, raw in reversed(chain):
             previous = raw.get('previous_response_id')
-            parent_id = self.responses.get(previous) if previous else None
+            parent_id = self.response_row(previous,current) if previous else None
             if parent_id is not None:
                 output = self.payload(self.rows[parent_id].get('_response')) or {}
                 if not isinstance(output.get('output_items'), list):
@@ -503,7 +509,7 @@ class BundleIndex:
         raw = chain[0][2]
         context = {'items':items, 'complete':complete, 'missing':missing, 'tools':tools,
                    'incremental':bool(raw.get('previous_response_id')),
-                   'previousRequestId':self.responses.get(raw.get('previous_response_id')), 'raw':raw}
+                   'previousRequestId':self.response_row(raw.get('previous_response_id'),row), 'raw':raw}
         if complete:
             self.context_cache[row_id] = context
             while len(self.context_cache)>16:
@@ -560,9 +566,12 @@ class Store:
     def __init__(self, config_file=None):
         self.catalog = Catalog(config_file)
         self.indexes = OrderedDict()
+        self.thread_indexes = OrderedDict()
         self.lock = threading.RLock()
 
     def index(self, trace_id):
+        if isinstance(trace_id,str) and trace_id.startswith('thread@'):
+            return self.thread_index(trace_id[len('thread@'):])
         with self.lock:
             meta = self.catalog.find(trace_id=trace_id)
             if not meta:
@@ -575,6 +584,15 @@ class Store:
             while len(self.indexes) > 4:
                 self.indexes.popitem(last=False)
             return self.indexes[trace_id]
+
+    def thread_index(self, thread_id):
+        identifier(thread_id)
+        from thread_index import ThreadIndex
+        with self.lock:
+            if thread_id not in self.thread_indexes:self.thread_indexes[thread_id]=ThreadIndex(self,thread_id)
+            self.thread_indexes.move_to_end(thread_id)
+            while len(self.thread_indexes)>2:self.thread_indexes.popitem(last=False)
+            return self.thread_indexes[thread_id]
 
     def list(self, force=False):
         traces = self.catalog.list(force)
@@ -595,11 +613,21 @@ class Store:
         return candidates[0] if candidates else None
 
     def binding(self, thread_id):
-        meta=self.thread_recording(thread_id)
+        index=self.thread_index(thread_id);index.refresh(force=True)
+        meta=index.meta if index.sources else None
         return {'currentThreadId':thread_id,'trace':{k:v for k,v in meta.items() if not k.startswith('_')} if meta else None}
 
     def open(self, trace_id=None, thread_id=None):
-        meta = self.thread_recording(thread_id) if thread_id and not trace_id else self.catalog.find(trace_id, thread_id) if trace_id or thread_id else None
+        if isinstance(trace_id,str) and trace_id.startswith('thread@'):
+            selected=identifier(trace_id[len('thread@'):])
+            if thread_id and thread_id!=selected:raise TraceError('录制与聊天标识不一致。')
+            thread_id=selected;trace_id=None
+        if thread_id and not trace_id:
+            index=self.thread_index(thread_id);index.refresh(force=True)
+            if index.sources:return {'view':'trace','currentThreadId':thread_id,**index.overview()}
+            meta=None
+        else:
+            meta=self.catalog.find(trace_id, thread_id) if trace_id or thread_id else None
         if not meta:
             result={'view': 'select', 'currentThreadId': thread_id, **self.list()}
             problem=next((item for item in self.catalog.issues if trace_id and item.get('traceId')==trace_id or thread_id and item.get('threadId')==thread_id),None)
@@ -622,11 +650,11 @@ class Store:
         index.refresh()
         with index.lock:
             matches=[row for row in index.rows.values() if row.get('type') in ('tool','code')
-                     and (row.get('_modelCallId')==call_id or row['id']==call_id or row['id']=='tool:'+call_id)]
+                     and (row.get('_modelCallId')==call_id or index.call_identity(row,row.get('_modelCallId') or row['id'])==call_id or row['id']==call_id or row['id']=='tool:'+call_id)]
             if len(matches)!=1:
                 raise TraceError('没有找到唯一对应的工具调用。请检查调用标识。')
             row=matches[0]
-            return {**index.public_row(row),'callId':row.get('_modelCallId') or row['id']}
+            return {**index.public_row(row),'callId':index.call_identity(row,row.get('_modelCallId') or row['id'])}
 
     def cell_detail(self, trace_id, row_id, cell_key):
         projector = self.projection(trace_id)

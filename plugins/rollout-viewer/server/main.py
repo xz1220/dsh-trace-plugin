@@ -19,8 +19,9 @@ from urllib.parse import urlparse
 from store import Store, TraceError, identifier
 
 PLUGIN = Path(__file__).resolve().parents[1]
-VERSION = '0.2.12'
-URI = 'ui://rollout-viewer/viewer.html'
+VERSION = '0.2.14'
+URI = f'ui://rollout-viewer/viewer-{VERSION}.html'
+LEGACY_URI = 'ui://rollout-viewer/viewer.html'
 STORE = Store()
 
 
@@ -85,7 +86,7 @@ def call(name, args, metadata=None):
         if 'enum' in field and value not in field['enum']:
             raise TraceError('参数不在支持的选项中。')
     if name == 'list_rollout_traces':
-        return STORE.list(args.get('refresh', False))
+        return {**STORE.list(args.get('refresh', False)),'readerVersion':VERSION}
     if name == 'open_rollout_viewer':
         meta = metadata if isinstance(metadata, dict) else {}
         first, second = meta.get('thread_id'), meta.get('threadId')
@@ -101,7 +102,7 @@ def call(name, args, metadata=None):
         if result.get('view')!='trace':
             return result
         launch={'view':'open','trace':result['trace']}
-        if args.get('threadId') and not args.get('traceId'):
+        if result['trace'].get('isThreadAggregate') or args.get('threadId') and not args.get('traceId'):
             launch['currentThreadId']=result['currentThreadId']
         if args.get('callId') is not None:
             launch['focusCallId']=identifier(args['callId'])
@@ -171,8 +172,8 @@ def handle(method, params):
         return {'resources': [{'uri': URI, 'name': 'Rollout Viewer', 'mimeType': 'text/html;profile=mcp-app'}]}
     if method in ('resources/templates/list','prompts/list'):
         return {'resourceTemplates' if method.startswith('resources') else 'prompts': []}
-    if method == 'resources/read' and params.get('uri') == URI:
-        return {'contents': [{'uri': URI, 'mimeType': 'text/html;profile=mcp-app',
+    if method == 'resources/read' and params.get('uri') in (URI,LEGACY_URI):
+        return {'contents': [{'uri': params['uri'], 'mimeType': 'text/html;profile=mcp-app',
                              'text': (PLUGIN/'assets/viewer.html').read_text(),
                              '_meta': {'ui': {'prefersBorder': True}}}]}
     raise TraceError('不支持的 MCP 方法。')

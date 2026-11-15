@@ -8,6 +8,7 @@ import {renderImageSlot as renderSlot,loadImage} from './images.jsx';
 import {Failure, Skeleton, RequestContent, readComplete} from './content.jsx';
 import view from '../vendor/dsh/packages/client/ui-trajectory/src/client/views.module.css';
 import {durationPreference,wrappingPreference} from './preferences.js';
+import {trajectoryTurns} from './trajectory-order.js';
 
 export {t} from './locale.js';
 const toggle=(set,key)=>set(current=>{const next=new Set(current);next.has(key)?next.delete(key):next.add(key);return next;});
@@ -68,18 +69,7 @@ export default function Trajectory({data,call,earlier,copy,thread,focusCallId,on
 
   const visibleCells=useMemo(()=>[...cells.values()].filter(cell=>thread==='all'||cell.threadId===thread)
     .sort((a,b)=>a.seq-b.seq||a.slot-b.slot).map((cell,index)=>({...cell,index:index+1,group:groupOf(cell),text:captionOf(cell)})),[cells,thread,t]);
-  const turns=useMemo(()=>{
-    const sections=new Map();
-    for(const cell of visibleCells){
-      const key=cell.turn??`between:${cell.rowId}`;
-      if(!sections.has(key))sections.set(key,{turn:cell.turn,groups:[],byGroup:new Map()});
-      const section=sections.get(key);
-      let group=section.byGroup.get(cell.group);
-      if(!group){group={title:cell.group,cells:[]};section.byGroup.set(cell.group,group);section.groups.push(group);}
-      group.cells.push(cell);
-    }
-    return [...sections.values()].map(({turn,groups})=>({turn,groups}));
-  },[visibleCells]);
+  const turns=useMemo(()=>trajectoryTurns(visibleCells),[visibleCells]);
   const requestNumbers=useMemo(()=>{const visible=new Set(visibleCells.map(cell=>cell.rowId));return [...requests.values()].filter(request=>visible.has(request.rowId)).sort((a,b)=>a.seq-b.seq).map(request=>({...request,group:groupOf(request)}));},[requests,visibleCells,t]);
 
   const hydrate=useCallback(async(cell,force=false)=>{

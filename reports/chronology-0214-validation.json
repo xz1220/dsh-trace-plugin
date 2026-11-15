@@ -1,0 +1,92 @@
+{
+  "version": "0.2.14",
+  "date": "2026-11-15",
+  "bug": "A continued chat moves its newest question/answer before older pairs and replaces earlier request timing when following a new recording.",
+  "rootCauses": [
+    "Global turn/group bucketing reorders nonadjacent segments",
+    "The current-chat binding selects one recording instead of retaining earlier captures",
+    "Historical request-input turns inherit the resumed request's local turn number"
+  ],
+  "fixes": [
+    "Group adjacent segments only and preserve projected event order",
+    "Restore turn numbering from recorded metadata",
+    "Keep one stable exact-root chronological view across official recordings",
+    "Qualify record and call identities by source and preserve original payloads",
+    "Invalidate projection caches when history is replaced or prepended",
+    "Report frontend and reader versions separately and version the UI resource URI"
+  ],
+  "automatedChecks": {
+    "python": 63,
+    "node": 18,
+    "passed": 81,
+    "failed": 0,
+    "build": true,
+    "upstreamFilesUnchanged": 99,
+    "documentedAdapters": 5,
+    "coreDshCssChanged": false
+  },
+  "protocolHarnessClicks": {
+    "functionalCandidateVersion": "0.2.13",
+    "initialTurns": 2,
+    "newUserAppearsLastWhileReplyPending": true,
+    "thirdCompletedPairAppearsLast": true,
+    "fourthCompletedPairAppearsLast": true,
+    "fourRoundLabels": [1, 2, 3, 4],
+    "oldRequestEventsRetained": true,
+    "oldMeasuredDurationsUnchanged": true,
+    "selectedOldReplySurvivesNewRecording": true,
+    "stableChatIdentityAndEpoch": true
+  },
+  "actualScreenshotRecording": {
+    "recordings": 2,
+    "requests": 3,
+    "messages": 6,
+    "messageTurns": [1, 1, 2, 2, 3, 3],
+    "allMessagesInOriginalOrder": true,
+    "requestDurationsMs": [2197, 1869, 1341],
+    "originalTimingsMatch": true,
+    "localBrowserReplayVersion": "0.2.13",
+    "installedStdioReplayVersion": "0.2.14",
+    "allRawRequestChunksMatchSource": true
+  },
+  "installedPackage": {
+    "version": "0.2.14",
+    "method": "Desktop app-server plugin/install",
+    "officialMcpReloadAcknowledged": true,
+    "tools": 15,
+    "criticalFilesCompared": 9,
+    "installedFilesMatchSource": true,
+    "exactRootBindingRpc": true,
+    "versionedResourceAndLegacyAlias": true,
+    "archivedFullContextCharacters": 81919,
+    "archivedFullContextSha256": "6f4c7f2bfb58f43a7e2f00f39acc2f6999b62f9d2980164ff3d2fc14154bd043",
+    "finalReleaseExtraBrowserReplayExecuted": false
+  },
+  "bounds": {
+    "rawIndexLru": 4,
+    "chatIndexLru": 2,
+    "aggregateEventLogLimitMiB": 256,
+    "overLimitIsExplicit": true,
+    "unchangedPollingReadsNoPayloads": true
+  },
+  "nativeDesktop": {
+    "verified": false,
+    "currentModelConnectionReaderVersion": "Not reported",
+    "availableCuaMcpAppTabs": 0,
+    "limitation": "Installation does not replace an existing model connection. An expanded native app using the new frontend and reader is still required for native acceptance."
+  },
+  "browserCleanup": {
+    "spaceId": 34,
+    "functionalClicksCompleted": true,
+    "extraReplayStoppedBecauseSpaceNoLongerExists": true,
+    "replacementSpaceCreated": false,
+    "finishCalls": 0,
+    "ownedPreviewServersStopped": true
+  },
+  "screenshots": {
+    "threeTurnsControlled": "reports/screenshots/chronology-0213-three-rounds.png",
+    "fourTurnsControlled": "reports/screenshots/chronology-0213-four-rounds.png",
+    "actualRecordingLocalReplay": "reports/screenshots/chronology-0213-real-greeting.png",
+    "nativeCodexScreenshot": false
+  }
+}

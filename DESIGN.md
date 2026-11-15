@@ -1,5 +1,24 @@
 # Design system
 
+## Chronological chat continuity, 2026-11-15
+
+Version 0.2.14 keeps the current chat as a stable view across official recordings
+whose root matches exactly. Append new records without discarding older requests,
+tools, measured timing or the selected inspector. Explicit archive choices stay
+pinned. Qualify row and call identities by source and preserve raw payloads.
+Bound the aggregate event-log size explicitly; report an exceeded limit and keep
+individual captures available. An incomplete new manifest cannot erase history.
+
+Group only adjacent turn/step segments. A repeated label must never move an event
+across another segment. Recover historical turn numbers from recorded turn IDs;
+the initial global prompt precedes the numbered turns. Historical input messages
+retain their own provenance and have no invented generation metrics. Invalidate
+projection and detail caches when source history is replaced or prepended.
+
+The menu reports frontend and reader versions independently. Use a versioned UI
+resource URI while retaining the legacy alias. Installation checks, local browser
+clicks and native Codex acceptance remain distinct evidence categories.
+
 ## Historical assistant inputs, 2026-11-15
 
 Version 0.2.12 renders assistant messages already present in recorded request
