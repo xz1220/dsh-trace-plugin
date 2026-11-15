@@ -4,70 +4,47 @@ A local Codex sidebar app for official `rollout-trace` recordings. The interface
 uses DSH's theme and trajectory styles, with a paged execution ledger, timing
 overview, reconstructed request context, and tool inspectors.
 
-Version 0.2.15 uses the upstream DSH runtime: turn/step grouping, request boundaries,
+Version 0.2.16 uses the upstream DSH runtime: turn/step grouping, request boundaries,
 three levels of folding, full-content search, interactive timing overview,
 virtualized rows, a resizable inspector, Markdown/code/JSON views, prompt/tool
 diffs, and the original image gallery. Complete Codex context and original request
 and response JSON are additional request tabs. Raw result values remain available
 beside rendered content.
 
-Version 0.2.10 follows the supplied running DSH Web reference with one 36px
-trajectory navigation row and a “···” menu. Recording selection, refresh, live
-updates, theme, directories, language, agent filtering and statistics are inside
-that menu. The toolbar and timeline follow directly; there is no extra task-title
-row. Escape, outside clicks and keyboard exit dismiss the menu; explicit close
-and recording selection restore focus to its button. Nested-call controls remain
-conditional. The viewer clears ranges on timeline-mode changes,
-retains shared duration/wrapping preferences, and keeps tool-to-assistant links
-available before loading the assistant body. The launcher accepts an optional
-`callId` and loads the required history before selecting it. Core DSH controls
-follow the host locale in all eight upstream languages; Codex-specific panels
-use Chinese or English fallback.
+The view starts directly with the original DSH toolbar and timeline. Current-chat
+binding and live updates are automatic; theme and language follow Codex. There
+is no additional navigation row, ellipsis menu, recording selector or settings
+panel. Missing recordings show a brief status and keep checking for available
+records. Recording maintenance remains available through the local backend and
+its command-line interface, outside the chat viewing surface.
 
-Version 0.2.9 reads the schema-2 recordings produced by the current desktop
-runtime and reports unsupported formats instead of silently hiding them. An
-unbound chat refreshes against its own root thread when a recording appears;
-existing history is never substituted automatically.
+The viewer clears ranges on timeline-mode changes, retains shared duration and
+wrapping preferences, and keeps tool-to-assistant links available before loading
+an assistant body. The launcher accepts an optional `callId` and loads the
+required history before selecting it. All eight upstream locales are supported;
+Codex-specific panels use Chinese or English fallback.
 
-Version 0.2.11 reads the current chat on sidebar startup, even when the host has
-not delivered a model tool-result notification. If restarting the engine creates
-an empty recording, the latest nonempty recording for that exact chat stays
-visible until new execution records exist. Live mode continues after completion
-and resolves resumed recordings without needing a new launch notification.
-Manual archive selection remains pinned; “Return to this chat” resumes following.
-The menu footer displays the frontend version for reload verification.
+The current chat is one chronological view across official recordings with the
+same exact root. Earlier requests, tools, measured durations and stable row IDs
+survive resumed recordings. Historical assistant inputs remain interleaved with
+users and retain request-input provenance without invented generation metrics.
+Stable identities prevent repeated full snapshots from duplicating old messages.
+Source IDs qualify records and call references; raw payloads remain unchanged.
+The 256 MiB combined event-log bound is explicit, and source/index caches are
+bounded. Both schema 1 and 2 recordings are supported. Unsupported formats show
+a reason rather than being silently hidden. Explicit archive inspection remains
+available through the backend; the sidebar has no archive-management controls.
 
-Version 0.2.12 restores historical assistant messages recorded in request inputs.
-They remain interleaved with users after a recording switch and appear in their
-own history group, with request-input provenance and no invented inference
-timing or token usage. Replayed messages are deduplicated using stable identities
-and content; a distinct new message with the same text is kept. Current request
-inspection continues to select its actual response.
-
-Version 0.2.14 keeps the current chat as one chronological view across its official
-recordings. Earlier request/tool events, measured durations and stable row IDs
-survive resumed recordings. Source IDs qualify records and call references;
-raw requests and responses remain unchanged. Historical turns use recorded turn
-IDs, and display grouping joins only adjacent segments. Explicit archive views
-remain available. The menu reports both frontend and reader versions, and the UI
-resource URI includes the release version to avoid reusing old frontend assets.
-The current-chat aggregate has a 256 MiB combined event-log bound; exceeding it is
-explicit, while individual recordings remain selectable. Source indexes and
-aggregate views have bounded caches.
-
-Version 0.2.15 opens the current chat with live updates enabled. The compact
-ellipsis menu provides refresh, live updates and theme; recording selection,
-directories, language, agent filtering, statistics and version information are
-inside collapsed Advanced settings. Returning from an archive to the current
-chat also resumes live updates. Advanced settings collapse when the menu closes.
+The versioned resource URI and an HTML metadata tag identify the frontend build
+without adding visible version information to the viewer.
 
 ## Open
 
 In a Codex conversation's right panel, choose **+ → More tools… → Plugins and
 MCPs → Rollout Viewer**. The native entry joins only official recordings whose
-root thread ID matches the caller. If none exist, it offers an explicit recording
-selector. It never substitutes the latest task. Open “···” → “Advanced settings”
-for recording selection and directory management.
+root thread ID matches the caller. If none exist, it shows a brief
+empty state. It never substitutes the latest task or asks the user to pick a
+recording in the sidebar.
 
 The model-facing `show_rollout_trace` tool can also open an explicit trace ID.
 It returns only launch metadata. Prompt and tool bodies are loaded through
@@ -91,7 +68,7 @@ An already-running desktop process does not inherit a new shell variable.
 Desktop recording requires launching that process with the environment variable;
 reopening the viewer alone does not enable recording. Existing history cannot be
 retroactively captured. The plugin also accepts a recording directory configured
-through “···” or the server's `--register PATH` command.
+through the server's `--register PATH` command.
 
 ## Data and performance
 

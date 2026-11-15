@@ -12,38 +12,19 @@ import Trajectory from './Trajectory.jsx';
 import {installIconSprite} from '../vendor/dsh/packages/client/ui-theme/src/client/icon-sprite.ts';
 import {disposeImageTransfers} from './images.jsx';
 import {LocaleContext} from './locale-context.jsx';
-import {translatorFor,normalizeLocale,supportedLocales} from './locale.js';
-import {IconEllipsisOutlineRegular} from '../vendor/dsh/packages/client/ui-primitives/src/icons/index.tsx';
-
-const statusNames={running:'录制中',complete:'已结束',error:'失败',cancelled:'已取消'};
-const timeLabel=value=>typeof value==='number'?new Date(value).toLocaleString(undefined,{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'时间未知';
-const quoteShell=value=>`'${String(value).replaceAll("'", "'\"'\"'")}'`;
+import {translatorFor,normalizeLocale} from './locale.js';
 
 function App(){
   const host=useRef(),received=useRef(false),generation=useRef(0),earlierBusy=useRef(false),toastTimer=useRef();
-  const menuRoot=useRef(null),menuButton=useRef(null);
-  const [menuOpen,setMenuOpen]=useState(false);
-  const [data,setData]=useState(null),[traces,setTraces]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState('');
-  const [thread,setThread]=useState('all'),[dark,setDark]=useState(false),[live,setLive]=useState(true),[toast,setToast]=useState('');
-  const [directory,setDirectory]=useState(''),[adding,setAdding]=useState(false),[rootPath,setRootPath]=useState('');
+  const [data,setData]=useState(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
+  const [dark,setDark]=useState(false),[toast,setToast]=useState('');
   const [focusCallId,setFocusCallId]=useState(null);
-  const [selectionInfo,setSelectionInfo]=useState(null),[catalogInfo,setCatalogInfo]=useState(null);
+  const [selectionInfo,setSelectionInfo]=useState(null);
   const [followingThread,setFollowingThread]=useState(null),[connected,setConnected]=useState(false);
   const latestData=useRef(null);latestData.current=data;
   const [locale,setLocale]=useState('zh');
   const t=useMemo(()=>translatorFor(locale),[locale]);
   const text=t.text;
-  const closeMenu=useCallback(()=>{setMenuOpen(false);menuButton.current?.focus();},[]);
-  useEffect(()=>{
-    if(!menuOpen)return;
-    const outside=event=>{if(!menuRoot.current?.contains(event.target))setMenuOpen(false);};
-    const escape=event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();closeMenu();}};
-    document.addEventListener('click',outside);
-    document.addEventListener('focusin',outside);
-    document.addEventListener('keydown',escape,true);
-    menuRoot.current?.querySelector('[data-menu-initial-focus]')?.focus();
-    return()=>{document.removeEventListener('click',outside);document.removeEventListener('focusin',outside);document.removeEventListener('keydown',escape,true);};
-  },[menuOpen,closeMenu]);
   const call=useCallback((name,args={})=>host.current?host.current.call(name,args):Promise.reject(new Error('面板正在连接。')),[]);
   const notify=useCallback(text=>{setToast(text);clearTimeout(toastTimer.current);toastTimer.current=setTimeout(()=>setToast(''),2200);},[]);
   const copy=useCallback(async value=>{try{await navigator.clipboard.writeText(value);notify(text('已复制完整内容','Complete content copied'));}catch{notify(text('复制失败，请选择文本复制','Copy failed; select the text to copy'));}},[notify,text]);
@@ -63,7 +44,7 @@ function App(){
           value={...value,rows:[...rows.values()].sort((a,b)=>a.seq-b.seq),beforeSeq:page.beforeSeq,hasEarlier:page.hasEarlier};
         }
       }
-      if(ticket!==generation.current)return;setData(value);if(!preserve){setThread('all');setFocusCallId(focus);}setLoading(false);
+      if(ticket!==generation.current)return;setData(value);if(!preserve)setFocusCallId(focus);setLoading(false);
     }
     catch(e){if(ticket===generation.current){setError(e.message);setLoading(false);}}
   },[call]);
@@ -79,10 +60,10 @@ function App(){
       setSelectionInfo(value.currentThreadId?{currentThreadId:value.currentThreadId}:null);
       // A delayed host snapshot may predate the data already loaded by this UI connection.
       if(latestData.current?.trace.id===value.trace.id){loadTrace(value.trace.id,null,{quiet:true,preserve:true});return;}
-      generation.current++;setData(value);setThread('all');setFocusCallId(null);setLoading(false);setError('');return;
+      generation.current++;setData(value);setFocusCallId(null);setLoading(false);setError('');return;
     }
     if(value.view==='select'){
-      generation.current++;setSelectionInfo(value);setCatalogInfo(value);setTraces(value.traces||[]);setRootPath(value.defaultRoot||'');setData(null);setFocusCallId(null);setThread('all');setLoading(false);setError('');
+      generation.current++;setSelectionInfo({currentThreadId:value.currentThreadId,unavailableReason:value.unavailableReason});setData(null);setFocusCallId(null);setLoading(false);setError('');
     }
   },[loadTrace]);
   useEffect(()=>{
@@ -92,8 +73,8 @@ function App(){
     host.current=bridge;
     bridge.start().then(async()=>{
       if(bridge.preview){const result=await bridge.call('show_rollout_trace',bridge.preview.traceId?{traceId:bridge.preview.traceId}:{});apply(result);}
-      const list=await bridge.call('list_rollout_traces');if(!active)return;
-      if(!received.current)apply({view:'select',...list});setTraces(list.traces);setRootPath(list.defaultRoot);setCatalogInfo(list);setConnected(true);
+      if(!received.current)apply(await bridge.call('open_rollout_viewer'));
+      if(active)setConnected(true);
     }).catch(e=>{if(active){setError(e.message);setLoading(false);}});
     return()=>{active=false;generation.current++;bridge.dispose();clearTimeout(toastTimer.current);};
   },[applyResult]);
@@ -103,7 +84,7 @@ function App(){
   useEffect(()=>{const cleanup=[];installIconSprite({effect:setup=>cleanup.push(setup()),on:()=>{}},undefined);return()=>cleanup.forEach(dispose=>dispose?.());},[]);
   useEffect(()=>()=>disposeImageTransfers(),[]);
   useEffect(()=>{
-    if(!connected||!live||loading)return;
+    if(!connected||loading)return;
     let cancelled=false,busy=false;
     async function poll(){
       if(busy||document.hidden)return;busy=true;
@@ -116,11 +97,11 @@ function App(){
           const resolved=await call('get_rollout_binding',{threadId:followingThread});if(stale())return;
           const match=resolved.currentThreadId===followingThread?resolved.trace:null;
           if(match&&match.id!==traceId){
-            setTraces(current=>[match,...current.filter(trace=>trace.id!==match.id)]);
             await loadTrace(match.id,null,{quiet:true});return;
           }
         }
         const delta=await call('get_rollout_delta',{traceId,revision:current.revision});if(stale())return;
+        setError('');
         if(delta.resync){await loadTrace(traceId,null,{quiet:true,preserve:true});return;}
         if(!delta.unchanged)setData(current=>{
           if(current?.trace.id!==traceId)return current;
@@ -132,7 +113,7 @@ function App(){
     const timer=setInterval(poll,1500);
     document.addEventListener('visibilitychange',poll);poll();
     return()=>{cancelled=true;clearInterval(timer);document.removeEventListener('visibilitychange',poll);};
-  },[connected,loading,data?.trace.id,followingThread,live,call,loadTrace,applyResult]);
+  },[connected,loading,data?.trace.id,followingThread,call,loadTrace,applyResult]);
   const earlier=useCallback(async()=>{
     if(!data?.hasEarlier||earlierBusy.current)return false;
     earlierBusy.current=true;const ticket=generation.current;
@@ -143,82 +124,12 @@ function App(){
       return page.rows.length>0;
     }catch(e){if(ticket===generation.current)setError(e.message);return false;}finally{earlierBusy.current=false;}
   },[data,call]);
-  async function refresh(){try{
-    const list=await call('list_rollout_traces',{refresh:true});setTraces(list.traces);setCatalogInfo(list);
-    if(followingThread){
-      const resolved=await call('get_rollout_binding',{threadId:followingThread});
-      const match=resolved.currentThreadId===followingThread?resolved.trace:null;
-      if(match)await loadTrace(match.id,null,{quiet:!!data,preserve:match.id===data?.trace.id});
-      else if(!data)applyResult(await call('open_rollout_viewer'));
-    }
-    else if(data)await loadTrace(data.trace.id,null,{quiet:true,preserve:true});
-    else if(selectionInfo?.currentThreadId){
-      const match=list.traces.find(trace=>trace.threadId===selectionInfo.currentThreadId);
-      if(match)await loadTrace(match.id);
-      else{const issue=list.issues?.find(item=>item.threadId===selectionInfo.currentThreadId);setSelectionInfo(current=>({...current,unavailableReason:issue?.message}));setError('');}
-    }else setError('');
-  }catch(e){setError(e.message);}}
-  async function returnCurrent(){
-    const ticket=++generation.current;
-    try{const result=await call('open_rollout_viewer');if(ticket===generation.current){applyResult(result);setLive(true);closeMenu();}}
-    catch(e){if(ticket===generation.current)setError(e.message);}
-  }
-  async function register(){
-    if(!directory.trim())return;setAdding(true);setError('');
-    try{await call('add_rollout_directory',{path:directory.trim()});const list=await call('list_rollout_traces',{refresh:true});setTraces(list.traces);setCatalogInfo(list);setDirectory('');notify(text('录制目录已添加','Recording directory added'));}
-    catch(e){setError(e.message);}finally{setAdding(false);}
-  }
-  const stats=data?`${data.rows.length} / ${data.totalRows} ${text('条执行记录','records')} · ${data.requestCount} ${text('次模型请求','requests')} · ${data.toolCount} ${text('次工具执行','tools')}${data.codeCellCount?` · ${data.codeCellCount} ${text('个代码调用','code calls')}`:''}`:'';
-  const traceLabel=data?.trace.isThreadAggregate?text('当前聊天','This chat'):data?.trace.label;
-  const languages={zh:'中文',en:'English',ja:'日本語',es:'Español',fr:'Français',de:'Deutsch',ru:'Русский',pt:'Português'};
-  const directoryForm=<form className="app-directory-form" onSubmit={e=>{e.preventDefault();register();}}>
-    <label htmlFor="recording-directory">{text('录制目录','Recording directory')}</label><input id="recording-directory" value={directory} onChange={e=>setDirectory(e.target.value)} placeholder={text('包含 manifest.json 的目录或其父目录','Directory containing manifest.json, or its parent')}/>
-    <button type="submit" className="app-button" disabled={adding||!directory.trim()}>{adding?text('正在添加…','Adding…'):text('添加目录','Add directory')}</button>
-  </form>;
   return <LocaleContext.Provider value={t}><main className={`${view.root} app-frame`} aria-label="Rollout Viewer">
-    <header className="app-source-bar">
-      <h1 className="app-view-name" aria-current="page">{t('view.trajectory')}</h1>
-      <div className="app-source-settings" ref={menuRoot}>
-        <button ref={menuButton} type="button" className="app-icon app-more" aria-label={text('更多轨迹操作','More trajectory actions')} title={text('更多轨迹操作','More trajectory actions')} aria-haspopup="dialog" aria-expanded={menuOpen} aria-controls="trajectory-actions" onClick={()=>setMenuOpen(!menuOpen)}><IconEllipsisOutlineRegular size={16}/></button>
-        {menuOpen&&<section id="trajectory-actions" className="app-source-menu" role="dialog" aria-labelledby="trajectory-actions-title">
-          <div className="app-menu-heading"><h2 id="trajectory-actions-title">{text('轨迹操作','Trajectory actions')}</h2><button type="button" className="app-icon" aria-label={text('关闭轨迹操作','Close trajectory actions')} onClick={closeMenu}>×</button></div>
-          <div className="app-recording-actions">
-            {!followingThread&&selectionInfo?.currentThreadId&&<button type="button" className="app-button" onClick={returnCurrent}>{text('返回当前聊天','Return to this chat')}</button>}
-            <button type="button" className="app-button" data-menu-initial-focus="" onClick={refresh}>{text('刷新','Refresh')}</button>
-            {data&&<button type="button" className="app-button" aria-pressed={live} onClick={()=>setLive(!live)}>{text('实时更新','Live updates')}</button>}
-            <button type="button" className="app-button" onClick={()=>setDark(!dark)} aria-label={dark?text('切换浅色','Use light theme'):text('切换深色','Use dark theme')}>{dark?text('浅色','Light'):text('深色','Dark')}</button>
-          </div>
-          <details className="app-advanced-settings">
-            <summary>{text('高级设置','Advanced settings')}</summary>
-            <div className="app-advanced-body">
-              <div className="app-recording-title"><strong title={traceLabel}>{traceLabel||'Rollout Viewer'}</strong><span className="app-status" title={stats} data-status={data?.status}>{data?text(statusNames[data.status]||data.status,{running:'Recording',complete:'Complete',error:'Failed',cancelled:'Cancelled'}[data.status]||data.status):text('本地录制','Local recordings')}</span></div>
-              <div className="app-recording-picker"><label htmlFor="recording-select">{text('选择录制任务','Select recording')}</label><select id="recording-select" value={data?.trace.id||''} onChange={e=>{setFollowingThread(null);loadTrace(e.target.value);closeMenu();}}><option value="" disabled>{text('选择已录制任务…','Select a recording…')}</option>
-                {data?.trace.isThreadAggregate&&<option value={data.trace.id}>{text('当前聊天 · 全部录制','This chat · All recordings')}{` (${data.trace.recordingCount})`}</option>}
-                {traces.map(trace=><option key={trace.id} value={trace.id}>{timeLabel(trace.startedAt)} · {trace.label}</option>)}</select>
-                {data?.threads?.length>1&&<><label htmlFor="recording-agent">{text('筛选代理','Filter agents')}</label><select id="recording-agent" value={thread} onChange={e=>{setThread(e.target.value);closeMenu();}}><option value="all">{text('全部代理','All agents')}</option>{data.threads.map(agent=><option key={agent.id} value={agent.id}>{agent.label}</option>)}</select></>}
-              </div>
-              {directoryForm}
-              <div className="app-recording-picker"><label htmlFor="interface-locale">{text('界面语言','Interface language')}</label><select id="interface-locale" value={locale} onChange={e=>setLocale(e.target.value)}>{supportedLocales.map(value=><option key={value} value={value}>{languages[value]}</option>)}</select></div>
-              {data&&<output className="app-recording-stats" aria-label={text('录制统计','Recording statistics')}>{stats}</output>}
-              {catalogInfo?.unreadableCount>0&&<p className="app-note">{text(`${catalogInfo.unreadableCount} 份录制无法读取：`,`${catalogInfo.unreadableCount} recordings could not be read: `)}{catalogInfo.issues?.map(issue=>issue.message).filter((value,index,list)=>list.indexOf(value)===index).join(' · ')}</p>}
-              <small className="app-recording-stats" aria-label={text('界面版本','Interface version')}>Rollout Viewer 0.2.15</small>
-              <small className="app-recording-stats" aria-label={text('后台版本','Reader version')}>{text('后台','Reader')} {catalogInfo?.readerVersion||text('未报告','Not reported')}</small>
-            </div>
-          </details>
-          {error&&<p className="app-menu-error" role="alert">{error}</p>}
-        </section>}
-      </div>
-    </header>
-    {error&&!menuOpen&&<Failure error={error} retry={()=>data?loadTrace(data.trace.id):location.reload()}/>}
-    {loading?<Skeleton/>:!data?<section className="app-empty"><h2>{selectionInfo?.unavailableReason?text('当前聊天的录制无法读取','Unable to read this chat recording'):selectionInfo?.currentThreadId?text('当前聊天暂无可读取轨迹','No readable recording for this chat'):text('选择一份录制开始查看','Choose a recording')}</h2>
-      {selectionInfo?.unavailableReason?<p role="alert">{selectionInfo.unavailableReason}</p>:<p>{text('打开「···」中的「高级设置」，查看其他录制或添加目录。','Open “Advanced settings” in “···” to view other recordings or add a directory.')}</p>}
-      {catalogInfo?.recordingConfigured?<p>{text('录制路径已配置。在「···」中点击「刷新」重新匹配当前聊天；已经发生的请求无法补录。','The recording path is configured. Open “···” and refresh to match this chat again; past requests cannot be recorded retroactively.')}</p>:<>
-        <p>{text('需要在录制引擎启动前开启官方 rollout-trace；已经发生的请求无法补录。','Enable official rollout-trace before starting the recording engine; past requests cannot be recorded retroactively.')}</p>
-        <button type="button" className="app-button" onClick={()=>copy(!host.current?.preview&&catalogInfo?.platform==='darwin'?`launchctl setenv CODEX_ROLLOUT_TRACE_ROOT ${quoteShell(rootPath)}`:`CODEX_ROLLOUT_TRACE_ROOT=${quoteShell(rootPath)} codex`)}>{!host.current?.preview&&catalogInfo?.platform==='darwin'?text('复制桌面录制配置命令','Copy desktop recording setup'):text('复制 CLI 录制命令','Copy CLI recording command')}</button>
-      </>}
-      <span>{traces.length?text(`找到 ${traces.length} 份可读取录制`,`${traces.length} readable recordings found`):text('尚未找到可读取录制','No readable recordings found')}{catalogInfo?.unreadableCount?text(` · ${catalogInfo.unreadableCount} 份无法读取`,` · ${catalogInfo.unreadableCount} unreadable`):''} · {text('数据保存在本机','Stored locally')}</span></section>:<>
-      <Trajectory key={`${data.trace.id}:${data.revision.split(':')[0]}`} {...{data,call,earlier,copy,thread,focusCallId}} onFocusApplied={()=>setFocusCallId(null)}/>
-    </>}
+    {error&&<Failure error={error} retry={()=>data?loadTrace(data.trace.id,null,{quiet:true,preserve:true}):location.reload()}/>}
+    {loading?<Skeleton/>:!data?<section className="app-empty" aria-live="polite">
+      <h2>{selectionInfo?.unavailableReason?text('暂时无法读取当前聊天轨迹','Unable to read this chat trajectory'):text('当前聊天暂无轨迹','No trajectory for this chat yet')}</h2>
+      <p>{selectionInfo?.unavailableReason||text('新的执行记录可用时会自动显示。','New execution records will appear automatically when available.')}</p>
+    </section>:<Trajectory key={`${data.trace.id}:${data.revision.split(':')[0]}`} {...{data,call,earlier,copy,focusCallId}} thread="all" onFocusApplied={()=>setFocusCallId(null)}/>}
     <div className={`app-toast ${toast?'visible':''}`} role="status">{toast}</div>
   </main></LocaleContext.Provider>;
 }

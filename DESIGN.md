@@ -1,5 +1,20 @@
 # Design system
 
+## Direct trajectory view, 2026-11-15
+
+Version 0.2.16 supersedes the menu-based designs below. The user wants the
+trajectory itself, with no recording-management concepts to learn. Remove the
+entire extra navigation row, ellipsis and advanced settings. Start at the original
+DSH toolbar at y=0, followed by its timeline, ledger and inspector. Keep their
+upstream CSS intact. Theme and locale follow the host; live updates are automatic.
+
+Bind to the current chat on open. An empty state has brief status text and waits
+for records automatically; it must not ask users to choose archives or configure
+directories. Recover transient polling errors automatically when reads resume.
+Keep recording maintenance and build diagnostics in backend/CLI interfaces and
+invisible resource metadata. Do not reintroduce a settings entry elsewhere in the
+view. Explicit model/API archive launches remain supported outside this UI.
+
 ## Progressive menu settings, 2026-11-15
 
 Version 0.2.15 opens the current chat with live updates enabled. The default

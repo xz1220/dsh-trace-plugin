@@ -16,5 +16,6 @@ const result=await build({entryPoints:['src/viewer.jsx'],bundle:true,write:false
 const js=result.outputFiles.find(f=>f.path.endsWith('.js')).text.replaceAll('</script','<\\/script');
 const css=result.outputFiles.find(f=>f.path.endsWith('.css')).text;
 const license=await readFile('design/DSH-LICENSE.txt','utf8');
-await writeFile('plugins/rollout-viewer/assets/viewer.html',`<!doctype html>\n<!-- DSH component styles: ${license} -->\n<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Rollout Viewer</title><style>${css}</style></head><body><div id="root"></div><!--BOOTSTRAP--><script>${js}</script></body></html>`);
+const {version}=JSON.parse(await readFile('package.json','utf8'));
+await writeFile('plugins/rollout-viewer/assets/viewer.html',`<!doctype html>\n<!-- DSH component styles: ${license} -->\n<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="rollout-viewer-version" content="${version}"><title>Rollout Viewer</title><style>${css}</style></head><body><div id="root"></div><!--BOOTSTRAP--><script>${js}</script></body></html>`);
 console.log('Built Rollout Viewer MCP App');

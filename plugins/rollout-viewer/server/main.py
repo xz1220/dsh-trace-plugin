@@ -19,7 +19,7 @@ from urllib.parse import urlparse
 from store import Store, TraceError, identifier
 
 PLUGIN = Path(__file__).resolve().parents[1]
-VERSION = '0.2.15'
+VERSION = '0.2.16'
 URI = f'ui://rollout-viewer/viewer-{VERSION}.html'
 LEGACY_URI = 'ui://rollout-viewer/viewer.html'
 STORE = Store()

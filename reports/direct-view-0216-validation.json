@@ -1,0 +1,85 @@
+{
+  "version": "0.2.16",
+  "date": "2026-11-15",
+  "request": "Remove the entire extra trajectory navigation and settings layer; open directly into the DSH trajectory.",
+  "behavior": {
+    "extraNavigationRemoved": true,
+    "ellipsisAndAdvancedSettingsRemoved": true,
+    "recordingManagementControlsRemoved": true,
+    "automaticExactCurrentChat": true,
+    "automaticLiveUpdates": true,
+    "hostThemeAndLocale": true,
+    "noStartupCatalogSetupCall": true,
+    "maintenanceOutsideViewingSurface": true,
+    "invisibleBuildMetadata": "0.2.16"
+  },
+  "automatedChecks": {
+    "python": 63,
+    "node": 18,
+    "passed": 81,
+    "failed": 0,
+    "build": true,
+    "upstreamFilesUnchanged": 99,
+    "documentedAdapters": 5,
+    "coreDshCssChanged": false
+  },
+  "installedPackage": {
+    "version": "0.2.16",
+    "officialPluginInstall": true,
+    "mcpConfigReloadAcknowledged": true,
+    "criticalFilesCompared": 9,
+    "installedFilesMatchSource": true,
+    "tools": 15,
+    "versionedResourceAndLegacyAlias": true,
+    "actualGreetingOriginalOrderTurnsAndTimingsMatch": true,
+    "allActualGreetingRawRequestChunksMatch": true,
+    "archivedFullContextCharacters": 81919,
+    "archivedFullContextSha256": "6f4c7f2bfb58f43a7e2f00f39acc2f6999b62f9d2980164ff3d2fc14154bd043"
+  },
+  "installedBrowserClicks": {
+    "htmlBuildVersion": "0.2.16",
+    "coldStartupWithoutModelNotification": true,
+    "initialToolbarTopCssPx": 0,
+    "headerAndSettingsAbsent": true,
+    "durationToggle": true,
+    "turnFoldUnfold": true,
+    "searchAndClear": true,
+    "assistantDetails": true,
+    "thirdUserAndReplyAutomaticallyAppend": true,
+    "earlierSelectionRetained": true,
+    "hostDarkEnglishAndLightChineseNotifications": true,
+    "responsiveWidthsCssPx": [1224, 745, 520, 360],
+    "toolbarTopAtAllWidthsCssPx": 0,
+    "horizontalOverflow": false,
+    "narrowInspectorClose": true,
+    "emptyStateConfigurationControls": 0,
+    "unrelatedChatNotSubstituted": true,
+    "emptyStateToLiveWithoutManualRefresh": true,
+    "transientReadErrorAutomaticallyClears": true
+  },
+  "testEnvironmentNotes": [
+    "Duration mode is exposed through pressed/title; its static aria-label is unchanged. The initial assertion was corrected and rerun.",
+    "Two isolated localhost servers share a cookie name across ports. Restoring the first server's preview authentication resolved the test-only Forbidden state; responsive checks were rerun successfully."
+  ],
+  "nativeDesktopDiagnostic": {
+    "appAvailable": true,
+    "extraHeaderStillPresent": true,
+    "toolbarTopCssPx": 36,
+    "newHtmlBuildMarkerPresent": false,
+    "newReleaseAccepted": false,
+    "userSelectionUnchanged": true,
+    "diagnosticCompletionSummarySent": true,
+    "limitation": "The existing native page still uses the older frontend. Installation and local clicks do not prove it loaded this release."
+  },
+  "cleanup": {
+    "spaceId": 38,
+    "finishCalls": 1,
+    "keptPages": [],
+    "ownedPreviewServersStopped": true
+  },
+  "screenshots": {
+    "installedLocalReference": "reports/screenshots/direct-view-0216-reference.png",
+    "installedDark360": "reports/screenshots/direct-view-0216-dark-360.png",
+    "nativeCodexScreenshots": false
+  }
+}
