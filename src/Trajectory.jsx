@@ -15,7 +15,7 @@ const toggleAll=(set,ids,collapsed)=>set(current=>{const next=new Set(current);f
 
 export default function Trajectory({data,call,earlier,copy,thread,focusCallId,onFocusApplied}) {
   const t=useTranslation();
-  const groupOf=cell=>cell.cellKey==='compaction'||cell.purpose==='compaction'?t('group.compaction',{seq:cell.seq}):cell.step>0?t('group.step',{step:cell.step}):cell.group;
+  const groupOf=cell=>cell.inputHistory?t.text('历史消息（请求输入）','History in request'):cell.cellKey==='compaction'||cell.purpose==='compaction'?t('group.compaction',{seq:cell.seq}):cell.step>0?t('group.step',{step:cell.step}):cell.group;
   const captionOf=cell=>{
     if(cell.kind==='system'&&cell.cellKey==='prompt')return t.text(cell.text,cell.previousPromptDetail?'Instructions and tools updated':'Instructions and tool catalog');
     if(cell.kind==='compacted')return t.text(cell.text,'Context compaction');

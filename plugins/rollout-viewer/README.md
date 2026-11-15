@@ -4,7 +4,7 @@ A local Codex sidebar app for official `rollout-trace` recordings. The interface
 uses DSH's theme and trajectory styles, with a paged execution ledger, timing
 overview, reconstructed request context, and tool inspectors.
 
-Version 0.2.11 uses the upstream DSH runtime: turn/step grouping, request boundaries,
+Version 0.2.12 uses the upstream DSH runtime: turn/step grouping, request boundaries,
 three levels of folding, full-content search, interactive timing overview,
 virtualized rows, a resizable inspector, Markdown/code/JSON views, prompt/tool
 diffs, and the original image gallery. Complete Codex context and original request
@@ -36,6 +36,13 @@ visible until new execution records exist. Live mode continues after completion
 and resolves resumed recordings without needing a new launch notification.
 Manual archive selection remains pinned; “Return to this chat” resumes following.
 The menu footer displays the frontend version for reload verification.
+
+Version 0.2.12 restores historical assistant messages recorded in request inputs.
+They remain interleaved with users after a recording switch and appear in their
+own history group, with request-input provenance and no invented inference
+timing or token usage. Replayed messages are deduplicated using stable identities
+and content; a distinct new message with the same text is kept. Current request
+inspection continues to select its actual response.
 
 ## Open
 

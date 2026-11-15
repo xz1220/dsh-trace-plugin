@@ -27,6 +27,62 @@ class ProjectionTests(unittest.TestCase):
     def project(self):
         return self.store.projection('trace-test')
 
+    def test_replayed_assistant_messages_are_visible_with_request_input_provenance(self):
+        history='## Earlier answer\n\n完整保留 🌱\n'
+        inputs=[{'type':'message','role':'user','id':'old-user','content':[{'type':'input_text','text':'Earlier question'}]},
+                {'type':'message','role':'assistant','id':'old-assistant','content':[{'type':'output_text','text':history}]},
+                {'type':'message','role':'user','id':'new-user','content':[{'type':'input_text','text':'Current question'}]}]
+        request=self.fixture.payload({'model':'test','input':inputs},'inference_request')
+        self.fixture.append('inference_started',inference_call_id='resumed',thread_id='thread-root',codex_turn_id='turn-1',request_payload=request)
+        page=self.project().page();cells=page['cells']
+        self.assertEqual([cell['kind'] for cell in cells],['user','message','user','message'])
+        historical=cells[1]
+        self.assertTrue(historical['inputHistory']);self.assertEqual(historical['step'],0)
+        self.assertNotIn('sourceSeq',historical)
+        self.assertFalse(historical['assistantMetrics']['timingRecorded'])
+        self.assertFalse(historical['assistantMetrics']['usageProvided'])
+        self.assertNotIn('output',historical)
+        self.assertNotEqual(historical['group'],page['requestNumbers'][0]['group'])
+        detail=self.store.cell_detail('trace-test','request:resumed','input:1')
+        origin=json.loads(self.store.cell_text('trace-test','request:resumed','input:1','messageSource')['text'])
+        self.assertEqual(origin['role'],'assistant')
+        self.assertEqual(origin['origin'],'request_input')
+        text=self.store.cell_text('trace-test','request:resumed','input:1','outputDetail')['text']
+        self.assertEqual(text,history)
+        self.assertNotIn('inputDetail',detail['fields'])
+        self.assertTrue(self.store.projection('trace-test').search('完整保留',['request:resumed']))
+
+    def test_full_snapshot_deduplicates_recorded_messages_but_keeps_a_new_identical_user_message(self):
+        def message(role,identity,text):
+            return {'type':'message','role':role,'id':identity,'content':[{'type':'output_text' if role=='assistant' else 'input_text','text':text}]}
+        old_user=message('user','old-user','Earlier question');old_assistant=message('assistant','old-assistant','Earlier answer')
+        current_user=message('user','current-user','Repeat this');current_answer=message('assistant','current-answer','First recorded answer')
+        req=self.fixture.payload({'input':[old_user,old_assistant,current_user]},'inference_request')
+        self.fixture.append('inference_started',inference_call_id='one',thread_id='thread-root',request_payload=req)
+        result=self.fixture.payload({'output_items':[current_answer]},'inference_response')
+        self.fixture.append('inference_completed',inference_call_id='one',response_id='response-one',response_payload=result)
+        # A transport/context update changes the full prefix, but not message identities.
+        req=self.fixture.payload({'input':[message('developer','new-context','Changed context'),
+            old_user,{**old_assistant,'internal_chat_message_metadata_passthrough':{'turn_id':'old-turn'}},current_user,current_answer,
+            message('user','different-new-user','Repeat this')]},'inference_request')
+        self.fixture.append('inference_started',inference_call_id='two',thread_id='thread-root',request_payload=req)
+        cells=self.project().page()['cells']
+        visible=[cell for cell in cells if not cell.get('requestOnly')]
+        self.assertEqual(sum(cell.get('previewMarkdown')=='Earlier answer' for cell in visible),1)
+        self.assertEqual(sum(cell.get('previewMarkdown')=='First recorded answer' for cell in visible),1)
+        self.assertEqual(sum(cell.get('previewMarkdown')=='Repeat this' for cell in visible),2)
+        later=[cell for cell in visible if cell['rowId']=='request:two' and cell['kind']=='user']
+        self.assertEqual(len(later),1);self.assertFalse(later[0].get('inputHistory',False))
+
+    def test_failed_current_request_does_not_mark_its_historical_assistant_as_failed(self):
+        req=self.fixture.payload({'input':[{'type':'message','role':'assistant','id':'old',
+            'content':[{'type':'output_text','text':'Earlier successful answer'}]}]},'inference_request')
+        self.fixture.append('inference_started',inference_call_id='failed',thread_id='thread-root',request_payload=req)
+        self.fixture.append('inference_failed',inference_call_id='failed',error='Current request failed')
+        historical=next(cell for cell in self.project().page()['cells'] if cell.get('inputHistory'))
+        self.assertFalse(historical['isError'])
+        self.assertIsNone(historical['startedAt'])
+
     def test_turns_steps_and_request_result_anchor(self):
         self.fixture.conversation()
         page = self.project().page()

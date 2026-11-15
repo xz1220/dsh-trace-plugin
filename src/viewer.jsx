@@ -196,7 +196,7 @@ function App(){
             <button type="button" className="app-button" onClick={()=>setDark(!dark)} aria-label={dark?text('切换浅色','Use light theme'):text('切换深色','Use dark theme')}>{dark?text('浅色','Light'):text('深色','Dark')}</button>
           </div>
           {directoryForm}
-          <small className="app-recording-stats" aria-label={text('界面版本','Interface version')}>Rollout Viewer 0.2.11</small>
+          <small className="app-recording-stats" aria-label={text('界面版本','Interface version')}>Rollout Viewer 0.2.12</small>
           {error&&<p className="app-menu-error" role="alert">{error}</p>}
         </section>}
       </div>

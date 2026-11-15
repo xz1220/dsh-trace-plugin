@@ -1,5 +1,14 @@
 # Design system
 
+## Historical assistant inputs, 2026-11-15
+
+Version 0.2.12 renders assistant messages already present in recorded request
+inputs. Preserve their source order alongside historical users. Keep them in the
+history group, apart from the current request's user input and generated response;
+they must not become its result anchor. Use recorded identity, role and content
+to deduplicate full-snapshot replay without collapsing distinct repeated messages.
+Historical input messages have no inferred generation timing or token metrics.
+
 ## Startup and live following, 2026-11-15
 
 Version 0.2.11 reads the native entry after initializing its bridge when the host

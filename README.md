@@ -6,7 +6,7 @@ Native Codex sidebar plugin for official rollout-trace, using the approved
 DSH-style interface. It shows complete recorded client context, original
 incremental requests, tool input/output and caller relationships, and timing.
 
-The current implementation is **0.2.11**. Its compact trajectory navigation
+The current implementation is **0.2.12**. Its compact trajectory navigation
 follows the user's running DSH Web screenshot: “轨迹 / ···”, followed directly by
 the toolbar and timeline. Recording selection, refresh, live updates, theme,
 directories, language, agent filtering and statistics are in the “···” menu.
@@ -29,7 +29,14 @@ selected archives remain pinned. “Return to this chat” restores automatic fo
 The regression evidence is in `reports/startup-live-0211-validation.json`;
 native cold-start acceptance remains pending the new plugin connection reload.
 
-**63 automated checks pass.** The installed app was also clicked through with
+Recorded assistant messages replayed inside a request are now visible alongside
+historical users. Stable message identities prevent duplicate replay rows while
+keeping distinct new messages with identical text. Historical input messages have
+their own group and source; they are not presented as the current inference's
+response or assigned its token usage and timing. The regression evidence is in
+`reports/history-assistant-0212-validation.json`.
+
+**66 automated checks pass.** The installed app was also clicked through with
 real archived and controlled recordings, including 301-record call navigation,
 copying, image export, locale notifications and 360px dark layouts.
 [The current acceptance ledger](docs/DSH_PARITY.md) and

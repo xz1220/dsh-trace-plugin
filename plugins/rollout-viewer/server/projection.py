@@ -30,6 +30,18 @@ def message_text(item):
                        and isinstance(block.get('text',block.get('refusal')),str))
 
 
+def message_identity(item):
+    if not isinstance(item,dict) or item.get('type') not in ('message','input_message'):
+        return None
+    metadata=item.get('internal_chat_message_metadata_passthrough')
+    if not isinstance(metadata,dict):metadata={}
+    identity=item.get('id') or metadata.get('turn_id')
+    if not identity:return None
+    # Keep genuinely repeated messages and changed content; ignore transport metadata.
+    content=json.dumps(item.get('content',[]),ensure_ascii=False,sort_keys=True)
+    return (str(identity),item.get('role'),hashlib.sha256(content.encode()).hexdigest())
+
+
 def usage(value):
     if not isinstance(value, dict):
         return None
@@ -284,6 +296,7 @@ class Projection:
             previous = self.previous_requests.get(row['id'])
             # A full request can replay an earlier prefix. Retain only newly introduced items.
             skip = 0
+            known = []
             if not raw.get('previous_response_id') and previous:
                 before = self.index.context(previous['id'])
                 output = self.index.payload(previous.get('_response')) or {}
@@ -291,6 +304,13 @@ class Projection:
                 while skip < min(len(inputs), len(known)) and inputs[skip] == known[skip]:
                     skip += 1
             introduced = list(enumerate(inputs))[skip:]
+            known_messages={identity for item in known if (identity:=message_identity(item)) is not None}
+            introduced=[(position,item) for position,item in introduced
+                        if (identity:=message_identity(item)) is None or identity not in known_messages]
+            user_positions=[position for position,item in introduced if isinstance(item,dict)
+                            and item.get('role')=='user' and item.get('type') in ('message','input_message')
+                            and not message_text(item).lstrip().startswith(('<environment_context>','<turn_aborted>','<codex_internal_context'))]
+            last_user=user_positions[-1] if user_positions else None
             has_prompt = any(isinstance(item, dict) and item.get('role') in ('developer', 'system') for _, item in introduced) or raw.get('tools') is not None
             if has_prompt:
                 prompt = self.prompt(row)
@@ -300,10 +320,15 @@ class Projection:
                                   'timeSeconds': 0, 'promptDetail': {'system': '', 'tools': [], 'config': {}},
                                   **({'previousPromptDetail': {'system': '', 'tools': [], 'config': {}}} if prior else {})})
             for position, item in introduced:
-                if not isinstance(item, dict) or item.get('type') not in ('message', 'input_message') or item.get('role') in ('system', 'developer', 'assistant'):
+                if not isinstance(item, dict) or item.get('type') not in ('message', 'input_message') or item.get('role') in ('system', 'developer'):
                     continue
+                assistant=item.get('role')=='assistant'
                 text = message_text(item)
-                context = item.get('role') != 'user' or text.lstrip().startswith(('<environment_context>', '<turn_aborted>', '<codex_internal_context'))
+                context = not assistant and (item.get('role') != 'user' or text.lstrip().startswith(('<environment_context>', '<turn_aborted>', '<codex_internal_context')))
+                metadata=item.get('internal_chat_message_metadata_passthrough')
+                if not isinstance(metadata,dict):metadata={}
+                current_user=not context and not assistant and (bool(metadata.get('turn_id')) and metadata['turn_id']==row.get('turnId') or position==last_user)
+                historical=assistant or not context and not current_user
                 blocks = source_blocks(item, row['id'], f'input-{position}',metadata_only=True)
                 attachments = [block for block in blocks if 'attachment' in block or 'file' in block]
                 # Metadata counts are sufficient to paint the row without shipping a base64 image.
@@ -311,9 +336,11 @@ class Projection:
                 images = sum('attachment' in block for block in attachments)
                 files = sum('file' in block for block in attachments)
                 summary = ' · '.join(part for part in [f'图片 ×{images}' if images else '',f'文件 ×{files}' if files else ''] if part)
-                cells.append({**base, 'sourceSeq':None, 'cellKey': f'input:{position}', 'kind': 'context' if context else 'user',
-                              'text': summary, 'previewMarkdown':source[:2048], 'opensTurn': not context, 'inputDetail': ' ', 'timeSeconds': 0,
-                              'messageSource': {'role': item.get('role'), 'type': item.get('type')},
+                cells.append({**base, 'sourceSeq':None, 'cellKey': f'input:{position}', 'kind': 'message' if assistant else 'context' if context else 'user',
+                              **({'inputHistory':True,'step':0,'group':'历史消息（请求输入）'} if historical else {}),
+                              **({'outputDetail':' ','isError':False,'startedAt':None,'assistantMetrics':{'timingRecorded':False,'usageProvided':False}} if assistant else {'inputDetail':' '}),
+                              'text': summary, 'previewMarkdown':source[:2048], 'opensTurn': current_user, 'timeSeconds': 0,
+                              'messageSource': {'role': item.get('role'), 'type': item.get('type'),**({'kind':'request input'} if assistant else {})},
                               'sourceBlocks': [{**b, 'content': '', **({'attachment': {k:v for k,v in b['attachment'].items() if k != 'recordedUrl'}} if b.get('attachment') else {})} for b in attachments]})
             outputs = response.get('output_items', [])
             messages = [item for item in outputs if isinstance(item, dict) and item.get('type') == 'message']
@@ -422,9 +449,11 @@ class Projection:
             item = self.index.payload(row['_request'])['input'][position]
             blocks = source_blocks(item, row['id'], f'input-{position}')
             origin={'role':item.get('role'),'type':item.get('type')}
+            if item.get('role')=='assistant':origin['kind']='request input'
             if 'internal_chat_message_metadata_passthrough' in item:
                 origin['metadata']=item['internal_chat_message_metadata_passthrough']
-            data.update(inputDetail='\n\n'.join(b['content'] for b in blocks if b['type'] == 'text'),sourceBlocks=blocks,messageSource=origin)
+            field='outputDetail' if item.get('role')=='assistant' else 'inputDetail'
+            data.update({field:'\n\n'.join(b['content'] for b in blocks if b['type']=='text')},sourceBlocks=blocks,messageSource={**origin,'origin':'request_input'})
         elif cell_key == 'assistant':
             response = self.index.payload(row.get('_response')) or {}
             blocks = []
@@ -482,6 +511,8 @@ class Projection:
                     continue
                 value = self.detail(row_id, cell['cellKey'])
                 sources=[f'turn {value["turn"]}' if value['turn'] is not None else 'between turns',value['group'],value['kind']]
+                if value.get('inputHistory'):
+                    sources.append('历史消息（请求输入）' if locale=='zh' else 'history in request')
                 if value.get('cellKey')=='compaction':
                     sources.append(labels['compaction'].format(seq=value['seq']))
                 elif isinstance(value.get('step'),int) and value['step']>0:
