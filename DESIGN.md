@@ -1,5 +1,19 @@
 # Design system
 
+## Progressive menu settings, 2026-11-15
+
+Version 0.2.15 opens the current chat with live updates enabled. The default
+ellipsis popover contains refresh, live updates and theme. Keep recording choice,
+directory management, language, agent filtering, statistics and both versions in
+a native, initially collapsed Advanced settings disclosure. Returning from a
+manually selected archive resumes current-chat following and live updates.
+
+Reset the disclosure on menu close. Initial menu focus goes to refresh, outside
+the collapsed content. Preserve Escape, focus restoration and keyboard exit.
+The compact popover is 320px at most and scrolls in short viewports. Do not add
+new chrome above the original DSH toolbar or alter the core trajectory CSS.
+Empty-state instructions point to Advanced settings for recording management.
+
 ## Chronological chat continuity, 2026-11-15
 
 Version 0.2.14 keeps the current chat as a stable view across official recordings

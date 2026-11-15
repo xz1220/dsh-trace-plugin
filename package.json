@@ -1,7 +1,7 @@
 {
   "name": "codex-rollout-viewer",
   "private": true,
-  "version": "0.2.14",
+  "version": "0.2.15",
   "scripts": {
     "build": "node scripts/build-plugin.mjs",
     "test": "python3 -m unittest discover -s tests -v && node --test tests/test_file_drag.mjs tests/test_host.mjs tests/test_locale.mjs tests/test_preferences.mjs tests/test_trajectory_order.mjs",

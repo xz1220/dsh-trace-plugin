@@ -19,7 +19,7 @@ from urllib.parse import urlparse
 from store import Store, TraceError, identifier
 
 PLUGIN = Path(__file__).resolve().parents[1]
-VERSION = '0.2.14'
+VERSION = '0.2.15'
 URI = f'ui://rollout-viewer/viewer-{VERSION}.html'
 LEGACY_URI = 'ui://rollout-viewer/viewer.html'
 STORE = Store()
@@ -246,7 +246,7 @@ def preview_server(port, trace_id=None):
                 cold='true' if urlparse(self.path).query=='cold=1' else 'false'
                 html = '''<!doctype html><html><head><meta charset="utf-8"><title>MCP Apps handshake validation</title></head><body style="margin:0"><iframe title="Rollout Viewer native bridge" src="/native-frame" style="border:0;width:100vw;height:100vh"></iframe><script>
 const frame=document.querySelector('iframe');window.bridgeCalls=[];
-async function invoke(name,args){const response=await fetch('/api',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,arguments:args,_meta:{threadId:BOUND_THREAD}})});return response.json();}
+async function invoke(name,args){const response=await fetch('/api',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,arguments:args,_meta:{threadId:BOUND_THREAD}})});const result=await response.json();return response.ok?result:{isError:true,content:[{type:'text',text:result.error||'Local preview request failed'}],structuredContent:{error:result.error||'Local preview request failed'}};}
 addEventListener('message',async event=>{if(event.source!==frame.contentWindow||event.data?.jsonrpc!=='2.0')return;const m=event.data;const send=value=>frame.contentWindow.postMessage({jsonrpc:'2.0',...value},location.origin);
 if(m.method==='ui/initialize'){window.bridgeCalls.push(m.method);send({id:m.id,result:{protocolVersion:'2026-01-26',hostInfo:{name:'local-validation',version:'1'},hostCapabilities:{},hostContext:{theme:'light',locale:'zh-CN',displayMode:'fullscreen'}}});}
 else if(m.method==='ui/notifications/initialized'){window.bridgeCalls.push(m.method);if(!COLD_START){const result=await invoke('show_rollout_trace',{traceId:TRACE_ID});send({method:'ui/notifications/tool-result',params:result});}}

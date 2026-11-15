@@ -4,7 +4,7 @@ A local Codex sidebar app for official `rollout-trace` recordings. The interface
 uses DSH's theme and trajectory styles, with a paged execution ledger, timing
 overview, reconstructed request context, and tool inspectors.
 
-Version 0.2.14 uses the upstream DSH runtime: turn/step grouping, request boundaries,
+Version 0.2.15 uses the upstream DSH runtime: turn/step grouping, request boundaries,
 three levels of folding, full-content search, interactive timing overview,
 virtualized rows, a resizable inspector, Markdown/code/JSON views, prompt/tool
 diffs, and the original image gallery. Complete Codex context and original request
@@ -55,13 +55,19 @@ The current-chat aggregate has a 256 MiB combined event-log bound; exceeding it 
 explicit, while individual recordings remain selectable. Source indexes and
 aggregate views have bounded caches.
 
+Version 0.2.15 opens the current chat with live updates enabled. The compact
+ellipsis menu provides refresh, live updates and theme; recording selection,
+directories, language, agent filtering, statistics and version information are
+inside collapsed Advanced settings. Returning from an archive to the current
+chat also resumes live updates. Advanced settings collapse when the menu closes.
+
 ## Open
 
 In a Codex conversation's right panel, choose **+ → More tools… → Plugins and
 MCPs → Rollout Viewer**. The native entry joins only official recordings whose
 root thread ID matches the caller. If none exist, it offers an explicit recording
-selector. It never substitutes the latest task. Open “···” for recording selection and
-directory management.
+selector. It never substitutes the latest task. Open “···” → “Advanced settings”
+for recording selection and directory management.
 
 The model-facing `show_rollout_trace` tool can also open an explicit trace ID.
 It returns only launch metadata. Prompt and tool bodies are loaded through

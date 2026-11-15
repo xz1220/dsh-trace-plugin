@@ -6,10 +6,12 @@ Native Codex sidebar plugin for official rollout-trace, using the approved
 DSH-style interface. It shows complete recorded client context, original
 incremental requests, tool input/output and caller relationships, and timing.
 
-The current implementation is **0.2.14**. Its compact trajectory navigation
+The current implementation is **0.2.15**. Its compact trajectory navigation
 follows the user's running DSH Web screenshot: “轨迹 / ···”, followed directly by
-the toolbar and timeline. Recording selection, refresh, live updates, theme,
-directories, language, agent filtering and statistics are in the “···” menu.
+the toolbar and timeline. The “···” menu provides refresh, live updates and theme.
+Recording selection, directories, language, agent filtering, statistics and
+version information are inside collapsed “Advanced settings”. The current chat
+opens with live updates enabled; returning from an archive also resumes updates.
 There is no extra task-title row inside the sidebar. It uses the pinned upstream trajectory table, timeline, toolbar,
 inspectors and image gallery. Core component CSS remains unchanged; local
 adapters are documented in `vendor/dsh/PATCHES.md` and verified during builds.
@@ -36,11 +38,13 @@ their own group and source; they are not presented as the current inference's
 response or assigned its token usage and timing. The regression evidence is in
 `reports/history-assistant-0212-validation.json`.
 
-**81 automated checks pass.** Current chronology clicks cover three- and four-turn
-updates on the 0.2.13 functional candidate; installed 0.2.14 file/RPC checks cover
-the final release. Earlier installed builds also cover 301-record call navigation,
-copying, image export, locale notifications and 360px dark layouts. Native Codex
-acceptance of this release remains pending an updated, expanded app connection.
+**81 automated checks pass.** Current menu clicks cover advanced disclosure,
+keyboard interaction, directories, language/theme, live appends and archive return
+through five controlled turns; installed 0.2.15 was clicked again with both
+versions checked. Earlier installed builds also cover 301-record call navigation,
+copying, image export, locale notifications and 360px dark layouts. See
+`reports/advanced-settings-0215-validation.json`. Native Codex acceptance of this
+release remains pending a reload of the existing 0.2.14 app connection.
 [The current acceptance ledger](docs/DSH_PARITY.md) and
 `reports/dsh-alignment-028.json` record the earlier interaction evidence. The native
 panel has been observed live, and after the user's restart the connected backend

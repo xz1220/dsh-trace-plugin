@@ -160,7 +160,7 @@ function App(){
   }catch(e){setError(e.message);}}
   async function returnCurrent(){
     const ticket=++generation.current;
-    try{const result=await call('open_rollout_viewer');if(ticket===generation.current){applyResult(result);closeMenu();}}
+    try{const result=await call('open_rollout_viewer');if(ticket===generation.current){applyResult(result);setLive(true);closeMenu();}}
     catch(e){if(ticket===generation.current)setError(e.message);}
   }
   async function register(){
@@ -174,9 +174,6 @@ function App(){
   const directoryForm=<form className="app-directory-form" onSubmit={e=>{e.preventDefault();register();}}>
     <label htmlFor="recording-directory">{text('录制目录','Recording directory')}</label><input id="recording-directory" value={directory} onChange={e=>setDirectory(e.target.value)} placeholder={text('包含 manifest.json 的目录或其父目录','Directory containing manifest.json, or its parent')}/>
     <button type="submit" className="app-button" disabled={adding||!directory.trim()}>{adding?text('正在添加…','Adding…'):text('添加目录','Add directory')}</button>
-    <label htmlFor="interface-locale">{text('界面语言','Interface language')}</label><select id="interface-locale" value={locale} onChange={e=>setLocale(e.target.value)}>{supportedLocales.map(value=><option key={value} value={value}>{languages[value]}</option>)}</select>
-    {data&&<output className="app-recording-stats" aria-label={text('录制统计','Recording statistics')}>{stats}</output>}
-    {catalogInfo?.unreadableCount>0&&<p className="app-note">{text(`${catalogInfo.unreadableCount} 份录制无法读取：`,`${catalogInfo.unreadableCount} recordings could not be read: `)}{catalogInfo.issues?.map(issue=>issue.message).filter((value,index,list)=>list.indexOf(value)===index).join(' · ')}</p>}
   </form>;
   return <LocaleContext.Provider value={t}><main className={`${view.root} app-frame`} aria-label="Rollout Viewer">
     <header className="app-source-bar">
@@ -185,28 +182,36 @@ function App(){
         <button ref={menuButton} type="button" className="app-icon app-more" aria-label={text('更多轨迹操作','More trajectory actions')} title={text('更多轨迹操作','More trajectory actions')} aria-haspopup="dialog" aria-expanded={menuOpen} aria-controls="trajectory-actions" onClick={()=>setMenuOpen(!menuOpen)}><IconEllipsisOutlineRegular size={16}/></button>
         {menuOpen&&<section id="trajectory-actions" className="app-source-menu" role="dialog" aria-labelledby="trajectory-actions-title">
           <div className="app-menu-heading"><h2 id="trajectory-actions-title">{text('轨迹操作','Trajectory actions')}</h2><button type="button" className="app-icon" aria-label={text('关闭轨迹操作','Close trajectory actions')} onClick={closeMenu}>×</button></div>
-          <div className="app-recording-title"><strong title={traceLabel}>{traceLabel||'Rollout Viewer'}</strong><span className="app-status" title={stats} data-status={data?.status}>{data?text(statusNames[data.status]||data.status,{running:'Recording',complete:'Complete',error:'Failed',cancelled:'Cancelled'}[data.status]||data.status):text('本地录制','Local recordings')}</span></div>
-          <div className="app-recording-picker"><label htmlFor="recording-select">{text('选择录制任务','Select recording')}</label><select id="recording-select" data-menu-initial-focus="" value={data?.trace.id||''} onChange={e=>{setFollowingThread(null);loadTrace(e.target.value);closeMenu();}}><option value="" disabled>{text('选择已录制任务…','Select a recording…')}</option>
-            {data?.trace.isThreadAggregate&&<option value={data.trace.id}>{text('当前聊天 · 全部录制','This chat · All recordings')}{` (${data.trace.recordingCount})`}</option>}
-            {traces.map(trace=><option key={trace.id} value={trace.id}>{timeLabel(trace.startedAt)} · {trace.label}</option>)}</select>
-            {data?.threads?.length>1&&<><label htmlFor="recording-agent">{text('筛选代理','Filter agents')}</label><select id="recording-agent" value={thread} onChange={e=>{setThread(e.target.value);closeMenu();}}><option value="all">{text('全部代理','All agents')}</option>{data.threads.map(agent=><option key={agent.id} value={agent.id}>{agent.label}</option>)}</select></>}
-          </div>
           <div className="app-recording-actions">
             {!followingThread&&selectionInfo?.currentThreadId&&<button type="button" className="app-button" onClick={returnCurrent}>{text('返回当前聊天','Return to this chat')}</button>}
-            <button type="button" className="app-button" onClick={refresh}>{text('刷新','Refresh')}</button>
-            {data&&<button type="button" className="app-button" aria-label={text('跟随录制','Follow recording')} aria-pressed={live} onClick={()=>setLive(!live)} title={text('跟随正在录制的任务','Follow a running recording')}>{text('实时','Live')}</button>}
+            <button type="button" className="app-button" data-menu-initial-focus="" onClick={refresh}>{text('刷新','Refresh')}</button>
+            {data&&<button type="button" className="app-button" aria-pressed={live} onClick={()=>setLive(!live)}>{text('实时更新','Live updates')}</button>}
             <button type="button" className="app-button" onClick={()=>setDark(!dark)} aria-label={dark?text('切换浅色','Use light theme'):text('切换深色','Use dark theme')}>{dark?text('浅色','Light'):text('深色','Dark')}</button>
           </div>
-          {directoryForm}
-          <small className="app-recording-stats" aria-label={text('界面版本','Interface version')}>Rollout Viewer 0.2.14</small>
-          <small className="app-recording-stats" aria-label={text('后台版本','Reader version')}>{text('后台','Reader')} {catalogInfo?.readerVersion||text('未报告','Not reported')}</small>
+          <details className="app-advanced-settings">
+            <summary>{text('高级设置','Advanced settings')}</summary>
+            <div className="app-advanced-body">
+              <div className="app-recording-title"><strong title={traceLabel}>{traceLabel||'Rollout Viewer'}</strong><span className="app-status" title={stats} data-status={data?.status}>{data?text(statusNames[data.status]||data.status,{running:'Recording',complete:'Complete',error:'Failed',cancelled:'Cancelled'}[data.status]||data.status):text('本地录制','Local recordings')}</span></div>
+              <div className="app-recording-picker"><label htmlFor="recording-select">{text('选择录制任务','Select recording')}</label><select id="recording-select" value={data?.trace.id||''} onChange={e=>{setFollowingThread(null);loadTrace(e.target.value);closeMenu();}}><option value="" disabled>{text('选择已录制任务…','Select a recording…')}</option>
+                {data?.trace.isThreadAggregate&&<option value={data.trace.id}>{text('当前聊天 · 全部录制','This chat · All recordings')}{` (${data.trace.recordingCount})`}</option>}
+                {traces.map(trace=><option key={trace.id} value={trace.id}>{timeLabel(trace.startedAt)} · {trace.label}</option>)}</select>
+                {data?.threads?.length>1&&<><label htmlFor="recording-agent">{text('筛选代理','Filter agents')}</label><select id="recording-agent" value={thread} onChange={e=>{setThread(e.target.value);closeMenu();}}><option value="all">{text('全部代理','All agents')}</option>{data.threads.map(agent=><option key={agent.id} value={agent.id}>{agent.label}</option>)}</select></>}
+              </div>
+              {directoryForm}
+              <div className="app-recording-picker"><label htmlFor="interface-locale">{text('界面语言','Interface language')}</label><select id="interface-locale" value={locale} onChange={e=>setLocale(e.target.value)}>{supportedLocales.map(value=><option key={value} value={value}>{languages[value]}</option>)}</select></div>
+              {data&&<output className="app-recording-stats" aria-label={text('录制统计','Recording statistics')}>{stats}</output>}
+              {catalogInfo?.unreadableCount>0&&<p className="app-note">{text(`${catalogInfo.unreadableCount} 份录制无法读取：`,`${catalogInfo.unreadableCount} recordings could not be read: `)}{catalogInfo.issues?.map(issue=>issue.message).filter((value,index,list)=>list.indexOf(value)===index).join(' · ')}</p>}
+              <small className="app-recording-stats" aria-label={text('界面版本','Interface version')}>Rollout Viewer 0.2.15</small>
+              <small className="app-recording-stats" aria-label={text('后台版本','Reader version')}>{text('后台','Reader')} {catalogInfo?.readerVersion||text('未报告','Not reported')}</small>
+            </div>
+          </details>
           {error&&<p className="app-menu-error" role="alert">{error}</p>}
         </section>}
       </div>
     </header>
     {error&&!menuOpen&&<Failure error={error} retry={()=>data?loadTrace(data.trace.id):location.reload()}/>}
     {loading?<Skeleton/>:!data?<section className="app-empty"><h2>{selectionInfo?.unavailableReason?text('当前聊天的录制无法读取','Unable to read this chat recording'):selectionInfo?.currentThreadId?text('当前聊天暂无可读取轨迹','No readable recording for this chat'):text('选择一份录制开始查看','Choose a recording')}</h2>
-      {selectionInfo?.unavailableReason?<p role="alert">{selectionInfo.unavailableReason}</p>:<p>{text('打开「···」选择已录制任务，或添加录制目录。','Open “···” to select a recording or add a recording directory.')}</p>}
+      {selectionInfo?.unavailableReason?<p role="alert">{selectionInfo.unavailableReason}</p>:<p>{text('打开「···」中的「高级设置」，查看其他录制或添加目录。','Open “Advanced settings” in “···” to view other recordings or add a directory.')}</p>}
       {catalogInfo?.recordingConfigured?<p>{text('录制路径已配置。在「···」中点击「刷新」重新匹配当前聊天；已经发生的请求无法补录。','The recording path is configured. Open “···” and refresh to match this chat again; past requests cannot be recorded retroactively.')}</p>:<>
         <p>{text('需要在录制引擎启动前开启官方 rollout-trace；已经发生的请求无法补录。','Enable official rollout-trace before starting the recording engine; past requests cannot be recorded retroactively.')}</p>
         <button type="button" className="app-button" onClick={()=>copy(!host.current?.preview&&catalogInfo?.platform==='darwin'?`launchctl setenv CODEX_ROLLOUT_TRACE_ROOT ${quoteShell(rootPath)}`:`CODEX_ROLLOUT_TRACE_ROOT=${quoteShell(rootPath)} codex`)}>{!host.current?.preview&&catalogInfo?.platform==='darwin'?text('复制桌面录制配置命令','Copy desktop recording setup'):text('复制 CLI 录制命令','Copy CLI recording command')}</button>
