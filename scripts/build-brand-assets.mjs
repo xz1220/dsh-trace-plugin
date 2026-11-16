@@ -1,8 +1,8 @@
 // Deterministic vector and PNG exports. No additional build dependencies.
-import { writeFile, mkdir } from 'node:fs/promises';
 import { deflateSync } from 'node:zlib';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { updateGeneratedFiles } from './generated-files.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const output = path.join(root, 'plugins/codex-dsh-trace/assets');
@@ -108,10 +108,16 @@ function png(size, theme) {
     chunk('IEND', Buffer.alloc(0)),
   ]);
 }
-await mkdir(output, { recursive: true });
-await writeFile(path.join(output, 'icon.svg'), svg('light'));
-await writeFile(path.join(output, 'logo-dark.svg'), svg('dark'));
-await writeFile(path.join(output, 'icon.png'), png(64, 'light'));
-await writeFile(path.join(output, 'logo.png'), png(256, 'light'));
-await writeFile(path.join(output, 'logo-dark.png'), png(256, 'dark'));
-console.log('Built Codex Trace SVG and PNG brand assets');
+export function brandAssets() {
+  return new Map([
+    [path.join(output, 'icon.svg'), svg('light')],
+    [path.join(output, 'logo-dark.svg'), svg('dark')],
+    [path.join(output, 'icon.png'), png(64, 'light')],
+    [path.join(output, 'logo.png'), png(256, 'light')],
+    [path.join(output, 'logo-dark.png'), png(256, 'dark')],
+  ]);
+}
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  await updateGeneratedFiles(brandAssets(), { check: process.argv.includes('--check') });
+  console.log('Built Codex Trace SVG and PNG brand assets');
+}
