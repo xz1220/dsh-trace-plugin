@@ -2,7 +2,7 @@
 
 在 Codex 聊天侧栏查看已录制的模型请求、嵌套工具调用、压缩记录和执行耗时。
 
-[English](README.md) · [参与开发](CONTRIBUTING.md) · [架构](docs/ARCHITECTURE.md) · [安全与隐私](SECURITY.md)
+[English](README.md) · [参与开发](.github/CONTRIBUTING.md) · [架构](docs/ARCHITECTURE.md) · [安全与隐私](.github/SECURITY.md)
 
 ![Codex Trace 展示合成录制数据](docs/images/trace-viewer.png)
 
@@ -36,6 +36,8 @@ codex plugin add codex-dsh-trace@rollout-local
 仓库已包含构建好的前端，安装时无需 Node.js、npm 或手动克隆源码。如果仓库仍为私有，你的 Git 凭据需要有仓库访问权限。
 
 在聊天右侧工具菜单中打开 **Codex Trace**。新安装后若入口未出现，打开一个新聊天。
+
+macOS 的单命令安装、配置检查与卸载方式见[安装助手说明](docs/INSTALLER.md)。
 
 ## 更新
 
@@ -100,7 +102,7 @@ python3 plugins/codex-dsh-trace/server/main.py --register /absolute/path/to/reco
 
 插件读取默认目录、`CODEX_ROLLOUT_TRACE_ROOT` 和手动登记目录中的官方录制，不用普通会话日志代替。登记目录只会写入 `$CODEX_HOME/rollout-viewer/` 下的小型配置文件，默认位置是 `~/.codex/rollout-viewer/`；不会修改录制。
 
-读取器没有上传、统计埋点或远程服务集成。录制内容交给本地 Codex 应用展示；可选预览通过带认证的 loopback HTTP 提供同一份数据。录制可能含密钥、私有代码、提示词和图片。分享截图、复制内容、导出图片或打开外部链接前，请先阅读[安全说明](SECURITY.md)。
+读取器没有上传、统计埋点或远程服务集成。录制内容交给本地 Codex 应用展示；可选预览通过带认证的 loopback HTTP 提供同一份数据。录制可能含密钥、私有代码、提示词和图片。分享截图、复制内容、导出图片或打开外部链接前，请先阅读[安全说明](.github/SECURITY.md)。
 
 ## 常见问题
 
@@ -122,7 +124,7 @@ npm test
 
 运行 `npm run demo` 可打开隔离的合成录制，不读取个人 Codex 数据。
 
-格式化、CI、合成夹具、浏览器预览、打包和 DSH 更新方法见 [CONTRIBUTING.md](CONTRIBUTING.md)。产品行为及后续计划见 [docs/PRODUCT.md](docs/PRODUCT.md) 与 [docs/ROADMAP.md](docs/ROADMAP.md)。
+先在本页了解安装与使用，再按[贡献指南](.github/CONTRIBUTING.md)完成开发准备、检查并找到要修改的目录。修改读取器或界面时阅读[架构说明](docs/ARCHITECTURE.md)；具体行为约束和后续计划见[产品说明](docs/PRODUCT.md)与[路线图](docs/ROADMAP.md)。
 
 ## 致谢与许可
 

@@ -110,7 +110,7 @@ export async function thirdPartyNotices(metafile) {
       credits.push(`${path.basename(font)}\n${notice}`);
     }
     sections.push(
-      `KaTeX mathematical fonts (unmodified)\nLicense: OFL-1.1\nSource: https://github.com/KaTeX/KaTeX\nThe following copyright, license, and reserved font names are read from the original bundled font metadata.\n\n${credits.join('\n\n')}\n\n${(await readFile('licenses/OFL-1.1.txt', 'utf8')).trim()}`,
+      `KaTeX mathematical fonts (unmodified)\nLicense: OFL-1.1\nSource: https://github.com/KaTeX/KaTeX\nThe following copyright, license, and reserved font names are read from the original bundled font metadata.\n\n${credits.join('\n\n')}\n\n${(await readFile('vendor/licenses/OFL-1.1.txt', 'utf8')).trim()}`,
     );
   }
   return sections.join('\n\n' + '='.repeat(78) + '\n\n') + '\n';

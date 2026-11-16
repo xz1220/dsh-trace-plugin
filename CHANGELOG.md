@@ -27,6 +27,9 @@ User-visible changes are recorded here. Historical entries describe code changes
 
 ### Changed
 
+- Reduce root entries by grouping contribution/security policies and release settings under `.github/`, browser configuration with its tests, and asset licenses under `vendor/`.
+- Consolidate regenerable check and browser outputs under `.cache/` and add a local cleanup command.
+
 - Separate recording/catalog, preview transport, and frontend data controllers.
 - Reuse catalog scans during chat polling and retain unaffected detail caches.
 - Verify the pinned clean upstream checkout before importing vendor source.

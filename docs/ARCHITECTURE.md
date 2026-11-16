@@ -36,7 +36,7 @@ Production startup owns one process-local `Store`. The catalog, indices, project
 
 ## Recording and trust boundaries
 
-Schemas 1 and 2 are supported. The reader checks identifiers, known payload layouts, symlinks, hard links, and size limits before reading. These checks reduce accidental or malicious path access; the process still runs with the user's local permissions and is not a security sandbox against a hostile local account. See [SECURITY.md](../SECURITY.md).
+Schemas 1 and 2 are supported. The reader checks identifiers, known payload layouts, symlinks, hard links, and size limits before reading. These checks reduce accidental or malicious path access; the process still runs with the user's local permissions and is not a security sandbox against a hostile local account. See [SECURITY.md](../.github/SECURITY.md).
 
 Recording files remain read-only. Registering a directory writes only the catalog configuration. The separate recording helper sets an environment variable for a child Codex process or a macOS login session; it does not turn tracing on inside an already-running process.
 
@@ -68,3 +68,9 @@ The original integration used Codex CLI 0.163.0 and source commit `83086188ae061
 DSH runtime source is pinned to `deepseek-ai/deepseek-harness` commit `e8f7b93a344964de3dca1ace9e72b6e4d6de87cb`: [trajectory components](https://github.com/deepseek-ai/deepseek-harness/tree/e8f7b93a344964de3dca1ace9e72b6e4d6de87cb/packages/client/ui-trajectory) and [theme source](https://github.com/deepseek-ai/deepseek-harness/tree/e8f7b93a344964de3dca1ace9e72b6e4d6de87cb/packages/client/ui-theme). The [imported file manifest](../vendor/dsh/upstream.json), [approved patch hashes](../vendor/dsh/patches.json), [adaptation rationale](../vendor/dsh/PATCHES.md), and [upstream license](../vendor/dsh/LICENSE) accompany the source.
 
 These pins describe the implementation baseline; they do not imply that later upstream releases preserve the same APIs or recording formats. Early synthetic prototypes and manual study reports are retained in Git history. Public tests and synthetic fixture generators provide reproducible regression evidence; historical observations do not establish current native-host compatibility.
+
+## Repository entry points
+
+The root README files introduce installation and link to the contribution guide under `.github/`. Architecture, product constraints, and the roadmap are read when needed under `docs/`. Source, tests, maintenance tools, and vendored dependencies have distinct directories. Community policies and release metadata live together under `.github/`; browser configuration stays with its tests and third-party licenses stay under `vendor/`.
+
+Package manifests, lockfiles, ESLint, and editor/Git configuration remain at their conventional discovery locations. Prettier reads its settings from `package.json`. Regenerable local outputs use `.cache/`, with release archives under `dist/`; `local-context/` is reserved for private evidence.

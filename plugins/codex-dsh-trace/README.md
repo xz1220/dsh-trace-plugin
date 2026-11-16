@@ -42,7 +42,7 @@ Supported schemas are **1 and 2**. Event logs are limited to **256 MiB**, includ
 
 Recordings remain read-only. Discovery uses `$CODEX_HOME/rollout-traces` (default `~/.codex/rollout-traces`), `CODEX_ROLLOUT_TRACE_ROOT`, and registered directories. Registration writes only `$CODEX_HOME/rollout-viewer/config.json`. The `rollout-viewer` MCP/resource namespace, configuration, preferences, and legacy resource alias remain compatible with earlier installations.
 
-The reader has no upload, telemetry, or model integration. Detailed tools are app-only visibility hints enforced by the host. Recordings can contain credentials and private code; review content before copying, exporting, or sharing it. The optional `python3 server/main.py --preview` binds to loopback and prints a secret bootstrap URL; keep it private and stop the server when finished. Its bridge harness does not establish native Codex compatibility. See [security and privacy](https://github.com/xz1220/dsh-trace-plugin/blob/main/SECURITY.md).
+The reader has no upload, telemetry, or model integration. Detailed tools are app-only visibility hints enforced by the host. Recordings can contain credentials and private code; review content before copying, exporting, or sharing it. The optional `python3 server/main.py --preview` binds to loopback and prints a secret bootstrap URL; keep it private and stop the server when finished. Its bridge harness does not establish native Codex compatibility. See [security and privacy](https://github.com/xz1220/dsh-trace-plugin/blob/main/.github/SECURITY.md).
 
 ## Attribution
 

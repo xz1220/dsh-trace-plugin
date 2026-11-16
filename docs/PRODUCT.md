@@ -33,7 +33,7 @@ The icon connects three execution nodes with a rounded path and highlights the c
 
 [scripts/build-brand-assets.mjs](../scripts/build-brand-assets.mjs) is the source for both SVG and PNG assets. Change that script and run `node scripts/build-brand-assets.mjs`; editing generated files under the plugin's `assets/` directory will be overwritten.
 
-Keep imported DSH component CSS and theme tokens intact. Record source adaptations in [vendor/dsh/PATCHES.md](../vendor/dsh/PATCHES.md) and its approved hashes. Follow [the update procedure](../CONTRIBUTING.md#update-dsh) when changing upstream source.
+Keep imported DSH component CSS and theme tokens intact. Record source adaptations in [vendor/dsh/PATCHES.md](../vendor/dsh/PATCHES.md) and its approved hashes. Follow [the update procedure](../.github/CONTRIBUTING.md#update-dsh) when changing upstream source.
 
 ## Compatibility
 

@@ -6,7 +6,7 @@ export default [
   {
     ignores: [
       'vendor/**',
-      'design/**',
+      '.cache/**',
       'local-context/**',
       'coverage/**',
       'dist/**',
@@ -16,7 +16,7 @@ export default [
     ],
   },
   {
-    files: ['src/**/*.{js,jsx}', 'scripts/**/*.mjs', 'tests/**/*.mjs', '*.js', '*.mjs'],
+    files: ['src/**/*.{js,jsx}', 'scripts/**/*.mjs', 'tests/**/*.{js,mjs}', '*.js', '*.mjs'],
     ...js.configs.recommended,
     languageOptions: {
       ecmaVersion: 'latest',

@@ -12,9 +12,10 @@ dev = ["coverage>=7.6,<8", "mypy>=1.15,<2", "ruff==0.15.22"]
 package = false
 
 [tool.ruff]
+cache-dir = ".cache/ruff"
 target-version = "py39"
 line-length = 100
-extend-exclude = ["vendor", "design", "local-context", "node_modules"]
+extend-exclude = ["vendor", "local-context", "node_modules"]
 exclude = ["plugins/codex-dsh-trace/server/_version.py"]
 
 [tool.ruff.lint]
@@ -26,6 +27,7 @@ select = ["E4", "E7", "E9", "F", "I"]
 "scripts/*.py" = ["E402"]
 
 [tool.mypy]
+cache_dir = ".cache/mypy"
 python_version = "3.9"
 files = ["plugins/codex-dsh-trace/server"]
 check_untyped_defs = true
@@ -33,6 +35,7 @@ warn_unused_ignores = true
 warn_redundant_casts = true
 
 [tool.coverage.run]
+data_file = ".cache/coverage/python/.coverage"
 source = ["plugins/codex-dsh-trace/server"]
 branch = true
 omit = ["*/_version.py"]

@@ -2,7 +2,7 @@
 
 Read recorded Codex requests, nested tool calls, compaction, and execution timing alongside your conversation.
 
-[简体中文](README.zh-CN.md) · [Contributing](CONTRIBUTING.md) · [Architecture](docs/ARCHITECTURE.md) · [Security](SECURITY.md)
+[简体中文](README.zh-CN.md) · [Contributing](.github/CONTRIBUTING.md) · [Architecture](docs/ARCHITECTURE.md) · [Security](.github/SECURITY.md)
 
 ![Codex Trace displaying a synthetic execution recording](docs/images/trace-viewer.png)
 
@@ -36,6 +36,8 @@ codex plugin add codex-dsh-trace@rollout-local
 The repository includes the built frontend. You do not need Node.js, npm, or a source checkout to install it. If the repository is private, your Git credentials must have access.
 
 Open **Codex Trace** from the conversation's right-panel tools menu. Open a new chat after installation if the entry does not appear.
+
+For the macOS setup helper, including configuration checks and uninstall, see the [installer guide](docs/INSTALLER.md).
 
 ## Update
 
@@ -100,7 +102,7 @@ python3 plugins/codex-dsh-trace/server/main.py --register /absolute/path/to/reco
 
 The plugin reads official local trace bundles from the default recording root, `CODEX_ROLLOUT_TRACE_ROOT`, and directories you register. It does not substitute ordinary session logs. Registration writes a small configuration file under `$CODEX_HOME/rollout-viewer/` (default `~/.codex/rollout-viewer/`); it does not modify recordings.
 
-The reader has no upload, analytics, or remote-service integration. Recording data is delivered to the local Codex app for display. The optional preview serves the same data on authenticated loopback HTTP. Follow external links and use copy or export actions with care: recordings can include credentials, private code, prompts, and images. Read [Security](SECURITY.md) before sharing a trace or screenshot.
+The reader has no upload, analytics, or remote-service integration. Recording data is delivered to the local Codex app for display. The optional preview serves the same data on authenticated loopback HTTP. Follow external links and use copy or export actions with care: recordings can include credentials, private code, prompts, and images. Read [Security](.github/SECURITY.md) before sharing a trace or screenshot.
 
 ## Troubleshooting
 
@@ -122,7 +124,7 @@ npm test
 
 Run `npm run demo` for an isolated synthetic recording without access to personal Codex data.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for formatting, CI checks, synthetic fixtures, the browser preview, packaging, and the DSH update workflow. Product behavior and planned work are documented in [docs/PRODUCT.md](docs/PRODUCT.md) and [docs/ROADMAP.md](docs/ROADMAP.md).
+Start with this README for installation and use, then follow the [contribution guide](.github/CONTRIBUTING.md) for setup, checks, and the repository map. Read the [architecture](docs/ARCHITECTURE.md) when changing the reader or UI; [product behavior](docs/PRODUCT.md) and the [roadmap](docs/ROADMAP.md) provide the detailed constraints and planned work.
 
 ## Attribution and license
 

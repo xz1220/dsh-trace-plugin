@@ -35,13 +35,13 @@ jobs:
           python-version: ${{ matrix.python }}
       - run: python3 -m unittest discover -s tests -v
       - name: Synthetic performance sample
-        run: python3 scripts/benchmark.py --out benchmark.json
+        run: python3 scripts/benchmark.py --out .cache/benchmarks/latest.json
       - name: Summarize synthetic performance
         run: |
           python3 - <<'PY'
           import json, os
           from pathlib import Path
-          report = json.loads(Path('benchmark.json').read_text())
+          report = json.loads(Path('.cache/benchmarks/latest.json').read_text())
           sample = report['synthetic']
           rows = ['| Metric | Value |', '| --- | --- |']
           for key in ('initialIndexMs', 'warmPageP50Ms', 'warmPageP95Ms', 'unchangedPollP50Ms', 'initialPayloadReads', 'warmExtraLogBytes'):
@@ -58,7 +58,8 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: benchmark-${{ matrix.os }}-py${{ matrix.python }}
-          path: benchmark.json
+          include-hidden-files: true
+          path: .cache/benchmarks/latest.json
 
   node:
     name: Node ${{ matrix.node }} on ${{ matrix.os }}
@@ -106,8 +107,9 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: coverage-and-plugin
+          include-hidden-files: true
           path: |
-            coverage/
+            .cache/coverage/
             dist/
 
   browser:
@@ -128,6 +130,6 @@ jobs:
         if: failure()
         with:
           name: browser-failure
+          include-hidden-files: true
           path: |
-            playwright-report/
-            test-results/
+            .cache/playwright/

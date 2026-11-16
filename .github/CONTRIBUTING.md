@@ -4,7 +4,7 @@ Bug reports, documentation improvements, and focused patches are welcome. Read t
 
 ## Set up
 
-Use Node.js 20.19+, npm, and Python 3.9+ (`python3`). Use the exact Node version in `.nvmrc` when regenerating committed assets; `npm ci` installs the locked build dependencies. A compatible Codex client is needed only for native integration checks, not unit tests. macOS arm64 is the native integration baseline; other platforms need evidence before being described as verified.
+Run commands from the repository root. Use Node.js 20.19+, npm, and Python 3.9+ (`python3`). Use the exact Node version in `.nvmrc` when regenerating committed assets; `npm ci` installs the locked build dependencies. A compatible Codex client is needed only for native integration checks, not unit tests. macOS arm64 is the native integration baseline; other platforms need evidence before being described as verified.
 
 ```sh
 npm ci
@@ -34,17 +34,29 @@ See the CI workflow for the exact checked versions and commands. `npm run check`
 
 ## Repository layout
 
+Start with the [README](../README.md) for installation and use, then this guide for development. Consult the [architecture](../docs/ARCHITECTURE.md) when changing data flow; the table below locates the relevant implementation.
+
+The root keeps user-facing entry documents and files that package managers, editors, and linters discover by convention. Community policies and release configuration live under `.github/`; detailed product and architecture documents live under `docs/`.
+
 | Path                              | Purpose                                                               |
 | --------------------------------- | --------------------------------------------------------------------- |
 | `src/`                            | React integration, MCP Apps host bridge, local styles and preferences |
 | `plugins/codex-dsh-trace/server/` | Standard-library Python reader and MCP server                         |
 | `plugins/codex-dsh-trace/assets/` | Generated frontend and plugin branding                                |
+| `.github/`                        | Contribution and security policies, CI, and release configuration     |
 | `vendor/dsh/`                     | Pinned upstream source, licenses, hashes, and reviewed patches        |
+| `vendor/licenses/`                | Additional license texts included in generated dependency notices     |
 | `tests/`                          | Isolated Python and Node regression tests                             |
 | `scripts/`                        | Build, verification, recording, fixtures, and packaging               |
 | `docs/`                           | Product and interface behavior, architecture, sources, and roadmap    |
 
-`local-context/`, screenshots used for private review, caches, and `dist/` are local artifacts. Do not add captured private traces to Git.
+`local-context/` holds private recordings and historical evidence. Regenerable tool caches, coverage, browser results, and retained demo fixtures go under `.cache/`; release archives go under `dist/`. Do not add captured private traces to Git.
+
+## Clean local outputs
+
+Run `npm run clean` to remove caches, test outputs, release archives, and Python bytecode. Add `-- --dependencies` to remove `node_modules/` and `.venv/` too; restore them with `npm ci` and `uv sync --group dev`. Cleanup preserves source, installed plugin assets, and private evidence under `local-context/`.
+
+Browser test artifacts are in `.cache/playwright/`. Coverage and static-check caches are under `.cache/coverage/`, `.cache/mypy/`, and `.cache/ruff/`. CI uploads use those same paths.
 
 ## Work with synthetic recordings
 
@@ -61,7 +73,7 @@ The demo uses temporary recording and catalog roots, including the fallback and 
 To retain a fixture for live-append testing:
 
 ```sh
-npm run demo -- --directory local-context/demo
+npm run demo -- --directory .cache/demo
 ```
 
 `scripts/review-fixtures.py --help` describes schema and live-update options. Generate each fixture in an explicitly chosen directory with `--output`; its default is a new temporary directory. The optional `/harness` route exercises the MCP Apps bridge and does not replace native Codex acceptance.
@@ -72,7 +84,7 @@ Preserve original payloads and distinguish recorded facts from inferred presenta
 
 ## Update DSH
 
-Read [vendor/dsh/PATCHES.md](vendor/dsh/PATCHES.md) first. The update script overwrites imported source, including local patches.
+Read [vendor/dsh/PATCHES.md](../vendor/dsh/PATCHES.md) first. The update script overwrites imported source, including local patches.
 
 1. Prepare an audited checkout of the pinned upstream project.
 2. Review/update the repository and commit pin in `vendor/dsh/upstream.json`, then run `node scripts/vendor-dsh.mjs /absolute/path/to/deepseek-harness` against a clean checkout of that commit. The importer rejects a different HEAD, tracked modifications, or untracked files.
@@ -88,7 +100,7 @@ The version in `package.json` is authoritative. A build generates the plugin man
 
 After `npm run build`, use `npm run package` to create an installable ZIP and checksums under `dist/`. Packaging checks generated assets and fails if they are stale; it does not silently repair them. Keep the generated frontend, plugin metadata, and dependency notices consistent with the source. The generated-file check should leave the working tree clean on a committed build.
 
-The **Prepare release PR** workflow uses [Release Please](https://github.com/googleapis/release-please-action) to propose the next package version and generate changelog entries from Conventional Commits. It is opt-in: after configuring the permissions below, set the repository Actions variable `ENABLE_RELEASE_PLEASE` to `true` to run it automatically on pushes to `main`. Maintainers can also start the workflow manually on `main` to try it before enabling automatic runs. The same workflow rebuilds and commits the derived assets to that release PR, so reviewers can inspect the exact distributable before merging. `.release-please-manifest.json` records release history; it is not another runtime version source. The workflow deliberately does not create tags or publish releases.
+The **Prepare release PR** workflow uses [Release Please](https://github.com/googleapis/release-please-action) to propose the next package version and generate changelog entries from Conventional Commits. It is opt-in: after configuring the permissions below, set the repository Actions variable `ENABLE_RELEASE_PLEASE` to `true` to run it automatically on pushes to `main`. Maintainers can also start the workflow manually on `main` to try it before enabling automatic runs. The same workflow rebuilds and commits the derived assets to that release PR, so reviewers can inspect the exact distributable before merging. [`.release-please-manifest.json`](.release-please-manifest.json) records release history alongside the [release configuration](release-please-config.json) in `.github/`; it is not another runtime version source. The workflow deliberately does not create tags or publish releases.
 
 To run PR CI automatically on these bot-created changes, configure the repository secret `RELEASE_PLEASE_TOKEN` with a repository-scoped token that can write contents, pull requests, and issues. GitHub may also require **Allow GitHub Actions to create and approve pull requests** in repository settings. Without that secret, the workflow uses `GITHUB_TOKEN` and validates the generated build itself; GitHub does not trigger the separate PR CI from that token. A maintainer must manually run **CI** on the release PR branch before merging. See the [official token behavior](https://github.com/googleapis/release-please-action#other-actions-on-release-please-prs).
 
@@ -96,7 +108,7 @@ After reviewing and merging the release PR, a maintainer pushes a `v<version>` t
 
 Release Please's [extra-file updaters](https://github.com/googleapis/release-please/blob/main/docs/customizing.md#updating-arbitrary-files) can replace version fields, but cannot regenerate the compiled HTML. This project therefore derives all runtime copies through `npm run build` rather than configuring independent version substitutions.
 
-Document user-visible behavior in [CHANGELOG.md](CHANGELOG.md). Keep installation status, personal paths, and one-off validation logs out of public documentation. Native installation and reload behavior must be verified separately from packaging.
+Document user-visible behavior in [CHANGELOG.md](../CHANGELOG.md). Keep installation status, personal paths, and one-off validation logs out of public documentation. Native installation and reload behavior must be verified separately from packaging.
 
 ## Submit a pull request
 

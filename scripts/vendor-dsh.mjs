@@ -6,7 +6,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { verifyVendorSource } from './vendor-source.mjs';
 
-const upstream = path.resolve(process.argv[2] || 'local-context/dsh-upstream');
+const upstream = path.resolve(process.argv[2] || '.cache/dsh-upstream');
 const destination = path.resolve('vendor/dsh');
 const { repository, commit } = verifyVendorSource(
   upstream,
@@ -46,7 +46,7 @@ const barrel = Object.entries(primitives)
       `export {${names.join(',')}} from ${JSON.stringify(path.join(primitiveRoot, file))};`,
   )
   .join('\n');
-const temporary = path.resolve('local-context/dsh-primitives-entry.ts');
+const temporary = path.resolve('.cache/dsh-primitives-entry.ts');
 await mkdir(path.dirname(temporary), { recursive: true });
 await writeFile(temporary, barrel);
 const trajectory = path.join(upstream, 'packages/client/ui-trajectory/src/client');
@@ -75,7 +75,7 @@ const result = await build({
   bundle: true,
   write: false,
   metafile: true,
-  outdir: 'local-context/vendor-probe',
+  outdir: '.cache/vendor-probe',
   jsx: 'automatic',
   packages: 'external',
   alias: aliases,

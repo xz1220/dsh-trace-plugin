@@ -7,8 +7,8 @@
     "test": "npm run test:python && npm run test:node",
     "test:python": "python3 -m unittest discover -s tests -v",
     "test:node": "node --test tests/*.mjs",
-    "test:e2e": "playwright test",
-    "test:coverage": "uv run coverage run -m unittest discover -s tests && uv run coverage report && c8 --include=src/host.js --include=src/trajectory-order.js --include=src/errors.js --check-coverage --lines=80 --branches=65 --functions=80 node --test tests/*.mjs",
+    "test:e2e": "playwright test --config tests/e2e/playwright.config.js",
+    "test:coverage": "uv run coverage run -m unittest discover -s tests && uv run coverage report && c8 --reports-dir=.cache/coverage/javascript --temp-directory=.cache/coverage/v8 --include=src/host.js --include=src/trajectory-order.js --include=src/errors.js --check-coverage --lines=80 --branches=65 --functions=80 node --test tests/*.mjs",
     "lint": "eslint src scripts tests *.js && uv run ruff check",
     "format": "prettier --write . && uv run ruff format",
     "format:check": "prettier --check . && uv run ruff format --check",
@@ -17,7 +17,8 @@
     "package": "node scripts/package-plugin.mjs",
     "demo": "python3 scripts/demo.py",
     "benchmark": "python3 scripts/benchmark.py",
-    "check": "npm run lint && npm run format:check && npm run typecheck && npm test && npm run check:generated"
+    "check": "npm run lint && npm run format:check && npm run typecheck && npm test && npm run check:generated",
+    "clean": "python3 scripts/clean.py"
   },
   "dependencies": {
     "@shikijs/langs": "4.4.3",
@@ -63,5 +64,10 @@
       "glob": "^14.0.6",
       "minimatch": "^11.0.1"
     }
+  },
+  "prettier": {
+    "singleQuote": true,
+    "printWidth": 100,
+    "trailingComma": "all"
   }
 }
