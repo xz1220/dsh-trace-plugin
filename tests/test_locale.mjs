@@ -33,3 +33,10 @@ test('backend search group templates match the displayed pinned dictionaries',as
   const labels=JSON.parse(await readFile(new URL('../plugins/codex-dsh-trace/server/trajectory-locales.json',import.meta.url),'utf8'));
   for(const locale of supportedLocales)assert.deepEqual(labels[locale],{step:dictionaries[locale]['group.step'],compaction:dictionaries[locale]['group.compaction']});
 });
+test('native transcript evidence is labelled separately from recorded model requests',()=>{
+  assert.equal(translatorFor('zh',{source:'antigravity'})('codex.prompt'),'上下文可用性');
+  assert.equal(translatorFor('en',{source:'antigravity'})('codex.response'),'Native step JSON');
+  assert.equal(translatorFor('en',{source:'antigravity'})('request.label',{request:2}),'Step #2');
+  assert.equal(translatorFor('zh')('codex.prompt'),'完整上下文');
+  assert.equal(translatorFor('en')('codex.response'),'Raw response');
+});

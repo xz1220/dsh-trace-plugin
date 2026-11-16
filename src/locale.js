@@ -27,9 +27,20 @@ export const dictionaries=Object.fromEntries(supportedLocales.map(locale=>[local
   'timing.sessionTimestamps':locale==='zh'?'官方录制起止事件':'Recorded start and end events',
   'timing.sessionTimestampsRunning':locale==='zh'?'官方录制开始事件（运行中）':'Recorded start event (running)',
 }]));
-export function translatorFor(value){
+export function translatorFor(value,{source}={}){
   const locale=normalizeLocale(value),dictionary=dictionaries[locale];
-  const t=(key,params={})=>String(dictionary[key]??dictionaries.en[key]??key).replace(/\{(\w+)\}/g,(_,name)=>params[name]??'');
+  const native=source==='antigravity'?{
+    'codex.prompt':locale==='zh'?'上下文可用性':'Context availability',
+    'codex.request':locale==='zh'?'模型请求（未记录）':'Model request (not recorded)',
+    'codex.response':locale==='zh'?'原生步骤 JSON':'Native step JSON',
+    'request.label':locale==='zh'?'步骤 #{request}':'Step #{request}',
+    'request.rowPrefix':locale==='zh'?'步骤 {request}，':'Step {request}, ',
+    'timing.started':locale==='zh'?'步骤时间戳':'Step timestamp',
+    'timeline.started':locale==='zh'?'步骤记录于 {time}':'Step recorded {time}',
+    'timing.sessionTimestamps':locale==='zh'?'原生步骤时间戳':'Native step timestamp',
+    'timing.sessionTimestampsRunning':locale==='zh'?'原生步骤时间戳（运行中）':'Native step timestamp (running)',
+  }:{};
+  const t=(key,params={})=>String(native[key]??dictionary[key]??dictionaries.en[key]??key).replace(/\{(\w+)\}/g,(_,name)=>params[name]??'');
   t.locale=locale;
   // Codex-specific extensions use English when no native translation is available.
   t.text=(chinese,english)=>locale==='zh'?chinese:english;

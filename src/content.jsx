@@ -71,7 +71,7 @@ export function TextContent({rowId, section, itemIndex, api, copy, label}) {
         <button type="button" className="app-button" aria-pressed={wrap} onClick={()=>setWrap(!wrap)}>{text('换行','Wrap')}</button>
         <button type="button" className="app-icon" disabled={busy||data?.available===false} aria-label={text(`复制完整${label}`,`Copy complete ${label}`)} title={text(`复制完整${label}`,`Copy complete ${label}`)} onClick={copyAll}><IconCopyOutlineRegular size={14}/></button></div></div>
     {error&&<Failure error={error} retry={()=>load(data?.nextOffset||0)}/>}
-    {!data&&!error?<Skeleton/>:data?.available===false?<p className={table.noPayload}>{text('录制中没有此内容。','This content is not in the recording.')}</p>:
+    {!data&&!error?<Skeleton/>:data?.available===false?<p className={table.noPayload}>{data.reason?text(data.reason,data.reasonEn||data.reason):text('录制中没有此内容。','This content is not in the recording.')}</p>:
       json!==undefined&&tree?<JsonTree data={json} label={label} labels={labels} collapsedStringLines={12} className={table.jsonPayload}/>:
       <pre className={`${table.payload} app-raw`} data-wrap={wrap}>{data?.text}</pre>}
     {data?.nextOffset!==null&&data?.nextOffset!==undefined&&<button className="app-load-more" disabled={busy} onClick={()=>load(data.nextOffset)}>
@@ -93,6 +93,10 @@ function PromptContext({request,detail,api,copy}) {
     try {const text=await readComplete(api,'read_rollout_text',{rowId:request.rowId,section:'full_context'});await copy(text||'');}
     catch(e){setError(e.message);}finally{setCopying(false);}
   }
+  if(context.available===false)return <section className="app-context-note" data-incomplete aria-label={text('上下文可用性','Context availability')}>
+    <strong>{text('未记录模型请求上下文','Model request context was not recorded')}</strong>
+    <span>{text(context.reason||'会话步骤日志未保存完整模型输入，无法从中恢复系统指令、工具声明或完整请求。',context.reasonEn||'The conversation step log does not preserve complete model input, system instructions, tool declarations, or raw requests.')}</span>
+  </section>;
   return <>
     <div className="app-context-note" data-incomplete={!context.complete||undefined}>
       <strong>{!context.complete?text('前序录制缺失，以下是已知上下文','Earlier recording missing; showing known context'):context.incremental?text('已沿响应链恢复完整上下文','Complete context restored along the response chain'):text('客户端实际请求输入','Recorded client request input')}</strong>
@@ -130,7 +134,10 @@ export function RequestContent({traceId,request,tab,call,copy}) {
     if(tab==='codex-prompt')api('get_rollout_detail',{rowId:request.rowId}).then(value=>{if(active)setDetail(value);}).catch(e=>{if(active)setError(e.message);});
     return()=>{active=false;};
   },[api,request.rowId,tab,retry]);
-  if(tab==='codex-request'||tab==='codex-response')return <TextContent rowId={request.rowId} section={tab==='codex-request'?'raw_request':'response'} api={api} copy={copy} label={`${t(tab==='codex-request'?'codex.request':'codex.response')} JSON`}/>;
+  if(tab==='codex-request'||tab==='codex-response'){
+    const label=t(tab==='codex-request'?'codex.request':'codex.response');
+    return <TextContent rowId={request.rowId} section={tab==='codex-request'?'raw_request':'response'} api={api} copy={copy} label={/JSON$/i.test(label)?label:`${label} JSON`}/>;
+  }
   if(tab!=='codex-prompt')return null;
   if(request.purpose==='compaction')return error?<Failure error={error} retry={()=>setRetry(v=>v+1)}/>:detail?<section className="app-context-note" aria-label={t.text('上下文压缩','Context compaction')}><MarkdownText text={compactionText(detail.compaction,t)}/></section>:<Skeleton/>;
   return error?<Failure error={error} retry={()=>setRetry(v=>v+1)}/>:detail?<PromptContext key={request.rowId} {...{request,detail,api,copy}}/>:<Skeleton/>;

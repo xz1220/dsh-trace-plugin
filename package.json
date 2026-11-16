@@ -4,7 +4,8 @@
   "version": "0.2.18",
   "scripts": {
     "build": "node scripts/build-plugin.mjs",
-    "test": "python3 -m unittest discover -s tests -v && node --test tests/test_file_drag.mjs tests/test_host.mjs tests/test_locale.mjs tests/test_preferences.mjs tests/test_trajectory_order.mjs",
+    "build:antigravity": "node scripts/build-antigravity.mjs",
+    "test": "python3 -m unittest discover -s tests -v && node --test tests/test_file_drag.mjs tests/test_host.mjs tests/test_locale.mjs tests/test_preferences.mjs tests/test_trajectory_order.mjs tests/test_antigravity_host.mjs",
     "build:design": "node design/build.mjs",
     "build:analysis": "node design/build-analysis.mjs",
     "build:mock": "node design/build-dsh-mock.mjs"

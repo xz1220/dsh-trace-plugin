@@ -23,7 +23,7 @@ function App(){
   const [followingThread,setFollowingThread]=useState(null),[connected,setConnected]=useState(false);
   const latestData=useRef(null);latestData.current=data;
   const [locale,setLocale]=useState('zh');
-  const t=useMemo(()=>translatorFor(locale),[locale]);
+  const t=useMemo(()=>translatorFor(locale,{source:window.__ROLLOUT_HOST__?.source}),[locale]);
   const text=t.text;
   const call=useCallback((name,args={})=>host.current?host.current.call(name,args):Promise.reject(new Error('面板正在连接。')),[]);
   const notify=useCallback(text=>{setToast(text);clearTimeout(toastTimer.current);toastTimer.current=setTimeout(()=>setToast(''),2200);},[]);
@@ -124,7 +124,7 @@ function App(){
       return page.rows.length>0;
     }catch(e){if(ticket===generation.current)setError(e.message);return false;}finally{earlierBusy.current=false;}
   },[data,call]);
-  return <LocaleContext.Provider value={t}><main className={`${view.root} app-frame`} aria-label="Codex DSH Trace">
+  return <LocaleContext.Provider value={t}><main className={`${view.root} app-frame`} aria-label={window.__ROLLOUT_HOST__?.name||'Codex DSH Trace'}>
     {error&&<Failure error={error} retry={()=>data?loadTrace(data.trace.id,null,{quiet:true,preserve:true}):location.reload()}/>}
     {loading?<Skeleton/>:!data?<section className="app-empty" aria-live="polite">
       <h2>{selectionInfo?.unavailableReason?text('暂时无法读取当前聊天轨迹','Unable to read this chat trajectory'):text('当前聊天暂无轨迹','No trajectory for this chat yet')}</h2>
