@@ -1,11 +1,14 @@
 """Installer checks use fake commands and temporary homes, never real settings."""
 
 import contextlib
+import hashlib
 import importlib.util
 import io
 import json
 import plistlib
+import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -53,14 +56,25 @@ class FakeSystem:
         elif words[:3] == ["plugin", "marketplace", "add"]:
             self.marketplace = {
                 "name": "rollout-local",
-                "marketplaceSource": {"sourceType": "git", "source": words[3]},
+                "marketplaceSource": {"sourceType": "local", "source": words[3]},
             }
         elif words[:2] == ["plugin", "add"]:
+            version = "0.2.19"
+            if self.marketplace:
+                source = Path(self.marketplace["marketplaceSource"]["source"])
+                try:
+                    catalog = json.loads((source / ".agents/plugins/marketplace.json").read_text())
+                    plugin_path = source / catalog["plugins"][0]["source"]["path"]
+                    version = json.loads((plugin_path / ".codex-plugin/plugin.json").read_text())[
+                        "version"
+                    ]
+                except (OSError, ValueError, KeyError, TypeError):
+                    pass
             self.plugin = {
                 "pluginId": setup.PLUGIN,
                 "installed": True,
                 "enabled": True,
-                "version": "0.2.19",
+                "version": version,
             }
         elif words[:2] == ["plugin", "remove"]:
             self.plugin = None
@@ -72,10 +86,6 @@ class FakeSystem:
             self.environment = words[2]
         elif words == ["unsetenv", setup.ENV_KEY]:
             self.environment = None
-        elif command[:2] == ["git", "-C"]:
-            return subprocess.CompletedProcess(
-                command, 0, "https://github.com/xz1220/dsh-trace-plugin.git\n", ""
-            )
         else:
             raise AssertionError(f"Unexpected command: {command}")
         return subprocess.CompletedProcess(command, 0, json.dumps(data), "")
@@ -89,16 +99,73 @@ def tree_snapshot(directory):
     }
 
 
+def make_npm_payload(root, version="0.2.19"):
+    prefix = "plugins/codex-dsh-trace/"
+    files = {
+        ".agents/plugins/marketplace.json": json.dumps(
+            {
+                "name": "rollout-local",
+                "plugins": [
+                    {
+                        "name": "codex-dsh-trace",
+                        "source": {"source": "local", "path": "./plugins/codex-dsh-trace"},
+                    }
+                ],
+            }
+        ).encode(),
+        prefix + ".codex-plugin/plugin.json": json.dumps(
+            {"name": "codex-dsh-trace", "version": version}
+        ).encode(),
+        prefix + ".mcp.json": json.dumps(
+            {
+                "mcpServers": {
+                    "rollout-viewer": {
+                        "command": "python3",
+                        "args": ["./server/main.py"],
+                        "cwd": ".",
+                    }
+                }
+            }
+        ).encode(),
+        prefix + "assets/viewer.html": b"<!doctype html>isolated bundled interface",
+        prefix
+        + "server/main.py": b"from pathlib import Path\nprint(Path('assets/viewer.html').read_text())\n",
+        prefix + "server/store.py": b"# isolated fixture\n",
+        prefix + "LICENSE": b"MIT fixture\n",
+        prefix + "THIRD_PARTY_NOTICES.txt": b"fixture notices\n",
+    }
+    root.mkdir(parents=True)
+    for name, data in files.items():
+        target = root / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
+    (root / "bundle-manifest.json").write_text(
+        json.dumps(
+            {
+                "format": 1,
+                "name": "dsh-trace-extension",
+                "repository": "xz1220/dsh-trace-plugin",
+                "version": version,
+                "files": {name: hashlib.sha256(data).hexdigest() for name, data in files.items()},
+            }
+        )
+    )
+    return root
+
+
 class SetupTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix="trace-installer-test-")
         self.addCleanup(self.temporary.cleanup)
-        self.home = Path(self.temporary.name).resolve()
+        self.root = Path(self.temporary.name).resolve()
+        self.home = self.root / "home"
+        self.home.mkdir()
+        self.payload = make_npm_payload(self.root / "npm-cache")
         self.system = FakeSystem()
 
     def installer(self, *arguments, platform="darwin"):
         return setup.Installer(
-            setup.parser().parse_args([*arguments, "--yes"]),
+            setup.parser().parse_args(["--bundle", str(self.payload), *arguments, "--yes"]),
             system=self.system,
             platform=platform,
             home=self.home,
@@ -115,7 +182,6 @@ class SetupTests(unittest.TestCase):
         installer = self.installer("--codex-home", "~/custom-codex", "--trace-root", "~/traces")
         self.assertEqual(installer.codex_home, self.home / "custom-codex")
         self.assertEqual(installer.trace_root, self.home / "traces")
-        self.assertEqual(installer.local_source("~/checkout"), self.home / "checkout")
 
     def test_uninstall_does_not_remove_a_plugin_from_a_replaced_marketplace(self):
         installer, _ = self.run_setup()
@@ -142,7 +208,7 @@ class SetupTests(unittest.TestCase):
         self.assertIsNotNone(self.system.plugin)
 
     def test_success_installs_and_configures_only_owned_files(self):
-        installer, result = self.run_setup("--ref", "release-commit")
+        installer, result = self.run_setup()
         self.assertEqual(result["status"], "configured")
         self.assertFalse(result["nativeVerified"])
         self.assertEqual(self.system.environment, str(installer.trace_root))
@@ -162,9 +228,7 @@ class SetupTests(unittest.TestCase):
                 "plugin",
                 "marketplace",
                 "add",
-                setup.DEFAULT_SOURCE,
-                "--ref",
-                "release-commit",
+                str(installer.bundle.source_path),
                 "--json",
             ],
             self.system.calls,
@@ -213,7 +277,7 @@ class SetupTests(unittest.TestCase):
             "EXTRA": "kept",
         }
         installer = setup.Installer(
-            setup.parser().parse_args(["--dry-run", "--yes"]),
+            setup.parser().parse_args(["--bundle", str(self.payload), "--dry-run", "--yes"]),
             system=self.system,
             platform="darwin",
             home=self.home,
@@ -232,55 +296,32 @@ class SetupTests(unittest.TestCase):
         self.assertNotIn("HOME", environment)
 
     def test_foreign_marketplace_is_not_overwritten_even_with_yes(self):
-        self.system.marketplace = {
-            "name": "rollout-local",
-            "marketplaceSource": {"sourceType": "git", "source": "other/project"},
-        }
-        with self.assertRaisesRegex(setup.SetupError, "different or unknown source"):
-            self.run_setup()
-        self.assertEqual(list(self.home.iterdir()), [])
-        self.assertEqual(self.system.marketplace["marketplaceSource"]["source"], "other/project")
-
-    def test_same_project_local_marketplace_is_reused(self):
-        local = self.home / "source"
+        local = self.home / "unrelated-local-source"
         (local / ".agents/plugins").mkdir(parents=True)
         (local / ".agents/plugins/marketplace.json").write_text(
-            json.dumps(
-                {
-                    "name": "rollout-local",
-                    "plugins": [{"name": "codex-dsh-trace"}],
-                }
-            )
+            json.dumps({"name": "rollout-local", "plugins": [{"name": "codex-dsh-trace"}]})
         )
-        self.system.marketplace = {
-            "name": "rollout-local",
-            "root": str(local),
-            "marketplaceSource": {"sourceType": "local", "source": str(local)},
-        }
-        self.run_setup()
-        self.assertFalse(any(c[1:4] == ["plugin", "marketplace", "add"] for c in self.system.calls))
+        before = tree_snapshot(self.home)
+        for source in ["other/project", "xz1220/dsh-trace-plugin", str(local)]:
+            with self.subTest(source=source):
+                self.system.marketplace = {
+                    "name": "rollout-local",
+                    "marketplaceSource": {
+                        "sourceType": "local" if source == str(local) else "git",
+                        "source": source,
+                    },
+                }
+                with self.assertRaisesRegex(setup.SetupError, "different or unknown source"):
+                    self.run_setup()
+                self.assertEqual(tree_snapshot(self.home), before)
+                self.assertEqual(self.system.marketplace["marketplaceSource"]["source"], source)
+        self.assertFalse(any(Path(c[0]).name in ("git", "gh", "curl") for c in self.system.calls))
 
     def test_foreign_login_environment_is_preserved(self):
         self.system.environment = str(self.home / "someone-elses-recordings")
         with self.assertRaisesRegex(setup.SetupError, "already points elsewhere"):
             self.run_setup()
         self.assertEqual(list(self.home.iterdir()), [])
-
-    def test_distinct_checkouts_with_same_project_remote_are_reused(self):
-        original = self.home / "original"
-        checkout = self.home / "worktree"
-        for source in [original, checkout]:
-            (source / ".agents/plugins").mkdir(parents=True)
-            (source / ".agents/plugins/marketplace.json").write_text(
-                json.dumps({"name": "rollout-local", "plugins": [{"name": "codex-dsh-trace"}]})
-            )
-        self.system.marketplace = {
-            "name": "rollout-local",
-            "root": str(original),
-            "marketplaceSource": {"sourceType": "local", "source": str(original)},
-        }
-        self.run_setup("--source", str(checkout))
-        self.assertFalse(any(c[1:4] == ["plugin", "marketplace", "add"] for c in self.system.calls))
 
     def test_foreign_launch_agent_is_preserved(self):
         installer = self.installer()
@@ -355,20 +396,15 @@ class SetupTests(unittest.TestCase):
         self.assertIsNone(self.system.plugin)
         self.assertIsNotNone(self.system.marketplace)
 
-    def test_existing_plugin_and_matching_environment_are_not_adopted(self):
-        self.system.marketplace = {
-            "name": "rollout-local",
-            "marketplaceSource": {"sourceType": "git", "source": setup.DEFAULT_SOURCE},
-        }
-        self.system.plugin = {"pluginId": setup.PLUGIN, "installed": True, "enabled": True}
+    def test_matching_existing_recording_environment_is_not_adopted(self):
         self.system.environment = str(self.installer().trace_root)
         installer, _ = self.run_setup()
         state = json.loads(installer.state_path.read_text())
-        self.assertFalse(state["pluginOwned"])
+        self.assertTrue(state["pluginOwned"])
         self.assertFalse(state["environmentOwned"])
         with contextlib.redirect_stderr(io.StringIO()):
             self.installer("uninstall").uninstall()
-        self.assertIsNotNone(self.system.plugin)
+        self.assertIsNone(self.system.plugin)
         self.assertEqual(self.system.environment, str(installer.trace_root))
 
     def test_no_persist_has_no_login_agent(self):
@@ -410,7 +446,7 @@ class SetupTests(unittest.TestCase):
         output = io.StringIO()
         with contextlib.redirect_stdout(output), contextlib.redirect_stderr(io.StringIO()):
             code = setup.main(
-                ["--dry-run", "--json"],
+                ["--bundle", str(self.payload), "--dry-run", "--json"],
                 system=self.system,
                 platform="darwin",
                 home=self.home,
@@ -433,7 +469,11 @@ class SetupTests(unittest.TestCase):
         output = io.StringIO()
         with contextlib.redirect_stdout(output), contextlib.redirect_stderr(io.StringIO()):
             code = setup.main(
-                ["--dry-run"], system=self.system, platform="darwin", home=self.home, environ={}
+                ["--bundle", str(self.payload), "--dry-run"],
+                system=self.system,
+                platform="darwin",
+                home=self.home,
+                environ={},
             )
         self.assertEqual(code, 0)
         self.assertIn("Codex setup plan", output.getvalue())
@@ -532,6 +572,120 @@ class SetupTests(unittest.TestCase):
         installer.launch_path.write_bytes(b"user changed file")
         result = self.installer("doctor").doctor()
         self.assertEqual(result["status"], "needs-setup")
+
+    def test_bundled_first_install_registers_only_a_persistent_local_source(self):
+        payload = make_npm_payload(self.home / "npm-cache")
+        installer, result = self.run_setup("--bundle", str(payload))
+        self.assertEqual(result["status"], "configured")
+        stable = installer.codex_home / setup.OWNER / "marketplace"
+        registrations = [c for c in self.system.calls if c[1:4] == ["plugin", "marketplace", "add"]]
+        self.assertEqual(registrations[0][4], str(stable))
+        self.assertFalse(any(Path(c[0]).name in ("git", "gh", "curl") for c in self.system.calls))
+        state = json.loads(installer.state_path.read_text())
+        self.assertEqual(state["source"], str(stable))
+        self.assertEqual(state["bundle"]["version"], "0.2.19")
+
+    def test_bundled_dry_run_does_not_write_to_home(self):
+        payload = make_npm_payload(self.home / "npm-cache")
+        before = tree_snapshot(self.home)
+        installer, result = self.run_setup("--bundle", str(payload), "--dry-run")
+        self.assertEqual(result["status"], "dry-run")
+        self.assertIn("persist-bundled-plugin", [c["action"] for c in result["plan"]["changes"]])
+        self.assertEqual(tree_snapshot(self.home), before)
+        self.assertFalse(installer.state_path.exists())
+
+    def test_bundled_repeat_is_unchanged_and_npm_cache_can_be_deleted(self):
+        payload = make_npm_payload(self.home / "npm-cache")
+        installer, _ = self.run_setup("--bundle", str(payload))
+        second = make_npm_payload(self.home / "next-npm-cache")
+        shutil.rmtree(payload)
+        stable = installer.codex_home / setup.OWNER / "marketplace"
+        catalog = json.loads((stable / ".agents/plugins/marketplace.json").read_text())
+        plugin_root = stable / catalog["plugins"][0]["source"]["path"]
+        mcp = json.loads((plugin_root / ".mcp.json").read_text())["mcpServers"]["rollout-viewer"]
+        self.assertEqual(mcp["command"], str(Path(sys.executable).resolve()))
+        result = subprocess.run(
+            [mcp["command"], *mcp["args"]],
+            cwd=plugin_root,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        self.assertIn("isolated bundled interface", result.stdout)
+        before = tree_snapshot(stable)
+        _, repeated = self.run_setup("--bundle", str(second))
+        self.assertEqual(repeated["status"], "unchanged")
+        self.assertEqual(tree_snapshot(stable), before)
+
+    def test_bundled_source_is_retained_after_registration_attempt_failure(self):
+        payload = make_npm_payload(self.home / "npm-cache")
+        installer = self.installer("--bundle", str(payload))
+        self.system.failure = "plugin add codex-dsh-trace"
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(setup.SetupError):
+                installer.setup()
+        self.assertTrue(installer.bundle.verify()["valid"])
+        self.assertFalse(installer.launch_path.exists())
+        self.assertIsNone(self.system.environment)
+        self.assertIsNotNone(self.system.marketplace)
+        self.system.failure = None
+        _, result = self.run_setup("--bundle", str(payload))
+        self.assertEqual(result["status"], "configured")
+
+    def test_bundled_doctor_and_uninstall_preserve_modified_payload_files(self):
+        payload = make_npm_payload(self.home / "npm-cache")
+        installer, _ = self.run_setup("--bundle", str(payload))
+        stable = installer.bundle.source_path
+        receipt = json.loads(installer.bundle.receipt_path.read_text())
+        server = stable / receipt["activeBundle"] / "plugins/codex-dsh-trace/server/main.py"
+        server.write_text("# user edit\n")
+        before = tree_snapshot(self.home)
+        doctor = self.installer("doctor", "--bundle", str(payload)).doctor()
+        self.assertEqual(doctor["status"], "needs-setup")
+        self.assertFalse(doctor["bundledMarketplace"]["valid"])
+        with self.assertRaisesRegex(setup.SetupError, "Preserving the managed npm source"):
+            self.installer("uninstall", "--bundle", str(payload)).uninstall()
+        self.assertEqual(tree_snapshot(self.home), before)
+
+    def test_bundled_uninstall_keeps_registered_source_and_recordings(self):
+        payload = make_npm_payload(self.home / "npm-cache")
+        installer, _ = self.run_setup("--bundle", str(payload))
+        recording = installer.trace_root / "keep-recording"
+        recording.write_text("keep")
+        stable_before = tree_snapshot(installer.bundle.source_path)
+        with contextlib.redirect_stderr(io.StringIO()):
+            result = self.installer("uninstall", "--bundle", str(payload)).uninstall()
+        self.assertEqual(result["plan"]["bundleSourceRetained"], str(installer.bundle.source_path))
+        self.assertEqual(tree_snapshot(installer.bundle.source_path), stable_before)
+        self.assertEqual(recording.read_text(), "keep")
+        self.assertIsNotNone(self.system.marketplace)
+
+    def test_bundled_actual_plugin_version_mismatch_is_not_reported_as_success(self):
+        payload = make_npm_payload(self.home / "npm-cache")
+        original_run = self.system.run
+
+        def wrong_version(command, env=None):
+            result = original_run(command, env=env)
+            if command[1:3] == ["plugin", "add"] and "--help" not in command:
+                self.system.plugin["version"] = "0.0.1"
+            return result
+
+        installer = self.installer("--bundle", str(payload))
+        with patch.object(self.system, "run", side_effect=wrong_version):
+            with contextlib.redirect_stderr(io.StringIO()):
+                with self.assertRaisesRegex(setup.SetupError, "expected '0.2.19'"):
+                    installer.setup()
+        self.assertTrue(installer.bundle.verify()["valid"])
+        self.assertFalse(installer.state_path.exists())
+
+    def test_bundled_doctor_detects_changed_marketplace_registration(self):
+        payload = make_npm_payload(self.home / "npm-cache")
+        self.run_setup("--bundle", str(payload))
+        self.system.marketplace["marketplaceSource"]["source"] = "xz1220/dsh-trace-plugin"
+        before = tree_snapshot(self.home)
+        with self.assertRaisesRegex(setup.SetupError, "different or unknown source"):
+            self.installer("doctor", "--bundle", str(payload)).doctor()
+        self.assertEqual(tree_snapshot(self.home), before)
 
 
 if __name__ == "__main__":

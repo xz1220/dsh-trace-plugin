@@ -8,6 +8,7 @@ deleted. All runtime dependencies are in Python's standard library.
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import plistlib
@@ -17,11 +18,9 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from urllib.parse import urlparse
 
 OWNER = "dsh-trace-extension"
 STATE_VERSION = 1
-DEFAULT_SOURCE = "xz1220/dsh-trace-plugin"
 MARKETPLACE = "rollout-local"
 PLUGIN = "codex-dsh-trace@rollout-local"
 ENV_KEY = "CODEX_ROLLOUT_TRACE_ROOT"
@@ -53,22 +52,6 @@ def safe_path(path):
     return path
 
 
-def git_identity(source):
-    source = str(source).rstrip("/")
-    if source.startswith("git@github.com:"):
-        source = source[len("git@github.com:") :]
-    elif "://" in source:
-        parsed = urlparse(source)
-        if parsed.username or parsed.password:
-            raise SetupError("Use credential-free repository URLs and your Git credential helper.")
-        if parsed.hostname != "github.com":
-            return source
-        source = parsed.path.lstrip("/")
-    if source.endswith(".git"):
-        source = source[:-4]
-    return source.lower()
-
-
 class System:
     def run(self, command, env=None):
         return subprocess.run(command, capture_output=True, text=True, check=False, env=env)
@@ -98,6 +81,56 @@ class Installer:
         self.warnings = []
         self.state = None
         self.last_state_bytes = None
+        self.bundle = None
+        self.bundle_error = None
+        self.install_source = None
+        self.observed_source = None
+        self.bundle_retained = False
+
+    def initialize_bundle(self):
+        if self.bundle is not None:
+            return
+        module_path = Path(__file__).resolve().with_name("installer_bundle.py")
+        if not module_path.is_file():
+            raise SetupError("The npm package is incomplete. Reinstall dsh-trace-extension.")
+        spec = importlib.util.spec_from_file_location("dsh_trace_installer_bundle", module_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        self.bundle_error = module.BundleError
+        try:
+            self.bundle = module.BundledMarketplace(
+                absolute(self.args.bundle, self.home), self.codex_home, sys.executable
+            )
+        except self.bundle_error as exc:
+            raise SetupError(str(exc)) from exc
+        self.install_source = str(self.bundle.source_path)
+
+    def bundled(self, method, *args, **kwargs):
+        try:
+            return getattr(self.bundle, method)(*args, **kwargs)
+        except self.bundle_error as exc:
+            raise SetupError(str(exc)) from exc
+
+    def bundle_source(self, value):
+        return bool(
+            self.bundle is not None
+            and isinstance(value, str)
+            and Path(value).is_absolute()
+            and absolute(value, self.home) == self.bundle.source_path
+        )
+
+    def require_verified_bundle(self):
+        result = self.bundled("verify")
+        if not result.get("valid"):
+            raise SetupError(
+                "Preserving the managed npm source: " + result.get("reason", "verification failed")
+            )
+        return result
+
+    def retain_bundle_source(self):
+        paths = self.bundled("commit_source")
+        self.journal = [entry for entry in self.journal if entry[0] not in paths]
+        self.bundle_retained = True
 
     def bytes_at(self, path):
         safe_path(path)
@@ -150,10 +183,7 @@ class Installer:
             or not Path(state["traceRoot"]).is_absolute()
             or not isinstance(state.get("environmentOwned"), bool)
             or not isinstance(state.get("pluginOwned"), bool)
-            or not isinstance(state.get("source"), str)
-            or not state["source"]
-            or state.get("ref") is not None
-            and not isinstance(state["ref"], str)
+            or state.get("source") != str(self.state_path.parent / "marketplace")
             or state.get("previousEnvironment") is not None
             and not isinstance(state["previousEnvironment"], str)
         ):
@@ -167,6 +197,15 @@ class Installer:
             or any(c not in "0123456789abcdef" for c in agent["sha256"])
         ):
             raise SetupError("Setup state contains an unrecognized managed resource.")
+        bundle = state.get("bundle")
+        if (
+            not isinstance(bundle, dict)
+            or bundle.get("source") != str(self.state_path.parent / "marketplace")
+            or bundle.get("receipt")
+            != str(self.state_path.parent / "marketplace/.dsh-trace-bundle.json")
+            or not isinstance(bundle.get("version"), str)
+        ):
+            raise SetupError("Setup state contains an unrecognized bundled marketplace.")
         return state
 
     def check_dependencies(self):
@@ -207,74 +246,7 @@ class Installer:
             None,
         )
 
-    def local_source(self, source):
-        value = str(source)
-        if value.startswith(("/", ".", "~")) or Path(value).exists():
-            return absolute(value, self.home)
-        return None
-
-    def source_matches(self, existing, requested_source=None):
-        requested_source = self.args.source if requested_source is None else requested_source
-        requested_local = self.local_source(requested_source)
-        existing_local = self.local_source(existing)
-        if existing_local:
-            safe_path(existing_local)
-            if requested_local and existing_local == requested_local:
-                return True
-            catalog = existing_local / ".agents/plugins/marketplace.json"
-            try:
-                data = json.loads(catalog.read_text(encoding="utf-8"))
-                if data.get("name") != MARKETPLACE or not any(
-                    p.get("name") == "codex-dsh-trace" for p in data.get("plugins", [])
-                ):
-                    return False
-            except (OSError, ValueError, TypeError, AttributeError):
-                return False
-            result = self.command(
-                ["git", "-C", str(existing_local), "config", "--get", "remote.origin.url"],
-                required=False,
-            )
-            if requested_local:
-                requested = self.command(
-                    ["git", "-C", str(requested_local), "config", "--get", "remote.origin.url"],
-                    required=False,
-                )
-                return (
-                    not result.returncode
-                    and not requested.returncode
-                    and bool(result.stdout.strip())
-                    and git_identity(result.stdout.strip())
-                    == git_identity(requested.stdout.strip())
-                )
-            return (
-                not result.returncode
-                and not requested_local
-                and git_identity(result.stdout.strip()) == git_identity(requested_source)
-            )
-        return not requested_local and git_identity(existing) == git_identity(requested_source)
-
-    def inspect_marketplace(self, requested_source=None):
-        requested_source = self.args.source if requested_source is None else requested_source
-        local = self.local_source(requested_source)
-        if local:
-            safe_path(local)
-            try:
-                catalog = json.loads(
-                    (local / ".agents/plugins/marketplace.json").read_text(encoding="utf-8")
-                )
-            except (OSError, ValueError) as exc:
-                raise SetupError("Local source is missing a valid marketplace catalog.") from exc
-            if (
-                not isinstance(catalog, dict)
-                or catalog.get("name") != MARKETPLACE
-                or not any(
-                    isinstance(p, dict) and p.get("name") == "codex-dsh-trace"
-                    for p in catalog.get("plugins", [])
-                )
-            ):
-                raise SetupError("Local source does not contain the expected Codex plugin.")
-        else:
-            git_identity(requested_source)
+    def inspect_marketplace(self):
         data = self.json_command([self.codex, "plugin", "marketplace", "list", "--json"])
         rows = data.get("marketplaces")
         if not isinstance(rows, list):
@@ -282,21 +254,21 @@ class Installer:
         matches = [r for r in rows if isinstance(r, dict) and r.get("name") == MARKETPLACE]
         if len(matches) > 1:
             raise SetupError("Several marketplaces use the expected name; preserving them.")
-        if matches:
-            row = matches[0]
-            metadata = row.get("marketplaceSource") or {}
-            if not isinstance(metadata, dict):
-                raise SetupError(
-                    "Unsupported marketplace source metadata; preserving configuration."
-                )
-            source = metadata.get("source") or row.get("root")
-            if not source or not self.source_matches(source, requested_source):
-                raise SetupError(
-                    f"Marketplace {MARKETPLACE!r} belongs to a different or unknown source; "
-                    "it will not be overwritten."
-                )
-            return True
-        return False
+        self.observed_source = None
+        if not matches:
+            return False
+        row = matches[0]
+        metadata = row.get("marketplaceSource")
+        if not isinstance(metadata, dict):
+            raise SetupError("Unrecognized marketplace metadata; preserving configuration.")
+        source = metadata.get("source") or row.get("root")
+        if not self.bundle_source(source):
+            raise SetupError(
+                f"Marketplace {MARKETPLACE!r} uses a different or unknown source; "
+                "it will not be overwritten."
+            )
+        self.observed_source = source
+        return True
 
     def environment(self):
         result = self.command([self.launchctl, "getenv", ENV_KEY], required=False)
@@ -332,6 +304,7 @@ class Installer:
     def preflight(self):
         version = self.check_dependencies()
         self.state = self.load_state()
+        self.initialize_bundle()
         if self.state and not self.args.trace_root:
             self.trace_root = absolute(self.state["traceRoot"])
         for path in (self.codex_home, self.trace_root, self.state_path.parent):
@@ -340,6 +313,7 @@ class Installer:
                 raise SetupError(f"Expected a directory; preserving existing path: {path}")
         self.check_owned_agent()
         marketplace_exists = self.inspect_marketplace()
+        bundle_plan = self.bundled("plan")
         plugin = self.installed_plugin(marketplace_exists)
         current_env = self.environment()
         old_owned = bool(
@@ -354,14 +328,17 @@ class Installer:
             )
         commands = []
         if not marketplace_exists:
-            command = [self.codex, "plugin", "marketplace", "add", self.args.source]
-            if self.args.ref and not self.local_source(self.args.source):
-                command += ["--ref", self.args.ref]
-            commands.append(command + ["--json"])
-        if not plugin or not plugin.get("enabled", True):
+            commands.append(
+                [self.codex, "plugin", "marketplace", "add", self.install_source, "--json"]
+            )
+        if (
+            not plugin
+            or not plugin.get("enabled", True)
+            or plugin.get("version") != self.bundle.version
+        ):
             commands.append([self.codex, "plugin", "add", PLUGIN, "--json"])
         agent_bytes = None if self.args.no_persist else self.desired_agent()
-        changes = []
+        changes = list(bundle_plan["changes"])
         if not self.trace_root.exists():
             changes.append({"action": "create-recording-directory", "path": str(self.trace_root)})
         if current_env != str(self.trace_root):
@@ -378,8 +355,7 @@ class Installer:
         return {
             "client": "codex",
             "codexVersion": version,
-            "source": self.args.source,
-            "ref": self.args.ref,
+            "source": self.install_source,
             "traceRoot": str(self.trace_root),
             "stateFile": str(self.state_path),
             "persistentLoginSetup": not self.args.no_persist,
@@ -387,6 +363,7 @@ class Installer:
             "changes": changes,
             "restartRequired": True,
             "nativeVerified": False,
+            "bundledPluginVersion": self.bundle.version,
             "notes": [
                 "Recording is opt-in and may contain prompts, code, credentials, and tool output.",
                 "Fully quit and reopen Codex, then run a new task; opening the panel does not enable recording.",
@@ -399,11 +376,13 @@ class Installer:
             "_state_bytes": self.last_state_bytes,
             "_agent_before": self.bytes_at(self.launch_path),
             "_marketplace_exists": marketplace_exists,
+            "_observed_source": self.observed_source,
         }
 
     def revalidate(self, plan):
         self.expect_bytes(self.state_path, plan["_state_bytes"])
         self.expect_bytes(self.launch_path, plan["_agent_before"])
+        self.bundled("revalidate")
         if self.environment() != plan["_environment"]:
             raise SetupError(
                 "Recording environment changed since inspection; preserving it. Rerun setup."
@@ -411,6 +390,8 @@ class Installer:
         marketplace_exists = self.inspect_marketplace()
         if marketplace_exists != plan["_marketplace_exists"]:
             raise SetupError("Marketplace registration changed since inspection. Rerun setup.")
+        if self.observed_source != plan["_observed_source"]:
+            raise SetupError("Marketplace source changed since inspection. Rerun setup.")
         if self.installed_plugin(marketplace_exists) != plan["_plugin"]:
             raise SetupError("Plugin installation changed since inspection. Rerun setup.")
 
@@ -513,6 +494,9 @@ class Installer:
         self.revalidate(plan)
         env_changed = False
         try:
+            self.bundled("apply", self.write_managed, self.ensure_directory)
+            if plan["_marketplace_exists"]:
+                self.retain_bundle_source()
             self.ensure_directory(self.trace_root)
             if plan["_agent"] is not None:
                 self.write_managed(self.launch_path, plan["_agent"], expected=plan["_agent_before"])
@@ -523,6 +507,8 @@ class Installer:
                 self.command([self.launchctl, "setenv", ENV_KEY, str(self.trace_root)])
                 env_changed = True
             for command in plan["commands"]:
+                # Once registration is attempted, Codex may retain this path.
+                self.retain_bundle_source()
                 self.command(command)
                 self.commands_done.append(command)
             plugin = self.installed_plugin()
@@ -530,6 +516,12 @@ class Installer:
                 raise SetupError(
                     "Codex did not report the plugin installed and enabled after setup."
                 )
+            if plugin.get("version") != self.bundle.version:
+                raise SetupError(
+                    f"Codex reported plugin version {plugin.get('version')!r}, expected {self.bundle.version!r}. "
+                    "The source was preserved; rerun setup after reviewing the CLI state."
+                )
+            self.require_verified_bundle()
             if self.args.no_persist and self.launch_path.exists():
                 self.check_owned_agent()
                 self.remove_managed(self.launch_path, expected=plan["_agent_before"])
@@ -540,8 +532,7 @@ class Installer:
                 "owner": OWNER,
                 "stateVersion": STATE_VERSION,
                 "client": "codex",
-                "source": self.args.source,
-                "ref": self.args.ref,
+                "source": self.install_source,
                 "traceRoot": str(self.trace_root),
                 "environmentOwned": bool(plan["_environment_owned"] or env_changed),
                 "previousEnvironment": self.state.get("previousEnvironment")
@@ -557,6 +548,11 @@ class Installer:
                 if plan["_agent"] is not None
                 else None,
             }
+            state["bundle"] = {
+                "source": str(self.bundle.source_path),
+                "receipt": str(self.bundle.receipt_path),
+                "version": self.bundle.version,
+            }
             data = (json.dumps(state, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode()
             self.write_managed(self.state_path, data, expected=plan["_state_bytes"])
         except (SetupError, OSError) as exc:
@@ -564,6 +560,11 @@ class Installer:
                 self.rollback(plan["_environment"], env_changed)
             except (SetupError, OSError) as rollback_error:
                 self.warnings.append(f"Rollback needs review: {rollback_error}")
+            if self.bundle_retained:
+                self.warnings.append(
+                    "The verified bundled marketplace was retained because Codex may refer to it. "
+                    "Rerunning npm setup can finish this installation."
+                )
             partial = ""
             if self.commands_done:
                 partial = (
@@ -600,8 +601,8 @@ class Installer:
     def doctor(self):
         version = self.check_dependencies()
         self.state = self.load_state()
-        rows = self.json_command([self.codex, "plugin", "marketplace", "list", "--json"])
-        market = any(r.get("name") == MARKETPLACE for r in rows.get("marketplaces", []))
+        self.initialize_bundle()
+        market = self.inspect_marketplace()
         plugin = self.installed_plugin(market)
         if self.state and not self.args.trace_root:
             self.trace_root = absolute(self.state["traceRoot"])
@@ -645,6 +646,13 @@ class Installer:
             and environment == str(self.trace_root)
             and (not agent or agent_status == "unchanged")
         )
+        bundle_report = self.bundled("verify")
+        installed_version = plugin.get("version") if plugin else None
+        bundle_report["pluginVersionMatches"] = bool(
+            bundle_report.get("valid") and installed_version == bundle_report.get("version")
+        )
+        bundle_report["marketplaceMatches"] = market
+        configured = configured and bundle_report["pluginVersionMatches"] and market
         return {
             "status": "configured-needs-native-check" if configured else "needs-setup",
             "client": "codex",
@@ -657,6 +665,7 @@ class Installer:
             "unsupportedRecordingBundles": unsupported,
             "traceRoot": str(self.trace_root),
             "nativeVerified": False,
+            "bundledMarketplace": bundle_report,
             "next": "Open a new recorded task in Codex Trace to verify native readiness. Old bundles do not prove the running app has reloaded.",
         }
 
@@ -665,6 +674,8 @@ class Installer:
         self.state = self.load_state()
         if not self.state:
             return {"status": "not-managed", "recordingsDeleted": False}
+        self.initialize_bundle()
+        bundle_before = self.require_verified_bundle()
         state_before = self.last_state_bytes
         self.check_owned_agent()
         agent_before = self.bytes_at(self.launch_path)
@@ -675,9 +686,7 @@ class Installer:
             conflicts.append("Recording environment changed after setup and will be preserved.")
         commands = []
         plugin_owned = self.state.get("pluginOwned")
-        marketplace_exists = (
-            self.inspect_marketplace(self.state["source"]) if plugin_owned else False
-        )
+        marketplace_exists = self.inspect_marketplace()
         plugin_before = self.installed_plugin(marketplace_exists) if plugin_owned else None
         if plugin_before:
             commands.append([self.codex, "plugin", "remove", PLUGIN, "--json"])
@@ -690,17 +699,23 @@ class Installer:
             "restoreOwnedEnvironment": bool(env_owned and not conflicts),
             "recordingsDeleted": False,
             "marketplaceRemoved": False,
+            "bundleSourceRetained": str(self.bundle.source_path),
             "notes": conflicts + ["Recordings and unrelated Codex settings are preserved."],
         }
+        plan["notes"].append(
+            "The verified bundled source is retained because the marketplace or a preserved plugin may refer to it."
+        )
         if self.args.dry_run:
             return {"status": "dry-run", "plan": plan}
         self.confirm(plan)
         self.expect_bytes(self.state_path, state_before)
         self.expect_bytes(self.launch_path, agent_before)
+        if self.require_verified_bundle() != bundle_before:
+            raise SetupError("The managed npm source changed since inspection; preserving it.")
         if self.environment() != environment:
             raise SetupError("Recording environment changed since inspection; preserving it.")
         if plugin_owned and (
-            self.inspect_marketplace(self.state["source"]) != marketplace_exists
+            self.inspect_marketplace() != marketplace_exists
             or self.installed_plugin(marketplace_exists) != plugin_before
         ):
             raise SetupError("Plugin installation changed since inspection; preserving it.")
@@ -780,10 +795,15 @@ def print_result(result):
             f"{result['unsupportedRecordingBundles']} unsupported. Native readiness is not verified."
         )
         print(f"Next: {result['next']}")
+        bundle = result.get("bundledMarketplace", {})
+        if bundle.get("status") != "not-used":
+            print(f"Bundled plugin source: {bundle.get('status', 'unknown')}.")
     elif status == "uninstalled":
         print(
             "Removed the unchanged helper-owned setup. Recordings and marketplace were preserved."
         )
+        if result.get("plan", {}).get("bundleSourceRetained"):
+            print(f"Bundled source retained: {result['plan']['bundleSourceRetained']}")
     elif status == "not-managed":
         print("No helper-owned setup found. Nothing was removed.")
     for warning in result.get("warnings", []):
@@ -796,8 +816,9 @@ def parser():
         "action", choices=("setup", "doctor", "uninstall"), nargs="?", default="setup"
     )
     value.add_argument("--client", choices=("codex",), default="codex")
-    value.add_argument("--source", default=DEFAULT_SOURCE)
-    value.add_argument("--ref")
+    value.add_argument(
+        "--bundle", required=True, help="Path to the npm package's verified plugin payload"
+    )
     value.add_argument("--trace-root")
     value.add_argument("--codex-home")
     value.add_argument(
