@@ -27,6 +27,8 @@ User-visible changes are recorded here. Historical entries describe code changes
 
 ### Changed
 
+- Remove historical design prototypes and unused runtime state; consolidate product and source documentation.
+
 - Rename the repository to `dsh-trace-plugin`, retaining the existing plugin ID and display name.
 - Archived machine-specific handoff notes and one-off validation logs outside the tracked source tree.
 

@@ -42,8 +42,6 @@ The frontend is bundled into `plugins/codex-dsh-trace/assets/viewer.html`. The s
 
 `vendor/dsh/upstream.json` pins the upstream commit and original file hashes. `vendor/dsh/patches.json` allows only reviewed adaptations, explained in `vendor/dsh/PATCHES.md`. Core component CSS remains upstream source. Host CSS strengthens the caption color token to meet AA text contrast. Format and lint configuration must exclude vendored source from automatic rewriting.
 
-The `design/` directory contains historical studies with synthetic data. Those prototypes are separate build targets and do not read personal recordings. They are not runtime dependencies or native integration evidence.
-
 ## Compatibility identifiers
 
 The display name is **Codex Trace**. The repository is `dsh-trace-plugin`; the plugin ID remains `codex-dsh-trace`. Earlier `rollout-viewer` identifiers remain in:
@@ -58,3 +56,11 @@ Keeping these identifiers avoids breaking installed clients, saved preferences, 
 ## Verification scope
 
 Unit tests generate isolated recordings, so private captured traces are not required. A local preview exercises the real reader and bundle. A bridge harness exercises MCP Apps messages. Neither establishes that an installed native Codex panel has reloaded or that a particular client version is compatible. Native acceptance must inspect the actual installed panel separately.
+
+## Pinned implementation sources
+
+The original integration used Codex CLI 0.163.0 and source commit `83086188ae0614bd882818ff1aa23f3194962012`: [official rollout-trace source](https://github.com/openai/codex/tree/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/rollout-trace) and [inference recording implementation](https://github.com/openai/codex/blob/83086188ae0614bd882818ff1aa23f3194962012/codex-rs/rollout-trace/src/inference.rs). This is a historical baseline, not a minimum-version guarantee. The plugin reads official recordings directly and has no dependency on third-party session viewers.
+
+DSH runtime source is pinned to `deepseek-ai/deepseek-harness` commit `e8f7b93a344964de3dca1ace9e72b6e4d6de87cb`: [trajectory components](https://github.com/deepseek-ai/deepseek-harness/tree/e8f7b93a344964de3dca1ace9e72b6e4d6de87cb/packages/client/ui-trajectory) and [theme source](https://github.com/deepseek-ai/deepseek-harness/tree/e8f7b93a344964de3dca1ace9e72b6e4d6de87cb/packages/client/ui-theme). The [imported file manifest](../vendor/dsh/upstream.json), [approved patch hashes](../vendor/dsh/patches.json), [adaptation rationale](../vendor/dsh/PATCHES.md), and [upstream license](../vendor/dsh/LICENSE) accompany the source.
+
+These pins describe the implementation baseline; they do not imply that later upstream releases preserve the same APIs or recording formats. Early synthetic prototypes and manual study reports are retained in Git history. Public tests and synthetic fixture generators provide reproducible regression evidence; historical observations do not establish current native-host compatibility.

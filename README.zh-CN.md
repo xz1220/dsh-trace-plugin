@@ -128,4 +128,4 @@ npm test
 
 本项目独立维护，**不是 OpenAI 或 DeepSeek 官方产品**。界面使用固定版本的 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) MIT 组件，来源及适配记录见 [vendor/dsh/PATCHES.md](vendor/dsh/PATCHES.md)。DSH 指该上游项目。
 
-本项目代码使用 MIT 许可，见 [LICENSE](LICENSE)。构建的插件包包含 `LICENSE` 和 `THIRD_PARTY_NOTICES.txt`。早期合成数据设计稿保留在 [design/](design/README.md)。
+本项目代码使用 MIT 许可，见 [LICENSE](LICENSE)。构建的插件包包含 `LICENSE` 和 `THIRD_PARTY_NOTICES.txt`。

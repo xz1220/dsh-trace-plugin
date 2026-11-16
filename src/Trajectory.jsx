@@ -17,7 +17,6 @@ import view from '../vendor/dsh/packages/client/ui-trajectory/src/client/views.m
 import { durationPreference, wrappingPreference } from './preferences.js';
 import { trajectoryTurns } from './trajectory-order.js';
 
-export { t } from './locale.js';
 const toggle = (set, key) =>
   set((current) => {
     const next = new Set(current);
@@ -31,15 +30,7 @@ const toggleAll = (set, ids, collapsed) =>
     return next;
   });
 
-export default function Trajectory({
-  data,
-  call,
-  earlier,
-  copy,
-  thread,
-  focusCallId,
-  onFocusApplied,
-}) {
+export default function Trajectory({ data, call, earlier, copy, focusCallId, onFocusApplied }) {
   const t = useTranslation();
   const groupOf = useCallback(
     (cell) =>
@@ -172,7 +163,6 @@ export default function Trajectory({
   const visibleCells = useMemo(
     () =>
       [...cells.values()]
-        .filter((cell) => thread === 'all' || cell.threadId === thread)
         .sort((a, b) => a.seq - b.seq || a.slot - b.slot)
         .map((cell, index) => ({
           ...cell,
@@ -181,7 +171,7 @@ export default function Trajectory({
           group: groupOf(cell),
           text: captionOf(cell),
         })),
-    [cells, thread, t, groupOf, captionOf],
+    [cells, t, groupOf, captionOf],
   );
   const turns = useMemo(() => trajectoryTurns(visibleCells), [visibleCells]);
   const requestNumbers = useMemo(() => {

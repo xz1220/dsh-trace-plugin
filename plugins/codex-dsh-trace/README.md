@@ -9,77 +9,41 @@ codex plugin marketplace add xz1220/dsh-trace-plugin
 codex plugin add codex-dsh-trace@rollout-local
 ```
 
-The repository ships the built frontend; Node.js and a source build are not required. A private repository requires Git access.
+To update, run `codex plugin marketplace upgrade rollout-local`, then add the plugin again. Fully quit and reopen Codex to reload its backend and frontend. Choose **Codex Trace** in the conversation's right-panel tools menu.
 
-To update:
+The built plugin requires Python **3.9+** as `python3` and a compatible Codex client. It needs no Python packages or Node.js runtime. macOS arm64 has been checked locally; Linux and Windows native integrations remain unverified. Codex CLI 0.163.0 is the historical integration baseline, not a minimum-version guarantee.
 
-```sh
-codex plugin marketplace upgrade rollout-local
-codex plugin add codex-dsh-trace@rollout-local
-```
+See the [project README](https://github.com/xz1220/dsh-trace-plugin#readme) for full installation, platform, troubleshooting, and development instructions.
 
-Fully quit and reopen Codex after updating to reload the backend and frontend.
+## Enable recording
 
-## Open and record
-
-See the [installation instructions](https://github.com/xz1220/dsh-trace-plugin#install). Choose **Codex Trace** in the conversation's right-panel tools menu. The panel follows the current chat and new recordings automatically. It has no recording-management settings.
-
-Enable recording before starting Codex:
+Enable tracing before starting Codex:
 
 ```sh
 CODEX_ROLLOUT_TRACE_ROOT="$HOME/.codex/rollout-traces" codex
 ```
 
-An already-running desktop process does not inherit shell environment changes. On macOS, configure subsequently launched apps for the current login session:
+For subsequently launched macOS desktop apps in the current login session:
 
 ```sh
 mkdir -p -m 700 "$HOME/.codex/rollout-traces"
 launchctl setenv CODEX_ROLLOUT_TRACE_ROOT "$HOME/.codex/rollout-traces"
 ```
 
-Fully quit and reopen Codex afterwards. Existing history cannot be captured retroactively.
+Fully quit and reopen Codex afterwards. Existing history cannot be captured retroactively. Register another recording directory from this plugin directory with `python3 server/main.py --register /absolute/path/to/recordings`.
 
-Register another directory with:
+## Inspect recordings
 
-```sh
-python3 server/main.py --register /absolute/path/to/recordings
-```
+The panel follows the current chat, host theme and language, and new events automatically. It shows DSH timeline and ledger views, search, requests and nested tools, recorded images, and compaction. Complete context and original request/response JSON remain separate. Recordings join only for the same exact root thread, preserving resumed history and recorded provenance.
 
-Run this command from the plugin directory. Maintenance is available through the backend, outside the viewing surface.
+Supported schemas are **1 and 2**. Event logs are limited to **256 MiB**, including a chat aggregate; each payload is limited to **64 MiB**. Exceeded limits and unavailable evidence are reported explicitly. Opaque content, uncaptured images, and unrecorded timing cannot be reconstructed.
 
-## Inspect
+## Local data and compatibility
 
-The DSH interface provides turn/step grouping, request boundaries, folding, search, a timeline, virtualized rows, and a resizable inspector. Details include Markdown, code, JSON, prompt/tool diffs, and recorded images. Complete Codex context and original request/response JSON remain separate views.
+Recordings remain read-only. Discovery uses `$CODEX_HOME/rollout-traces` (default `~/.codex/rollout-traces`), `CODEX_ROLLOUT_TRACE_ROOT`, and registered directories. Registration writes only `$CODEX_HOME/rollout-viewer/config.json`. The `rollout-viewer` MCP/resource namespace, configuration, preferences, and legacy resource alias remain compatible with earlier installations.
 
-The panel joins recordings only for the same exact root thread. Resumed tasks preserve prior history and stable identities. Inherited fork history is deduplicated against confirmed ancestors. Compaction shows recorded application state, before/after counts, and opaque items without inventing hidden text. Subtool declarations come from the recording, including unambiguous recorded code-mode TypeScript sections when JSON schema is absent.
-
-The model-facing `show_rollout_trace` tool returns launch metadata. Detailed request and tool bodies are exposed through app-only tools for inspection. These visibility hints depend on the host; they are not an operating-system sandbox.
-
-Theme and language follow the host. Upstream controls support eight locales; Codex-specific text uses Chinese or English fallback.
-
-## Runtime and limits
-
-Python **3.9+**, available as `python3`, and a compatible Codex client are required. No Python packages or Node.js runtime are needed for this built plugin. macOS arm64 has been checked locally; Linux and Windows native integrations remain best effort. Codex CLI 0.163.0 was the original integration baseline, not a minimum-version guarantee.
-
-- Recording schemas: 1 and 2.
-- Event-log bound: 256 MiB, including a current-chat aggregate.
-- Individual payload bound: 64 MiB.
-- Default overview page: 200 execution records.
-- Long text is read in 48,000-character chunks; complete copy is available.
-- Payload, projection, text, image, and completed-detail caches are bounded. Active reads and selections may consume additional memory.
-
-An exceeded limit is reported explicitly. The reader does not silently present truncated content as complete. Missing continuation prefixes, uncaptured image bytes, opaque compaction text, and unrecorded generation metrics remain unavailable. Original recording files, including `state.json`, are not rewritten.
-
-## Data and privacy
-
-The catalog reads the default `$CODEX_HOME/rollout-traces` directory (default `~/.codex/rollout-traces`), the `CODEX_ROLLOUT_TRACE_ROOT` environment variable, and explicitly registered directories. It does not read the ordinary Codex session archive as a substitute.
-
-Registration writes `$CODEX_HOME/rollout-viewer/config.json`, with a default root under `~/.codex`. The viewer itself does not upload recordings, contact a model, or send telemetry. It provides data to the local host for display; external links and copy/export actions can take content outside that view. Traces may contain credentials and private code. Share only data you have reviewed and redacted.
-
-The optional `python3 server/main.py --preview` server binds to `127.0.0.1` and prints a secret bootstrap URL. It uses a random authenticated cookie and same-origin checks. Treat that URL as a credential. `/harness` tests the MCP Apps bridge locally and does not prove native Codex integration.
-
-The `rollout-viewer` MCP namespace, resource namespace, and configuration keys remain for compatibility with earlier installations.
+The reader has no upload, telemetry, or model integration. Detailed tools are app-only visibility hints enforced by the host. Recordings can contain credentials and private code; review content before copying, exporting, or sharing it. The optional `python3 server/main.py --preview` binds to loopback and prints a secret bootstrap URL; keep it private and stop the server when finished. Its bridge harness does not establish native Codex compatibility. See [security and privacy](https://github.com/xz1220/dsh-trace-plugin/blob/main/SECURITY.md).
 
 ## Attribution
 
-This project is independently maintained and is **not an official OpenAI or DeepSeek product**. DSH components are MIT licensed, © 2026 DeepSeek. See the included `LICENSE` and `THIRD_PARTY_NOTICES.txt` for project and bundled dependency notices.
+Independently maintained; **not an official OpenAI or DeepSeek product**. DSH components are MIT licensed, © 2026 DeepSeek. See the included `LICENSE` and `THIRD_PARTY_NOTICES.txt`.

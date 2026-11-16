@@ -49,8 +49,6 @@ export function translatorFor(value) {
       (_, name) => params[name] ?? '',
     );
   t.locale = locale;
-  // Codex-specific extensions use English when no native translation is available.
-  t.text = (chinese, english) => (locale === 'zh' ? chinese : english);
   return t;
 }
 export const dictionary = dictionaries.zh;

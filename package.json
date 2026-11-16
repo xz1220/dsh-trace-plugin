@@ -5,9 +5,6 @@
   "scripts": {
     "build": "node scripts/build-plugin.mjs",
     "test": "npm run test:python && npm run test:node",
-    "build:design": "node design/build.mjs",
-    "build:analysis": "node design/build-analysis.mjs",
-    "build:mock": "node design/build-dsh-mock.mjs",
     "test:python": "python3 -m unittest discover -s tests -v",
     "test:node": "node --test tests/*.mjs",
     "test:e2e": "playwright test",

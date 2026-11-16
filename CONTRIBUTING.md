@@ -30,7 +30,7 @@ uv run ruff format --check .
 uv run mypy
 ```
 
-See the CI workflow for the exact checked versions and commands. `npm run check` runs the combined repository checks. Run `npx playwright install chromium` once before `npm run test:e2e` for browser and accessibility checks. Automatic formatting excludes `vendor/dsh`, generated assets, and historical prototypes so upstream provenance remains valid.
+See the CI workflow for the exact checked versions and commands. `npm run check` runs the combined repository checks. Run `npx playwright install chromium` once before `npm run test:e2e` for browser and accessibility checks. Automatic formatting excludes `vendor/dsh` and generated assets so upstream provenance remains valid.
 
 ## Repository layout
 
@@ -42,8 +42,7 @@ See the CI workflow for the exact checked versions and commands. `npm run check`
 | `vendor/dsh/`                     | Pinned upstream source, licenses, hashes, and reviewed patches        |
 | `tests/`                          | Isolated Python and Node regression tests                             |
 | `scripts/`                        | Build, verification, recording, fixtures, and packaging               |
-| `docs/`                           | Product, architecture, design, and source notes                       |
-| `design/`                         | Historical synthetic prototypes, kept separate from the runtime       |
+| `docs/`                           | Product and interface behavior, architecture, sources, and roadmap    |
 
 `local-context/`, screenshots used for private review, caches, and `dist/` are local artifacts. Do not add captured private traces to Git.
 

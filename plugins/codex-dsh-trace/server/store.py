@@ -300,7 +300,6 @@ class BundleIndex:
         self.tool_counter = 0
         self.code_counter = 0
         self.latest_requests = {}
-        self.payload_refs = {}
         self.payload_cache = OrderedDict()
         self.payload_cache_size = 0
         self.context_cache = OrderedDict()
@@ -308,7 +307,6 @@ class BundleIndex:
         self.text_cache_bytes = 0
         self.status = "running"
         self.latest_time = self.meta["startedAt"] or 0
-        self.unsupported = set()
         self.projection = None
 
     def refresh(self):
@@ -370,7 +368,6 @@ class BundleIndex:
                     raise TraceError(
                         "录制中的 payload 路径不合法。", code="invalid_payload_reference"
                     )
-                self.payload_refs[value["raw_payload_id"]] = value
             for item in value.values():
                 self.remember_refs(item)
         elif isinstance(value, list):
@@ -685,7 +682,7 @@ class BundleIndex:
     def call_identity(self, row, call_id):
         return call_id
 
-    def context(self, row_id, visiting=None):
+    def context(self, row_id):
         # Iterative reconstruction avoids recursion and intermediate full copies.
         row = self.get_row(row_id)
         if row.get("type") != "request":
@@ -937,21 +934,6 @@ class Store:
             "recordingConfigured": bool(os.environ.get("CODEX_ROLLOUT_TRACE_ROOT")),
             "platform": sys.platform,
         }
-
-    def thread_recording(self, thread_id):
-        identifier(thread_id)
-        candidates = [
-            meta for meta in self.catalog.list(force=True) if meta["threadId"] == thread_id
-        ]
-        # Resuming the engine creates an empty bundle before the first new request.
-        # Keep existing history readable until that bundle has an execution record.
-        for meta in candidates:
-            index = self.index(meta["id"])
-            index.refresh()
-            with index.lock:
-                if index.rows:
-                    return meta
-        return candidates[0] if candidates else None
 
     def binding(self, thread_id):
         index = self.thread_index(thread_id)
