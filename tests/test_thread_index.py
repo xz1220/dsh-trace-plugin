@@ -8,8 +8,8 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "plugins/codex-dsh-trace/server"))
 
+from fixtures import Fixture
 from store import Store, TraceError
-from test_store import Fixture
 
 
 class ThreadIndexTests(unittest.TestCase):
@@ -243,3 +243,47 @@ class ThreadIndexTests(unittest.TestCase):
         self.store.binding("thread-root")
         self.assertTrue(self.store.index(opened["trace"]["id"]).delta(revision)["resync"])
         self.assertFalse(self.store.open(thread_id="thread-root")["trace"]["incomplete"])
+
+    def test_late_response_in_another_bundle_refreshes_cached_downstream_tool_schema(self):
+        parent = self.bundle("late-parent", 3000)
+        declaration = {
+            "type": "function",
+            "name": "recorded_tool",
+            "parameters": {"type": "object"},
+        }
+        request = parent.payload({"input": [], "tools": [declaration]}, "inference_request")
+        parent.append("inference_started", inference_call_id="parent", request_payload=request)
+
+        child = self.bundle("late-child", 9000)
+        request = child.payload(
+            {"input": [], "previous_response_id": "late-parent-response"}, "inference_request"
+        )
+        child.append("inference_started", inference_call_id="child", request_payload=request)
+        invocation = child.payload(
+            {"tool_name": "recorded_tool", "payload": {"arguments": "{}"}}, "tool_invocation"
+        )
+        child.append(
+            "tool_call_started",
+            tool_call_id="call",
+            invocation_payload=invocation,
+            kind={"type": "function"},
+            summary={"label": "recorded_tool"},
+        )
+        projector = self.store.projection("thread@thread-root")
+        row = "late-child:tool:call"
+        before = projector.detail(row, "tool")
+        self.assertEqual(before["schemaDetail"], "")
+        self.assertIs(projector.detail(row, "tool"), before)
+        revision = projector.index.overview()["revision"]
+
+        response = parent.payload({"output_items": []}, "inference_response")
+        parent.append(
+            "inference_completed",
+            inference_call_id="parent",
+            response_id="late-parent-response",
+            response_payload=response,
+        )
+        self.assertTrue(projector.index.delta(revision)["resync"])
+        after = projector.detail(row, "tool")
+        self.assertIsNot(after, before)
+        self.assertEqual(json.loads(after["schemaDetail"]), declaration)

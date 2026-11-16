@@ -27,6 +27,11 @@ User-visible changes are recorded here. Historical entries describe code changes
 
 ### Changed
 
+- Separate recording/catalog, preview transport, and frontend data controllers.
+- Reuse catalog scans during chat polling and retain unaffected detail caches.
+- Verify the pinned clean upstream checkout before importing vendor source.
+- Share synthetic test fixtures and make installation checks independent of recording completion.
+
 - Remove historical design prototypes and unused runtime state; consolidate product and source documentation.
 
 - Rename the repository to `dsh-trace-plugin`, retaining the existing plugin ID and display name.

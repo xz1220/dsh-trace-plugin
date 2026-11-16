@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>MCP Apps handshake validation</title>
+  </head>
+  <body style="margin: 0">
+    <iframe
+      title="Codex Trace native bridge"
+      src="/native-frame"
+      style="border: 0; width: 100vw; height: 100vh"
+    ></iframe>
+    <script>
+      const config = __CONFIG__;
+      const frame = document.querySelector('iframe');
+      window.bridgeCalls = [];
+      async function invoke(name, args) {
+        const response = await fetch('/api', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, arguments: args, _meta: { threadId: config.threadId } }),
+        });
+        const result = await response.json();
+        return response.ok
+          ? result
+          : {
+              isError: true,
+              content: [{ type: 'text', text: result.error || 'Local preview request failed' }],
+              structuredContent: { error: result.error || 'Local preview request failed' },
+            };
+      }
+      addEventListener('message', async (event) => {
+        if (event.source !== frame.contentWindow || event.data?.jsonrpc !== '2.0') return;
+        const m = event.data;
+        const send = (value) =>
+          frame.contentWindow.postMessage({ jsonrpc: '2.0', ...value }, location.origin);
+        if (m.method === 'ui/initialize') {
+          window.bridgeCalls.push(m.method);
+          send({
+            id: m.id,
+            result: {
+              protocolVersion: '2026-01-26',
+              hostInfo: { name: 'local-validation', version: '1' },
+              hostCapabilities: {},
+              hostContext: { theme: 'light', locale: 'zh-CN', displayMode: 'fullscreen' },
+            },
+          });
+        } else if (m.method === 'ui/notifications/initialized') {
+          window.bridgeCalls.push(m.method);
+          if (!config.coldStart) {
+            const result = await invoke('show_rollout_trace', { traceId: config.traceId });
+            send({ method: 'ui/notifications/tool-result', params: result });
+          }
+        } else if (m.method === 'tools/call') {
+          window.bridgeCalls.push(m.params.name);
+          const result = await invoke(m.params.name, m.params.arguments || {});
+          send({ id: m.id, result });
+        }
+      });
+    </script>
+  </body>
+</html>

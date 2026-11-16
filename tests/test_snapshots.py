@@ -10,9 +10,9 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "plugins/codex-dsh-trace/server"))
 
+from fixtures import Fixture
 from snapshots import Snapshots
 from store import CHUNK, Store, TraceError
-from test_store import Fixture
 
 
 class SnapshotTests(unittest.TestCase):

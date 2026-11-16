@@ -16,7 +16,8 @@ Users can inspect requests, tool calls and returns, nested execution, recorded i
 - Treat inherited fork context as historical input. It must not become new conversation output, a generation result anchor, or a source of invented timing and token usage.
 - Match the exact current chat; do not substitute a different recent task.
 - Prefer recorded JSON tool declarations. A subtool may use an unambiguous original TypeScript section from the same parent request. Missing or ambiguous declarations remain unavailable.
-- Keep uncaptured images, missing continuation prefixes, and unavailable timing explicit. Exceeded limits must not appear as complete output.
+- Keep uncaptured images, missing continuation prefixes, and unavailable timing explicit. Exceeded limits and unreadable captures in an aggregate must not appear as complete output.
+- Bind paged reads and complete copies to the selected content snapshot. New evidence may update the view while an existing snapshot finishes consistently.
 
 ## Responsiveness and accessibility
 

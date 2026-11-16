@@ -133,7 +133,7 @@ test('late agent metadata refreshes inherited history through polling', async ({
 import json, sys
 from pathlib import Path
 sys.path.insert(0, 'tests')
-from test_store import Fixture
+from fixtures import Fixture
 f = Fixture(Path(sys.argv[1]) / 'recordings/dependency')
 p = f.root / 'manifest.json'
 m = json.loads(p.read_text()); m['trace_id'] = 'dependency'; p.write_text(json.dumps(m))
@@ -173,4 +173,52 @@ with p.open('a') as f: f.write(json.dumps(last)+'\\n')
     timeout: 10000,
   });
   await expect(page.getByText('CHILD_METADATA_MARKER', { exact: true })).toBeVisible();
+});
+
+test('aggregate discovers a resumed capture without a separate binding poll', async ({
+  page,
+  recordingServer,
+}) => {
+  const createCapture = async (name, started, text) =>
+    execute(process.env.PYTHON || 'python3', [
+      '-c',
+      `
+import json, sys
+from pathlib import Path
+sys.path.insert(0, 'tests')
+from fixtures import Fixture
+f = Fixture(Path(sys.argv[1]) / 'recordings' / sys.argv[2], schema_version=2, started_at=int(sys.argv[3]))
+p=f.root/'manifest.json'; m=json.loads(p.read_text()); m.update(trace_id=sys.argv[2],root_thread_id='resume-root'); p.write_text(json.dumps(m))
+f.append('thread_started',thread_id='resume-root',agent_path='/root')
+f.append('codex_turn_started',thread_id='resume-root',codex_turn_id=sys.argv[2])
+f.append('inference_started',inference_call_id='one',thread_id='resume-root',codex_turn_id=sys.argv[2],request_payload=f.payload({'input':[{'type':'message','role':'user','content':[{'type':'input_text','text':sys.argv[4]}]}]},'inference_request'))
+`,
+      recordingServer.directory,
+      name,
+      String(started),
+      text,
+    ]);
+  await createCapture('resume-first', 1000, 'BEFORE_RESUME_MARKER');
+  await page.addInitScript(() => {
+    let preview;
+    Object.defineProperty(window, '__ROLLOUT_PREVIEW__', {
+      configurable: true,
+      get: () => preview,
+      set: (value) => {
+        preview = { ...value, traceId: 'thread@resume-root' };
+      },
+    });
+  });
+  const requests = [];
+  page.on('request', (request) => {
+    if (request.url().endsWith('/api')) requests.push(request.postDataJSON().name);
+  });
+  await page.goto(recordingServer.url);
+  await expect(page.getByText('BEFORE_RESUME_MARKER', { exact: true })).toBeVisible();
+  await createCapture('resume-second', 5000, 'AFTER_RESUME_MARKER');
+  await expect(page.getByText('AFTER_RESUME_MARKER', { exact: true })).toBeVisible({
+    timeout: 12000,
+  });
+  await expect(page.getByText('BEFORE_RESUME_MARKER', { exact: true })).toBeVisible();
+  expect(requests).not.toContain('get_rollout_binding');
 });

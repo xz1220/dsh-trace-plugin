@@ -75,7 +75,7 @@ Preserve original payloads and distinguish recorded facts from inferred presenta
 Read [vendor/dsh/PATCHES.md](vendor/dsh/PATCHES.md) first. The update script overwrites imported source, including local patches.
 
 1. Prepare an audited checkout of the pinned upstream project.
-2. Review/update the commit in `scripts/vendor-dsh.mjs`, then run `node scripts/vendor-dsh.mjs /absolute/path/to/deepseek-harness`.
+2. Review/update the repository and commit pin in `vendor/dsh/upstream.json`, then run `node scripts/vendor-dsh.mjs /absolute/path/to/deepseek-harness` against a clean checkout of that commit. The importer rejects a different HEAD, tracked modifications, or untracked files.
 3. Reapply and review the required adapters. Update `patches.json` hashes and `PATCHES.md`; do not allow unexplained changes.
 4. Run `node scripts/verify-dsh.mjs`, rebuild, run tests, and inspect the changed interactions.
 5. Review the generated third-party notices and commit source changes together with generated artifacts.

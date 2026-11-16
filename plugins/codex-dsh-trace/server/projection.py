@@ -11,7 +11,9 @@ from itertools import islice
 from pathlib import Path
 from typing import Any, Optional
 
-from store import TraceError, compaction_info, item_text, preview, unpack
+from bundle_index import preview
+from recorded_content import compaction_info, item_text, unpack
+from recording import TraceError
 
 GROUP_LABELS = json.loads(
     Path(__file__).with_name("trajectory-locales.json").read_text(encoding="utf-8")
@@ -896,7 +898,13 @@ class Projection:
     def detail(self, row_id, cell_key):
         row = self.index.get_row(row_id)
         self.requests()
-        key = (row_id, cell_key, row.get("_updated"), self.index.last_seq)
+        key = (
+            row_id,
+            cell_key,
+            row.get("_updated"),
+            self.index.epoch,
+            self.index.projection_revision,
+        )
         if key in self.detail_cache:
             self.detail_cache.move_to_end(key)
             return self.detail_cache[key][0]

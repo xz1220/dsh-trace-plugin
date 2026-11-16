@@ -1,21 +1,15 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { TrajectoryTable } from '../vendor/dsh/packages/client/ui-trajectory/src/client/TrajectoryTable.tsx';
 import { TrajectoryTimeline } from '../vendor/dsh/packages/client/ui-trajectory/src/client/TrajectoryTimeline.tsx';
 import { TrajectoryToolbar } from '../vendor/dsh/packages/client/ui-trajectory/src/client/TrajectoryToolbar.tsx';
 import { trajectoryTimelineFocusIndexes } from '../vendor/dsh/packages/client/ui-trajectory/src/client/timeline.ts';
 import { useTranslation } from './locale-context.jsx';
 import { renderImageSlot as renderSlot, loadImage } from './images.jsx';
-import { Failure, Skeleton, RequestContent, readComplete, compactionText } from './content.jsx';
+import { Failure, Skeleton, RequestContent, compactionText } from './content.jsx';
 import view from '../vendor/dsh/packages/client/ui-trajectory/src/client/views.module.css';
 import { durationPreference, wrappingPreference } from './preferences.js';
 import { trajectoryTurns } from './trajectory-order.js';
+import { useTrajectoryData } from './use-trajectory.js';
 
 const toggle = (set, key) =>
   set((current) => {
@@ -68,11 +62,6 @@ export default function Trajectory({ data, call, earlier, copy, focusCallId, onF
     [t],
   );
   const traceId = data.trace.id;
-  const [cells, setCells] = useState(new Map()),
-    [requests, setRequests] = useState(new Map());
-  const [loading, setLoading] = useState(true),
-    [error, setError] = useState(''),
-    [retry, setRetry] = useState(0);
   const [collapsedTurns, setCollapsedTurns] = useState(new Set()),
     [collapsedAssistants, setCollapsedAssistants] = useState(new Set()),
     [collapsedTools, setCollapsedTools] = useState(new Set());
@@ -81,9 +70,20 @@ export default function Trajectory({ data, call, earlier, copy, focusCallId, onF
     durationPreference.getSnapshot,
   );
   const [actualTime, setActualTime] = useState(false);
-  const [query, setQuery] = useState(''),
-    [matches, setMatches] = useState(null),
-    [searchBusy, setSearchBusy] = useState(false);
+  const [query, setQuery] = useState('');
+  const {
+    cells,
+    requests,
+    loading,
+    error,
+    retry,
+    hydrate,
+    selectCell,
+    selectRequest,
+    matches,
+    searchBusy,
+    watchToolResult,
+  } = useTrajectoryData({ data, call, query, locale: t.locale });
   const [range, setRange] = useState(null),
     [selectedIndex, setSelectedIndex] = useState(null);
   useEffect(() => {
@@ -95,71 +95,6 @@ export default function Trajectory({ data, call, earlier, copy, focusCallId, onF
     wrappingPreference.subscribe,
     wrappingPreference.getSnapshot,
   );
-  const versions = useRef(new Map()),
-    inflight = useRef(new Map()),
-    requestInflight = useRef(new Set()),
-    live = useRef(true);
-  const templates = useRef(new Map()),
-    hydrated = useRef(new Map()),
-    activeRecord = useRef(null);
-  const api = useCallback((name, args) => call(name, { traceId, ...args }), [traceId, call]);
-  useEffect(() => {
-    live.current = true;
-    return () => {
-      live.current = false;
-    };
-  }, []);
-  useEffect(() => {
-    let active = true;
-    const changed = data.rows
-      .filter((row) => versions.current.get(row.id) !== row.version)
-      .map((row) => row.id);
-    if (!changed.length) {
-      setLoading(false);
-      return;
-    }
-    async function refresh() {
-      try {
-        for (let offset = 0; offset < changed.length; offset += 200) {
-          const page = await api('get_rollout_projection', {
-            rowIds: changed.slice(offset, offset + 200),
-          });
-          if (!active) return;
-          const replaced = new Set(page.rowIds);
-          setCells((current) => {
-            const next = new Map([...current].filter(([, cell]) => !replaced.has(cell.rowId)));
-            for (const cell of page.cells) {
-              templates.current.set(cell.recordId, cell);
-              const old = current.get(cell.recordId);
-              next.set(
-                cell.recordId,
-                old?.version === cell.version && !old.detailsPending ? old : cell,
-              );
-            }
-            return next;
-          });
-          setRequests((current) => {
-            const next = new Map(current);
-            for (const request of page.requestNumbers)
-              next.set(request.rowId, { ...request, detailsPending: true });
-            return next;
-          });
-          for (const row of data.rows)
-            if (replaced.has(row.id)) versions.current.set(row.id, row.version);
-        }
-        setError('');
-      } catch (e) {
-        if (active) setError(e);
-      } finally {
-        if (active) setLoading(false);
-      }
-    }
-    refresh();
-    return () => {
-      active = false;
-    };
-  }, [api, data.rows, retry]);
-
   const visibleCells = useMemo(
     () =>
       [...cells.values()]
@@ -182,159 +117,14 @@ export default function Trajectory({ data, call, earlier, copy, focusCallId, onF
       .map((request) => ({ ...request, group: groupOf(request) }));
   }, [requests, visibleCells, groupOf]);
 
-  const hydrate = useCallback(
-    async (cell, force = false) => {
-      if (!cell || (!cell.detailsPending && !force)) return;
-      const key = `${cell.recordId}:${cell.version}`;
-      if (inflight.current.has(key)) return inflight.current.get(key);
-      const promise = (async () => {
-        try {
-          const metadata = await api('get_rollout_cell_detail', {
-            rowId: cell.rowId,
-            cellKey: cell.cellKey,
-          });
-          const fields = await Promise.all(
-            Object.entries(metadata.fields).map(async ([field, info]) => {
-              const text = await readComplete(
-                api,
-                'read_rollout_cell_text',
-                {
-                  rowId: cell.rowId,
-                  cellKey: cell.cellKey,
-                  field,
-                  version: metadata.cell.version,
-                  snapshot: metadata.snapshot,
-                },
-                () => live.current,
-              );
-              return [field, info.json && text !== null ? JSON.parse(text) : text];
-            }),
-          );
-          if (!live.current) return;
-          const complete = {
-            ...metadata.cell,
-            ...Object.fromEntries(fields),
-            detailsPending: false,
-          };
-          const size = Object.values(metadata.fields).reduce(
-            (sum, field) => sum + field.totalChars * 4,
-            0,
-          );
-          setCells((current) => {
-            if (current.get(cell.recordId)?.version !== cell.version) return current;
-            const next = new Map(current);
-            next.set(cell.recordId, complete);
-            hydrated.current.delete(cell.recordId);
-            hydrated.current.set(cell.recordId, size);
-            let total = [...hydrated.current.values()].reduce((sum, value) => sum + value, 0);
-            for (const [id, bytes] of hydrated.current) {
-              if (hydrated.current.size <= 20 && total <= 16 * 1024 * 1024) break;
-              if (id === activeRecord.current || id === cell.recordId) continue;
-              hydrated.current.delete(id);
-              total -= bytes;
-              if (templates.current.has(id)) next.set(id, templates.current.get(id));
-            }
-            return next;
-          });
-        } catch (e) {
-          if (live.current)
-            setCells((current) => {
-              if (current.get(cell.recordId)?.version !== cell.version) return current;
-              const next = new Map(current);
-              next.set(cell.recordId, { ...cell, detailsError: e });
-              return next;
-            });
-        } finally {
-          inflight.current.delete(key);
-        }
-      })();
-      inflight.current.set(key, promise);
-      return promise;
-    },
-    [api],
-  );
   const selectIndex = useCallback(
     (index) => {
       setSelectedIndex(index);
       const cell = visibleCells.find((value) => value.index === index);
-      activeRecord.current = cell?.recordId ?? null;
-      if (cell) hydrate(cell);
+      selectCell(cell);
     },
-    [visibleCells, hydrate],
+    [visibleCells, selectCell],
   );
-  // A completion changes the selected record's version without changing its index.
-  useEffect(() => {
-    const cell = visibleCells.find((value) => value.index === selectedIndex);
-    if (cell?.detailsPending && !cell.detailsError) hydrate(cell);
-  }, [visibleCells, selectedIndex, hydrate]);
-  const selectRequest = useCallback(
-    (request) => {
-      const key = `${request?.rowId}:${request?.version}`;
-      if (!request?.detailsPending || requestInflight.current.has(key)) return;
-      requestInflight.current.add(key);
-      api('get_rollout_request_info', { rowId: request.rowId })
-        .then((value) => {
-          if (live.current)
-            setRequests((current) => {
-              if (current.get(request.rowId)?.version !== request.version) return current;
-              const next = new Map(current);
-              next.set(request.rowId, { ...value.request, detailsPending: false });
-              return next;
-            });
-        })
-        .catch((e) => {
-          if (live.current)
-            setRequests((current) => {
-              if (current.get(request.rowId)?.version !== request.version) return current;
-              const next = new Map(current);
-              next.set(request.rowId, { ...request, detailsError: e });
-              return next;
-            });
-        })
-        .finally(() => requestInflight.current.delete(key));
-    },
-    [api],
-  );
-
-  const rowIds = useMemo(
-    () => [...new Set(visibleCells.map((cell) => cell.rowId))],
-    [visibleCells],
-  );
-  useEffect(() => {
-    if (!query.trim()) {
-      setMatches(null);
-      setSearchBusy(false);
-      return;
-    }
-    let active = true;
-    setSearchBusy(true);
-    const timer = setTimeout(async () => {
-      try {
-        const found = [];
-        for (let offset = 0; offset < rowIds.length; offset += 200) {
-          const result = await api('search_rollout_cells', {
-            query,
-            rowIds: rowIds.slice(offset, offset + 200),
-            locale: t.locale,
-          });
-          if (!active) return;
-          found.push(...result.matches);
-        }
-        if (active) {
-          setMatches(new Set(found));
-          setError('');
-        }
-      } catch (e) {
-        if (active) setError(e);
-      } finally {
-        if (active) setSearchBusy(false);
-      }
-    }, 200);
-    return () => {
-      active = false;
-      clearTimeout(timer);
-    };
-  }, [api, query, rowIds, data.revision, retry, t]);
   const searchIndexes = useMemo(
     () =>
       matches === null
@@ -379,39 +169,6 @@ export default function Trajectory({ data, call, earlier, copy, focusCallId, onF
     }),
     [wrapped, t],
   );
-  const watchToolResult = useCallback(
-    (seq, receive) => {
-      let active = true;
-      const row = data.rows.find((value) => value.seq === seq);
-      if (row)
-        readComplete(
-          api,
-          'read_rollout_text',
-          { rowId: row.id, section: 'raw_result' },
-          () => active,
-        )
-          .then((text) => {
-            if (!active) return;
-            if (text === null) {
-              receive(undefined);
-              return;
-            }
-            try {
-              receive(JSON.parse(text));
-            } catch {
-              receive(text);
-            }
-          })
-          .catch(() => {
-            if (active) receive(undefined);
-          });
-      return () => {
-        active = false;
-        receive(undefined);
-      };
-    },
-    [api, data.rows],
-  );
   const requestContent = useCallback(
     (request, tab) => (
       <RequestContent
@@ -426,11 +183,7 @@ export default function Trajectory({ data, call, earlier, copy, focusCallId, onF
       record.detailsError ? (
         <Failure
           error={record.detailsError}
-          retry={() =>
-            record.recordId
-              ? hydrate(record, true)
-              : selectRequest({ ...record, detailsError: undefined })
-          }
+          retry={() => (record.recordId ? hydrate(record, true) : selectRequest(record, true))}
         />
       ) : (
         <Skeleton />
@@ -441,7 +194,7 @@ export default function Trajectory({ data, call, earlier, copy, focusCallId, onF
   if (loading) return <Skeleton />;
   return (
     <>
-      {error && <Failure error={error} retry={() => setRetry((value) => value + 1)} />}
+      {error && <Failure error={error} retry={retry} />}
       <TrajectoryToolbar
         actualDuration={duration}
         onActualDurationChange={(value) => {

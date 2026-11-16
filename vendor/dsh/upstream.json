@@ -387,10 +387,6 @@
       "sha256": "99be6143d7c18725a3d699c343beaeba7b4e06d7d8b468a2ebf91ceeddbeb1af"
     },
     {
-      "path": "packages/client/ui-trajectory/src/client/trajectory-search-index.ts",
-      "sha256": "081fdf9092da9fe24e23b255262f3bd0f0e020aa9f377e318722f956b6cd371a"
-    },
-    {
       "path": "packages/client/ui-trajectory/src/client/trajectory-virtual-rows.ts",
       "sha256": "40177483d5b37c28941df1f75a715a7fbe793bc12ecea518ec8642ce36811309"
     },

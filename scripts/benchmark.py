@@ -2,18 +2,20 @@
 
 import argparse
 import json
+import os
 import platform
 import statistics
 import sys
 import tempfile
 import time
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "plugins/codex-dsh-trace/server"))
 sys.path.insert(0, str(ROOT / "tests"))
+from fixtures import Fixture
 from store import Store
-from test_store import Fixture
 
 
 def timed(fn):
@@ -101,6 +103,87 @@ def real_sample(trace_id):
     return result
 
 
+def large_body_sample():
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        fixture = Fixture(root / "bundle")
+        request = fixture.payload({"input": []}, "inference_request")
+        fixture.append("inference_started", inference_call_id="large", request_payload=request)
+        content = "X" * (3 * 1024 * 1024)
+        response = fixture.payload(
+            {
+                "output_items": [
+                    {
+                        "type": "message",
+                        "role": "assistant",
+                        "content": [{"type": "output_text", "text": content}],
+                    }
+                ]
+            },
+            "inference_response",
+        )
+        fixture.append("inference_completed", inference_call_id="large", response_payload=response)
+        store = Store(root / "config.json")
+        metadata = store.catalog.manifest(fixture.root)
+        store.catalog.cache = {metadata["id"]: metadata}
+        projector = store.projection(metadata["id"])
+        with patch.object(projector, "build_detail", wraps=projector.build_detail) as builds:
+            start = time.perf_counter()
+            selected = store.cell_detail(metadata["id"], "request:large", "assistant")
+            offset, pages, characters = 0, 0, 0
+            while offset is not None:
+                page = store.cell_text(
+                    metadata["id"],
+                    "request:large",
+                    "assistant",
+                    "outputDetail",
+                    offset=offset,
+                    snapshot=selected["snapshot"],
+                )
+                pages += 1
+                characters += len(page["text"])
+                offset = page["nextOffset"]
+            return {
+                "characters": characters,
+                "pages": pages,
+                "detailBuilds": builds.call_count,
+                "elapsedMs": round((time.perf_counter() - start) * 1000, 3),
+            }
+
+
+def thread_poll_sample():
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        # The full aggregate path scans roots; isolate both fallback locations.
+        with patch.dict(
+            os.environ,
+            {
+                "CODEX_HOME": str(root / "home"),
+                "CODEX_ROLLOUT_TRACE_ROOT": str(root / "recordings"),
+            },
+        ):
+            for number in range(10):
+                fixture = Fixture(root / "recordings" / str(number))
+                path = fixture.root / "manifest.json"
+                manifest = json.loads(path.read_text())
+                manifest["trace_id"] = f"trace-{number}"
+                path.write_text(json.dumps(manifest))
+                if number == 0:
+                    fixture.conversation()
+            store = Store(root / "config.json")
+            trace = store.binding("thread-root")["trace"]["id"]
+            index = store.index(trace)
+            revision = index.overview()["revision"]
+            with patch.object(store.catalog, "manifest", wraps=store.catalog.manifest) as reads:
+                elapsed = [timed(lambda: index.delta(revision))[1] for _ in range(30)]
+                return {
+                    "recordings": 10,
+                    "polls": len(elapsed),
+                    "manifestReads": reads.call_count,
+                    "pollP50Ms": round(statistics.median(elapsed), 3),
+                }
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -120,6 +203,8 @@ def main():
         "platform": platform.machine(),
         "syntheticRows": args.rows,
         "synthetic": synthetic,
+        "largeBody": large_body_sample(),
+        "threadPolling": thread_poll_sample(),
         "scope": "Local backend timings; OS filesystem cache may already be warm. UI and MCP bridge latency are measured separately.",
     }
     if args.rows == 10000:

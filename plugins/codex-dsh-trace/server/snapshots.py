@@ -4,7 +4,7 @@ import secrets
 import threading
 from collections import OrderedDict
 
-from store import CHUNK, TraceError
+from recording import CHUNK, TraceError
 
 
 class Snapshots:

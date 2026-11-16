@@ -4,10 +4,14 @@ import { build } from 'esbuild';
 import { readFile, writeFile, mkdir, copyFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import { verifyVendorSource } from './vendor-source.mjs';
 
 const upstream = path.resolve(process.argv[2] || 'local-context/dsh-upstream');
 const destination = path.resolve('vendor/dsh');
-const commit = 'e8f7b93a344964de3dca1ace9e72b6e4d6de87cb';
+const { repository, commit } = verifyVendorSource(
+  upstream,
+  JSON.parse(await readFile(new URL('../vendor/dsh/upstream.json', import.meta.url), 'utf8')),
+);
 const primitives = {
   'markdown/CodeBlock.tsx': ['CodeBlock'],
   'FileTypeIcon.tsx': ['FileTypeIcon', 'fileExtension'],
@@ -47,12 +51,7 @@ await mkdir(path.dirname(temporary), { recursive: true });
 await writeFile(temporary, barrel);
 const trajectory = path.join(upstream, 'packages/client/ui-trajectory/src/client');
 const entry =
-  [
-    'TrajectoryTable.tsx',
-    'TrajectoryTimeline.tsx',
-    'TrajectoryToolbar.tsx',
-    'trajectory-search-index.ts',
-  ]
+  ['TrajectoryTable.tsx', 'TrajectoryTimeline.tsx', 'TrajectoryToolbar.tsx']
     .map((file) => `export * from ${JSON.stringify(path.join(trajectory, file))};`)
     .join('\n') +
   `\nexport {ImageGallery} from ${JSON.stringify(path.join(upstream, 'packages/client/ui-attachment/src/MessageImage.tsx'))};` +
@@ -92,7 +91,7 @@ for (const file of ['locales.ts', 'views.module.css']) files.push(path.join(traj
 files.push(path.join(upstream, 'packages/client/ui-theme/src/client/icon-sprite.ts'));
 for (const language of ['zh', 'en', 'ja', 'es', 'fr', 'de', 'ru', 'pt'])
   files.push(path.join(upstream, `packages/client/locale/src/locales/${language}.ts`));
-const manifest = { repository: 'deepseek-ai/deepseek-harness', commit, files: [] };
+const manifest = { repository, commit, files: [] };
 for (const source of [...new Set(files)].sort()) {
   const relative = path.relative(upstream, source);
   const target = path.join(destination, relative);

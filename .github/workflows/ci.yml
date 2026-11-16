@@ -50,6 +50,10 @@ jobs:
               summary.write('### Synthetic recording performance\n\n' + '\n'.join(rows) + '\n')
           if sample['initialPayloadReads'] or sample['warmExtraLogBytes']:
               raise SystemExit('Lazy reads or unchanged-poll I/O regressed')
+          if report['largeBody']['detailBuilds'] != 1:
+              raise SystemExit('Paged details were rebuilt')
+          if report['threadPolling']['manifestReads']:
+              raise SystemExit('Warm chat polling rescanned recording manifests')
           PY
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

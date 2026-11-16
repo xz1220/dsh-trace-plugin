@@ -14,15 +14,19 @@ Codex process → official recording directory
             host bridge → DSH timeline and inspector
 ```
 
-`server/store.py` discovers recording roots, validates paths, indexes complete JSONL events, resolves continuation context, and reads payloads lazily. It caches unchanged reads and bounds logs and payloads. A partially written final line waits for a complete event.
+`server/recording.py` owns file validation, limits, and stable errors. `server/catalog.py` discovers and registers recording roots, keeping per-recording issues visible. `server/bundle_index.py` indexes complete JSONL events, resolves continuation context, and reads payloads lazily. It caches unchanged reads and bounds logs and payloads. A partially written final line waits for a complete event. `server/recorded_content.py` handles message, tool-result, and compaction content. `server/store.py` coordinates these modules as the public reader facade, retaining earlier import paths.
 
 `server/thread_index.py` combines captures for the exact same root thread. Source-qualified row and call identities preserve references across recordings. A resumed empty capture does not erase older history. Confirmed ancestor evidence prevents inherited fork context from being replayed as new work.
 
 `server/projection.py` maps recorded facts to DSH cells, search terms, and detail views. Reconstructed full context is separate from the incremental request actually sent. Compaction state and opaque content are explicit. Historical input messages do not acquire invented generation timing or token usage.
 
-`server/main.py` provides stdio JSON-RPC, MCP tool declarations, the versioned HTML resource, and an optional authenticated loopback preview. Detailed data tools are marked app-only. A launch tool returns only metadata needed to open the UI. Visibility annotations rely on the host and do not replace file-system permissions.
+`server/main.py` provides stdio JSON-RPC, MCP tool declarations, and the versioned HTML resource. `server/preview.py` provides the optional authenticated loopback transport through the same dispatcher; its bridge harness is a separate HTML asset. Detailed data tools are marked app-only. A launch tool returns only metadata needed to open the UI. Visibility annotations rely on the host and do not replace file-system permissions.
 
-`src/host.js` handles the MCP Apps bridge. `src/viewer.jsx` coordinates current-chat binding, live reads, preferences, and lazy details. `src/Trajectory.jsx` adapts backend records to the pinned DSH components. Only visible rows are mounted; loading the ledger does not eagerly load every prompt body.
+`src/host.js` handles the MCP Apps bridge. `src/use-chat.js` owns chat selection, paging, and live reads; `src/use-trajectory.js` owns projected records, search, and lazy details. `src/viewer.jsx` and `src/Trajectory.jsx` compose those controllers with the pinned DSH components. Only visible rows are mounted; loading the ledger does not eagerly load every prompt body.
+
+`server/snapshots.py` binds both text APIs to immutable selected content. New readers pass the opaque snapshot token on subsequent pages; eviction reports `content_updated` and the UI can restart the read. An older snapshot can finish after new recording evidence arrives. The cache is bounded by count and estimated bytes; one active selection may exceed the budget. Legacy numeric-version reads remain available.
+
+Chat polling uses the aggregate index directly. Catalog discovery is cached for five seconds; log appends are read on the next visible poll. Late metadata that changes existing projections causes a resync, and unsupported captures remain explicit in aggregate metadata.
 
 ## Python protocol implementation
 

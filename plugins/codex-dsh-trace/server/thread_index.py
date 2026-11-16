@@ -3,7 +3,8 @@
 from collections import OrderedDict
 from typing import Any
 
-from store import MAX_LOG, BundleIndex, TraceError, safe_file
+from bundle_index import BundleIndex
+from recording import MAX_LOG, TraceError, safe_file
 
 
 def source_reference(value, source):
@@ -83,6 +84,15 @@ class ThreadIndex(BundleIndex):
                     previous = self.sources.get(source)
                     if previous and previous["projectionRevision"] != index.projection_revision:
                         projection_changed = True
+                    for original in index.rows.values():
+                        old = self.rows.get(source + ":" + original["id"])
+                        if (
+                            old
+                            and original.get("type") == "request"
+                            and old.get("_sourceVersion") != original.get("_updated")
+                            and old["seq"] < self.latest_request_seq
+                        ):
+                            projection_changed = True
                     self.sources[source] = {
                         "meta": meta,
                         "rows": [dict(row) for row in index.rows.values()],
@@ -164,6 +174,10 @@ class ThreadIndex(BundleIndex):
                 self.projection_revision = revision
             self.request_counter = sum(
                 row.get("type") in ("request", "compaction") for row in self.rows.values()
+            )
+            self.latest_request_seq = max(
+                (row["seq"] for row in self.rows.values() if row.get("type") == "request"),
+                default=0,
             )
             self.tool_counter = sum(row.get("type") == "tool" for row in self.rows.values())
             self.code_counter = sum(row.get("type") == "code" for row in self.rows.values())

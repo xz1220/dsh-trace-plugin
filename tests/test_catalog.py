@@ -10,8 +10,8 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "plugins/codex-dsh-trace/server"))
 
+from fixtures import Fixture
 from store import Catalog, TraceError
-from test_store import Fixture
 
 
 class CatalogTests(unittest.TestCase):

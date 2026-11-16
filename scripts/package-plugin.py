@@ -24,8 +24,14 @@ FILES = (
     "assets/logo.png",
     "assets/viewer.html",
     "server/_version.py",
+    "server/bridge-harness.html",
+    "server/bundle_index.py",
+    "server/catalog.py",
     "server/main.py",
+    "server/preview.py",
     "server/projection.py",
+    "server/recorded_content.py",
+    "server/recording.py",
     "server/store.py",
     "server/snapshots.py",
     "server/thread_index.py",
@@ -43,7 +49,7 @@ def main() -> None:
     runtime_files = {
         path.relative_to(PLUGIN).as_posix()
         for path in (PLUGIN / "server").rglob("*")
-        if path.suffix in {".py", ".json"} and "__pycache__" not in path.parts
+        if path.suffix in {".py", ".json", ".html"} and "__pycache__" not in path.parts
     }
     missing = runtime_files - set(FILES)
     if missing:
