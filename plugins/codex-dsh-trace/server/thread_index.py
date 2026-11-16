@@ -1,8 +1,9 @@
 """A stable chronological view of official recordings for one exact chat root."""
 
 from collections import OrderedDict
+from typing import Any
 
-from store import BundleIndex, TraceError, safe_file, MAX_LOG
+from store import MAX_LOG, BundleIndex, TraceError, safe_file
 
 
 def source_reference(value, source):
@@ -52,7 +53,11 @@ class ThreadIndex(BundleIndex):
                 signatures[meta["id"]] = (stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns)
                 metas.append(meta)
             if sum(signature[2] for signature in signatures.values()) > MAX_LOG:
-                raise TraceError("当前聊天的录制总索引超过 256 MiB 上限，未返回不完整数据。")
+                raise TraceError(
+                    "当前聊天的录制总索引超过 256 MiB 上限，未返回不完整数据。",
+                    code="recording_index_too_large",
+                    params={"limitMiB": MAX_LOG // (1024 * 1024)},
+                )
             if signatures == self.source_signatures:
                 return
             reset = bool(set(self.sources) - set(signatures))
@@ -121,7 +126,7 @@ class ThreadIndex(BundleIndex):
                     self.shared_responses.setdefault(row["responseId"], []).append(key)
             self.rows = new_rows
             self.threads = {}
-            turns = {}
+            turns: dict[str, dict[str, Any]] = {}
             for value in self.sources.values():
                 self.threads.update(value["threads"])
                 for key, turn in value["turns"].items():
@@ -168,7 +173,7 @@ class ThreadIndex(BundleIndex):
             return None
         source = ref.get("_sourceTraceId")
         if source not in self.sources:
-            raise TraceError("未找到这条记录对应的原始录制。")
+            raise TraceError("未找到这条记录对应的原始录制。", code="recording_not_found")
         return self.store.index(source).payload(ref)
 
     def response_row(self, response_id, current):

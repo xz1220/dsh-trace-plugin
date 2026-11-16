@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import re
@@ -11,6 +10,7 @@ import threading
 import time
 from collections import OrderedDict
 from pathlib import Path
+from typing import Any, Optional
 
 MAX_LOG = 256 * 1024 * 1024
 MAX_PAYLOAD = 64 * 1024 * 1024
@@ -21,49 +21,64 @@ PAYLOAD_RE = re.compile(r"^payloads/[A-Za-z0-9_.-]+\.json$")
 
 
 class TraceError(ValueError):
-    pass
+    """A user-facing error with a stable code for client localization."""
+
+    def __init__(
+        self, message: str, *, code: str = "trace_error", params: Optional[dict[str, Any]] = None
+    ):
+        super().__init__(message)
+        self.code = code
+        self.params = dict(params or {})
 
 
 class TraceFormatError(TraceError):
     def __init__(self, trace_id, thread_id, version):
         label = str(version) if type(version) is int else "未知"
-        super().__init__(f"录制格式版本 {label} 暂不支持，请更新 Codex Trace。")
+        super().__init__(
+            f"录制格式版本 {label} 暂不支持，请更新 Codex Trace。",
+            code="unsupported_schema",
+            params={"version": version if type(version) is int else "?"},
+        )
         self.info = {
             "traceId": trace_id,
             "threadId": thread_id,
             "schemaVersion": version if type(version) is int else None,
             "message": str(self),
+            "errorCode": self.code,
+            "errorParams": self.params,
         }
 
 
 def identifier(value):
     if not isinstance(value, str) or not ID_RE.fullmatch(value):
-        raise TraceError("无效的录制或记录标识。")
+        raise TraceError("无效的录制或记录标识。", code="invalid_identifier")
     return value
 
 
 def safe_file(root, relative):
     rel = Path(relative)
     if rel.is_absolute() or ".." in rel.parts:
-        raise TraceError("录制文件路径超出允许范围。")
+        raise TraceError("录制文件路径超出允许范围。", code="unsafe_recording_path")
     path = root / rel
     part = root
     for name in rel.parts:
         part = part / name
         if part.is_symlink():
-            raise TraceError("录制目录内不能包含符号链接。")
+            raise TraceError("录制目录内不能包含符号链接。", code="recording_symlink")
     if not path.is_file() or path.stat().st_nlink != 1:
-        raise TraceError("录制文件不可用，或不是独立的普通文件。")
+        raise TraceError(
+            "录制文件不可用，或不是独立的普通文件。", code="recording_file_unavailable"
+        )
     return path
 
 
 def read_json(path, limit=MAX_PAYLOAD):
     if path.stat().st_size > limit:
-        raise TraceError("该文件超过读取上限，未截断展示。")
+        raise TraceError("该文件超过读取上限，未截断展示。", code="recording_file_too_large")
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (UnicodeError, json.JSONDecodeError) as exc:
-        raise TraceError("录制文件不是有效的 UTF-8 JSON。") from exc
+        raise TraceError("录制文件不是有效的 UTF-8 JSON。", code="invalid_recording_json") from exc
 
 
 def clean_status(value):
@@ -99,7 +114,7 @@ class Catalog:
             return {"roots": [], "labels": {}}
         data = read_json(self.config_file, 1024 * 1024)
         if not isinstance(data, dict):
-            raise TraceError("录制目录配置格式错误。")
+            raise TraceError("录制目录配置格式错误。", code="invalid_directory_config")
         return data
 
     def roots(self):
@@ -111,7 +126,7 @@ class Catalog:
     def register(self, path, label=None):
         root = Path(path).expanduser().resolve()
         if not root.is_dir():
-            raise TraceError("请选择存在的录制目录。")
+            raise TraceError("请选择存在的录制目录。", code="recording_directory_missing")
         with self.lock:
             config = self.config()
             roots = config.setdefault("roots", [])
@@ -136,7 +151,9 @@ class Catalog:
         if type(version) is not int or version not in SUPPORTED_SCHEMAS:
             raise TraceFormatError(trace_id, thread_id, version)
         if data.get("raw_event_log") != "trace.jsonl":
-            raise TraceError("该录制的事件文件布局尚不受支持。")
+            raise TraceError(
+                "该录制的事件文件布局尚不受支持。", code="unsupported_recording_layout"
+            )
         return {
             "id": trace_id,
             "threadId": thread_id,
@@ -159,7 +176,11 @@ class Catalog:
             for entry in os.scandir(root):
                 count += 1
                 if count > 10000:
-                    raise TraceError("录制目录过大，请配置更具体的目录。")
+                    raise TraceError(
+                        "录制目录过大，请配置更具体的目录。",
+                        code="recording_directory_too_large",
+                        params={"limit": 10000},
+                    )
                 if entry.is_dir(follow_symlinks=False):
                     yield Path(entry.path)
 
@@ -176,7 +197,14 @@ class Catalog:
                     except TraceFormatError as exc:
                         issues.append(exc.info)
                     except TraceError as exc:
-                        issues.append({"name": path.name, "message": str(exc)})
+                        issues.append(
+                            {
+                                "name": path.name,
+                                "message": str(exc),
+                                "errorCode": exc.code,
+                                "errorParams": exc.params,
+                            }
+                        )
                     except OSError:
                         continue
                 self.cache = found
@@ -193,7 +221,7 @@ class Catalog:
             if trace_id and thread_id:
                 item = self.find(trace_id=trace_id)
                 if item and item["threadId"] != thread_id:
-                    raise TraceError("录制与聊天标识不一致。")
+                    raise TraceError("录制与聊天标识不一致。", code="recording_thread_mismatch")
                 return item
             if thread_id:
                 # A resumed chat can create several bundles with the same root.
@@ -264,7 +292,11 @@ class BundleIndex:
             if sig == self.signature:
                 return
             if stat.st_size > MAX_LOG:
-                raise TraceError("事件索引超过 256 MiB 上限，未返回不完整数据。")
+                raise TraceError(
+                    "事件索引超过 256 MiB 上限，未返回不完整数据。",
+                    code="recording_index_too_large",
+                    params={"limitMiB": MAX_LOG // (1024 * 1024)},
+                )
             if self.signature and (
                 sig[:2] != self.signature[:2]
                 or stat.st_size < self.offset
@@ -289,19 +321,26 @@ class BundleIndex:
                         or event.get("schema_version") != self.meta.get("schemaVersion", 1)
                         or event.get("seq") != self.last_seq + 1
                     ):
-                        raise TraceError("事件版本或顺序不一致，请检查录制是否完整。")
+                        raise TraceError(
+                            "事件版本或顺序不一致，请检查录制是否完整。",
+                            code="invalid_recording_events",
+                        )
                     self.apply(event)
                     self.last_seq = event["seq"]
             except (ValueError, KeyError, TypeError) as exc:
                 self.reset()
-                raise TraceError("录制事件格式或顺序不一致。") from exc
+                raise TraceError(
+                    "录制事件格式或顺序不一致。", code="invalid_recording_events"
+                ) from exc
             self.signature = sig
 
     def remember_refs(self, value):
         if isinstance(value, dict):
             if {"raw_payload_id", "path", "kind"} <= value.keys():
                 if not isinstance(value["path"], str) or not PAYLOAD_RE.fullmatch(value["path"]):
-                    raise TraceError("录制中的 payload 路径不合法。")
+                    raise TraceError(
+                        "录制中的 payload 路径不合法。", code="invalid_payload_reference"
+                    )
                 self.payload_refs[value["raw_payload_id"]] = value
             for item in value.values():
                 self.remember_refs(item)
@@ -568,7 +607,7 @@ class BundleIndex:
             return None
         name = ref.get("path", "")
         if not PAYLOAD_RE.fullmatch(name):
-            raise TraceError("无效的 payload 引用。")
+            raise TraceError("无效的 payload 引用。", code="invalid_payload_reference")
         path = safe_file(self.path, name)
         stat = path.stat()
         key = (name, stat.st_mtime_ns, stat.st_size)
@@ -589,7 +628,7 @@ class BundleIndex:
         self.refresh()
         row = self.rows.get(row_id)
         if not row:
-            raise TraceError("没有找到这条执行记录。")
+            raise TraceError("没有找到这条执行记录。", code="record_not_found")
         return row
 
     def response_row(self, response_id, current):
@@ -602,7 +641,7 @@ class BundleIndex:
         # Iterative reconstruction avoids recursion and intermediate full copies.
         row = self.get_row(row_id)
         if row.get("type") != "request":
-            raise TraceError("这条记录不是模型请求。")
+            raise TraceError("这条记录不是模型请求。", code="not_model_request")
         if row_id in self.context_cache:
             self.context_cache.move_to_end(row_id)
             return self.context_cache[row_id]
@@ -613,7 +652,7 @@ class BundleIndex:
         complete, missing = True, None
         while cursor is not None:
             if cursor in seen:
-                raise TraceError("响应链包含循环。")
+                raise TraceError("响应链包含循环。", code="response_chain_cycle")
             seen.add(cursor)
             if cursor in self.context_cache:
                 base = self.context_cache[cursor]
@@ -624,7 +663,7 @@ class BundleIndex:
                 break
             raw = self.payload(current.get("_request"))
             if not isinstance(raw, dict) or not isinstance(raw.get("input"), list):
-                raise TraceError("原始请求缺少 input 数组。")
+                raise TraceError("原始请求缺少 input 数组。", code="invalid_request_input")
             chain.append((cursor, current, raw))
             previous = raw.get("previous_response_id")
             if not previous:
@@ -747,7 +786,7 @@ def compaction_info(index, row):
     def counts(items):
         if not isinstance(items, list):
             return None
-        roles = {}
+        roles: dict[str, int] = {}
         encrypted = 0
         for item in items:
             if not isinstance(item, dict):
@@ -811,8 +850,12 @@ class Store:
                     (item for item in self.catalog.issues if item.get("traceId") == trace_id), None
                 )
                 if problem:
-                    raise TraceError(problem["message"])
-                raise TraceError("未找到该录制。请添加其所在目录。")
+                    raise TraceError(
+                        problem["message"],
+                        code=problem.get("errorCode", "trace_error"),
+                        params=problem.get("errorParams"),
+                    )
+                raise TraceError("未找到该录制。请添加其所在目录。", code="recording_not_found")
             if trace_id not in self.indexes:
                 self.indexes[trace_id] = BundleIndex(meta)
             self.indexes.move_to_end(trace_id)
@@ -872,7 +915,7 @@ class Store:
         if isinstance(trace_id, str) and trace_id.startswith("thread@"):
             selected = identifier(trace_id[len("thread@") :])
             if thread_id and thread_id != selected:
-                raise TraceError("录制与聊天标识不一致。")
+                raise TraceError("录制与聊天标识不一致。", code="recording_thread_mismatch")
             thread_id = selected
             trace_id = None
         if thread_id and not trace_id:
@@ -898,6 +941,8 @@ class Store:
             )
             if problem:
                 result["unavailableReason"] = problem["message"]
+                result["errorCode"] = problem.get("errorCode", "trace_error")
+                result["errorParams"] = problem.get("errorParams", {})
             return result
         return {"view": "trace", "currentThreadId": thread_id, **self.index(meta["id"]).overview()}
 
@@ -928,7 +973,9 @@ class Store:
                 )
             ]
             if len(matches) != 1:
-                raise TraceError("没有找到唯一对应的工具调用。请检查调用标识。")
+                raise TraceError(
+                    "没有找到唯一对应的工具调用。请检查调用标识。", code="ambiguous_call_id"
+                )
             row = matches[0]
             return {
                 **index.public_row(row),
@@ -963,7 +1010,7 @@ class Store:
         projector = self.projection(trace_id)
         with projector.index.lock:
             if version is not None and projector.index.get_row(row_id).get("_updated") != version:
-                raise TraceError("记录已更新，请重新读取内容。")
+                raise TraceError("记录已更新，请重新读取内容。", code="content_updated")
             data = projector.detail(row_id, cell_key)
             if field not in (
                 "inputDetail",
@@ -977,7 +1024,9 @@ class Store:
                 "messageSource",
                 "programSource",
             ):
-                raise TraceError("未知的轨迹内容字段。")
+                raise TraceError(
+                    "未知的轨迹内容字段。", code="invalid_content_field", params={"field": field}
+                )
             value = data.get(field)
             if value is None:
                 return {"text": "", "available": False, "totalChars": 0, "nextOffset": None}
@@ -1069,6 +1118,7 @@ class Store:
         return None
 
     def text(self, trace_id, row_id, section, item_index=None, offset=0):
+        value: Any
         index = self.index(trace_id)
         with index.lock:
             row = index.get_row(row_id)
@@ -1090,7 +1140,7 @@ class Store:
                     if not isinstance(item_index, int) or not 0 <= item_index < len(
                         context["items"]
                     ):
-                        raise TraceError("无效的上下文项。")
+                        raise TraceError("无效的上下文项。", code="invalid_context_item")
                     item = context["items"][item_index]["value"]
                     value = (
                         item_text(item)
@@ -1130,7 +1180,9 @@ class Store:
             elif section == "runtime":
                 value = [index.payload(ref) for ref in row.get("_runtime", [])]
             else:
-                raise TraceError("未知的详情类型。")
+                raise TraceError(
+                    "未知的详情类型。", code="invalid_content_field", params={"field": section}
+                )
             if value is None:
                 return {"text": "", "available": False, "totalChars": 0, "nextOffset": None}
             text = (
@@ -1148,7 +1200,7 @@ class Store:
     @staticmethod
     def text_page(text, offset):
         if type(offset) is not int or offset < 0 or offset > len(text):
-            raise TraceError("无效的文本分页位置。")
+            raise TraceError("无效的文本分页位置。", code="invalid_text_offset")
         end = min(len(text), offset + CHUNK)
         return {
             "text": text[offset:end],

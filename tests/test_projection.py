@@ -2,13 +2,16 @@
 
 import json
 import os
+import sys
 import tempfile
 import unittest
-from unittest.mock import patch
 from pathlib import Path
+from unittest.mock import patch
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "plugins/codex-dsh-trace/server"))
+
+from store import CHUNK, Store, TraceError
 from test_store import Fixture
-from store import Store, CHUNK, TraceError
 
 
 class ProjectionTests(unittest.TestCase):

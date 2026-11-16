@@ -3,11 +3,11 @@ import os
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "plugins/codex-dsh-trace/server"))
-from store import Store, TraceError, CHUNK
+from store import CHUNK, Store, TraceError
 
 
 class Fixture:
@@ -258,10 +258,16 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(listed["traces"], [])
         self.assertEqual(listed["unreadableCount"], 1)
         self.assertEqual(listed["issues"][0]["threadId"], "thread-root")
+        self.assertEqual(listed["issues"][0]["errorCode"], "unsupported_schema")
+        self.assertEqual(listed["issues"][0]["errorParams"], {"version": 99})
         opened = self.store.open(thread_id="thread-root")
         self.assertIn("版本 99", opened["unavailableReason"])
-        with self.assertRaisesRegex(TraceError, "版本 99"):
+        self.assertEqual(opened["errorCode"], "unsupported_schema")
+        self.assertEqual(opened["errorParams"], {"version": 99})
+        with self.assertRaisesRegex(TraceError, "版本 99") as raised:
             self.store.index("trace-test")
+        self.assertEqual(raised.exception.code, "unsupported_schema")
+        self.assertEqual(raised.exception.params, {"version": 99})
 
     def test_event_schema_must_match_its_manifest(self):
         self.fixture.conversation()

@@ -2,13 +2,16 @@
 
 import json
 import os
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from test_store import Fixture
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "plugins/codex-dsh-trace/server"))
+
 from store import Store
+from test_store import Fixture
 
 
 class ForkHistoryTests(unittest.TestCase):

@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
-import hashlib
 import base64
+import hashlib
 import json
 import re
 from collections import OrderedDict
 from itertools import islice
 from pathlib import Path
+from typing import Any, Optional
 
-from store import TraceError, item_text, preview, unpack, compaction_info
+from store import TraceError, compaction_info, item_text, preview, unpack
 
 GROUP_LABELS = json.loads(
     Path(__file__).with_name("trajectory-locales.json").read_text(encoding="utf-8")
@@ -40,11 +41,10 @@ def message_text(item):
         return content
     if not isinstance(content, list):
         return item.get("text", "") if isinstance(item.get("text"), str) else ""
-    return "\n\n".join(
-        block.get("text", block.get("refusal"))
-        for block in content
-        if isinstance(block, dict) and isinstance(block.get("text", block.get("refusal")), str)
-    )
+    text_parts = [
+        block.get("text", block.get("refusal")) for block in content if isinstance(block, dict)
+    ]
+    return "\n\n".join(part for part in text_parts if isinstance(part, str))
 
 
 def message_identity(item):
@@ -85,7 +85,7 @@ def usage(value):
 
 def catalog_tools(value):
     """Keep complete recorded declarations, normalizing only DSH's display shape."""
-    tools = []
+    tools: list[dict[str, Any]] = []
     for entry in value or []:
         if not isinstance(entry, dict):
             continue
@@ -168,7 +168,7 @@ def source_blocks(item, owner, label, metadata_only=False):
             ):
                 url = f"data:{block['mimeType']};base64,{block['data']}"
             asset_id = f"{owner}:{label}:{position}"
-            attachment = {"attachmentId": asset_id}
+            attachment: dict[str, Any] = {"attachmentId": asset_id}
             name = block.get("filename", block.get("name"))
             if isinstance(name, str):
                 attachment["name"] = name
@@ -316,7 +316,7 @@ class Projection:
             history_key = (first["id"], first_ref.get("path")) if first and first_ref else None
             if history_key != self.history_turn_key:
                 raw = self.index.payload(first_ref) or {}
-                history_turns = {}
+                history_turns: dict[str, None] = {}
                 for item in raw.get("input", []):
                     if (
                         not isinstance(item, dict)
@@ -337,7 +337,8 @@ class Projection:
             self.previous_requests = {}
             self.inherited_requests = {}
             self.locations = {}
-            counters, previous = {}, {}
+            counters: dict[tuple[str, Optional[str]], int] = {}
+            previous: dict[str, dict[str, Any]] = {}
             root_path = self.index.threads.get(self.index.meta.get("threadId"))
             for row in self.request_rows:
                 if row.get("type") != "request":
@@ -444,7 +445,7 @@ class Projection:
         if reported:
             data["usage"] = reported
         if cumulative:
-            total = {}
+            total: dict[str, float] = {}
             for candidate in self.requests():
                 if candidate["seq"] > row["seq"]:
                     break
@@ -849,7 +850,7 @@ class Projection:
             )
             if program:
                 cells[-1]["programDescription"] = preview(row.get("_code"), 120)
-            elif native_program:
+            elif native_program and isinstance(arguments, dict):
                 cells[-1]["programDescription"] = preview(
                     arguments.get("description") or arguments["code"], 120
                 )
@@ -913,7 +914,7 @@ class Projection:
         row = self.index.get_row(row_id)
         template = next((cell for cell in self.cells(row) if cell["cellKey"] == cell_key), None)
         if template is None:
-            raise TraceError("没有找到这条轨迹记录。")
+            raise TraceError("没有找到这条轨迹记录。", code="record_not_found")
         data = {**template, "detailsPending": False}
         if cell_key == "prompt":
             data["promptDetail"] = self.prompt(row)

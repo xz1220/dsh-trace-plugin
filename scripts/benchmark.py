@@ -1,4 +1,4 @@
-"""Measure real recording reads plus a 10,000-row synthetic scaling fixture."""
+"""Benchmark synthetic recordings by default; local real recordings are opt-in."""
 
 import argparse
 import json
@@ -49,53 +49,88 @@ def projection_sample(store, index):
     }
 
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--trace-id", required=True)
-parser.add_argument("--out", type=Path)
-args = parser.parse_args()
-store = Store()
-index = store.index(args.trace_id)
-real = sample(index)
-row = [r for r in index.rows.values() if r.get("type") == "request"][-1]
-detail, ms = timed(lambda: store.details(args.trace_id, row["id"]))
-real["fullContextMetadataMs"] = round(ms, 3)
-real["messages"] = len(detail["messages"])
-real["contextComplete"] = detail["context"]["complete"]
-real.update(projection_sample(store, index))
-with tempfile.TemporaryDirectory() as temporary:
-    root = Path(temporary)
-    f = Fixture(root / "bundle")
-    ref = f.payload({"input": []}, "inference_request")
-    events = []
-    for n in range(10000):
-        events.append(
-            f.event(
-                "inference_started", inference_call_id=str(n), model="test", request_payload=ref
-            )
+def synthetic_sample(rows):
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        fixture = Fixture(root / "bundle")
+        ref = fixture.payload({"input": []}, "inference_request")
+        with (fixture.root / "trace.jsonl").open("w", encoding="utf-8") as stream:
+            for number in range(rows):
+                events = (
+                    fixture.event(
+                        "inference_started",
+                        inference_call_id=str(number),
+                        model="test",
+                        request_payload=ref,
+                    ),
+                    fixture.event(
+                        "inference_completed",
+                        inference_call_id=str(number),
+                        response_id=f"r{number}",
+                        response_payload=None,
+                    ),
+                )
+                for event in events:
+                    stream.write(json.dumps(event) + "\n")
+        store = Store(root / "config.json")
+        store.catalog.default_root = root / "default"
+        # Resolve directly from synthetic metadata without scanning configured local roots.
+        metadata = store.catalog.manifest(fixture.root)
+        store.catalog.cache = {metadata["id"]: metadata}
+        index = store.index(metadata["id"])
+        result = sample(index)
+        result.update(projection_sample(store, index))
+        return result
+
+
+def real_sample(trace_id):
+    store = Store()
+    index = store.index(trace_id)
+    result = sample(index)
+    row = next(
+        (row for row in reversed(list(index.rows.values())) if row.get("type") == "request"), None
+    )
+    if row is not None:
+        detail, elapsed = timed(lambda: store.details(trace_id, row["id"]))
+        result.update(
+            fullContextMetadataMs=round(elapsed, 3),
+            messages=len(detail["messages"]),
+            contextComplete=detail["context"]["complete"],
         )
-        events.append(
-            f.event(
-                "inference_completed",
-                inference_call_id=str(n),
-                response_id=f"r{n}",
-                response_payload=None,
-            )
-        )
-    (f.root / "trace.jsonl").write_text("".join(json.dumps(e) + "\n" for e in events))
-    test = Store(root / "config.json")
-    test.catalog.default_root = root / "default"
-    test.catalog.register(str(f.root))
-    synthetic = sample(test.index("trace-test"))
-    synthetic.update(projection_sample(test, test.index("trace-test")))
-report = {
-    "pluginVersion": json.loads((ROOT / "package.json").read_text())["version"],
-    "python": platform.python_version(),
-    "platform": platform.machine(),
-    "realRecording": real,
-    "synthetic10000Rows": synthetic,
-    "scope": "Local backend timings; OS filesystem cache may already be warm. UI and MCP bridge latency are measured separately.",
-}
-if args.out:
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(report, indent=2))
-print(json.dumps(report, indent=2))
+    result.update(projection_sample(store, index))
+    return result
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--trace-id", help="Optionally include one local real recording (never needed in CI)"
+    )
+    parser.add_argument(
+        "--rows", type=int, default=10000, help="Number of synthetic request rows (default: 10000)"
+    )
+    parser.add_argument("--out", type=Path)
+    args = parser.parse_args()
+    if not 1 <= args.rows <= 100000:
+        parser.error("--rows must be between 1 and 100000")
+    synthetic = synthetic_sample(args.rows)
+    report = {
+        "pluginVersion": json.loads((ROOT / "package.json").read_text())["version"],
+        "python": platform.python_version(),
+        "platform": platform.machine(),
+        "syntheticRows": args.rows,
+        "synthetic": synthetic,
+        "scope": "Local backend timings; OS filesystem cache may already be warm. UI and MCP bridge latency are measured separately.",
+    }
+    if args.rows == 10000:
+        report["synthetic10000Rows"] = synthetic
+    if args.trace_id:
+        report["realRecording"] = real_sample(args.trace_id)
+    if args.out:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    print(json.dumps(report, indent=2))
+
+
+if __name__ == "__main__":
+    main()
