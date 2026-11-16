@@ -2,7 +2,7 @@
   "files": [
     {
       "path": "packages/client/ui-trajectory/src/client/TrajectoryTable.tsx",
-      "sha256": "e36dcd06edd2558cf5ab47f892375145c3a9e055e7fa13c9229b50dcfdf16f1a"
+      "sha256": "1721cdbd7e8c33c452d8e54b3bbbb1bc410d8a55b7069699e037ba693a77f686"
     },
     {
       "path": "packages/client/ui-trajectory/src/client/code-program.ts",

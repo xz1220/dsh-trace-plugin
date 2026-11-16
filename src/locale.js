@@ -7,6 +7,8 @@ import { de } from '../vendor/dsh/packages/client/locale/src/locales/de.ts';
 import { ru } from '../vendor/dsh/packages/client/locale/src/locales/ru.ts';
 import { pt } from '../vendor/dsh/packages/client/locale/src/locales/pt.ts';
 import * as trajectory from '../vendor/dsh/packages/client/ui-trajectory/src/client/locales.ts';
+import { codexLocales } from './locales/codex.js';
+import { errorLocales } from './locales/errors.js';
 
 const common = { zh, en, ja, es, fr, de, ru, pt };
 const evidence = {
@@ -30,15 +32,11 @@ export const dictionaries = Object.fromEntries(
     {
       ...common[locale],
       ...trajectory[locale],
+      ...(codexLocales[locale] || codexLocales.en),
+      ...(errorLocales[locale] || errorLocales.en),
       'codex.prompt': evidence[locale][0],
       'codex.request': evidence[locale][1],
       'codex.response': evidence[locale][2],
-      'record.rawResultUnavailable':
-        locale === 'zh' ? '录制中没有原始结果' : 'No raw result in this recording',
-      'timing.sessionTimestamps':
-        locale === 'zh' ? '官方录制起止事件' : 'Recorded start and end events',
-      'timing.sessionTimestampsRunning':
-        locale === 'zh' ? '官方录制开始事件（运行中）' : 'Recorded start event (running)',
     },
   ]),
 );

@@ -20,6 +20,8 @@ The following local additions are deliberate and listed in `patches.json`:
   render recorded code-cell images through the existing output-block renderer.
   Request-only anchors use the correct generation/compaction accessibility label.
   Existing DSH tabs and layout are retained.
+  Native Enter/Space activation on request buttons stops at the button so the
+  enclosing row shortcut does not select an assistant instead of the request.
 - `trajectory-record.ts`: typed metadata for lazy records and Codex code cells.
 - `code-program.ts`: recognizes the recorded `functions.exec` code cell and its
   original JavaScript source, preserving whitespace and the trailing newline.

@@ -1,4 +1,6 @@
 /* MCP Apps bridge. The loopback transport is only for authenticated local preview. */
+import { apiError } from './errors.js';
+import { VERSION } from './version.js';
 export function createHost({ onResult, onContext, onError }) {
   const preview = window.__ROLLOUT_PREVIEW__;
   const pending = new Map();
@@ -24,7 +26,7 @@ export function createHost({ onResult, onContext, onError }) {
       const id = `rollout-viewer-${++counter}`;
       const timer = setTimeout(() => {
         pending.delete(id);
-        reject(new Error('连接超时，请重试。'));
+        reject(apiError({ errorCode: 'connection_timeout' }));
       }, 20000);
       pending.set(id, { resolve, reject, timer });
       post({ id, method, params });
@@ -59,7 +61,7 @@ export function createHost({ onResult, onContext, onError }) {
     window.removeEventListener('openai:set_globals', globals);
     for (const p of pending.values()) {
       clearTimeout(p.timer);
-      p.reject(new Error('面板已关闭'));
+      p.reject(apiError({ errorCode: 'panel_closed' }));
     }
     pending.clear();
   }
@@ -76,12 +78,13 @@ export function createHost({ onResult, onContext, onError }) {
         if (window.openai?.toolOutput) deliver({ structuredContent: window.openai.toolOutput });
         return request('ui/initialize', {
           protocolVersion: '2026-01-26',
-          appInfo: { name: 'Codex Trace', version: '0.2.19' },
+          appInfo: { name: 'Codex Trace', version: VERSION },
           appCapabilities: {},
         });
       })
       .then(async (result) => {
-        if (result.protocolVersion !== '2026-01-26') throw new Error('宿主版本不支持此面板。');
+        if (result.protocolVersion !== '2026-01-26')
+          throw apiError({ errorCode: 'unsupported_host' });
         ready = true;
         onContext(result.hostContext || {});
         post({ method: 'ui/notifications/initialized' });
@@ -94,10 +97,9 @@ export function createHost({ onResult, onContext, onError }) {
             });
             if (!receivedLaunch) {
               if (initial.isError || initial.structuredContent?.error)
-                throw new Error(
-                  initial.structuredContent?.error ||
-                    initial.content?.find((item) => item.type === 'text')?.text ||
-                    '读取失败',
+                throw apiError(
+                  initial.structuredContent,
+                  initial.content?.find((item) => item.type === 'text')?.text,
                 );
               deliver(initial);
             }
@@ -117,7 +119,7 @@ export function createHost({ onResult, onContext, onError }) {
     start,
     dispose,
     async call(name, args = {}) {
-      if (closed) throw new Error('面板已关闭');
+      if (closed) throw apiError({ errorCode: 'panel_closed' });
       let result;
       if (preview) {
         const response = await fetch('/api', {
@@ -127,16 +129,15 @@ export function createHost({ onResult, onContext, onError }) {
           body: JSON.stringify({ name, arguments: args }),
         });
         result = await response.json();
-        if (!response.ok) throw new Error(result.error || '本地服务不可用。');
+        if (!response.ok) throw apiError(result);
       } else {
         if (!ready) await start();
         result = await request('tools/call', { name, arguments: args });
       }
       if (result.isError || result.structuredContent?.error)
-        throw new Error(
-          result.structuredContent?.error ||
-            result.content?.find((x) => x.type === 'text')?.text ||
-            '读取失败',
+        throw apiError(
+          result.structuredContent,
+          result.content?.find((x) => x.type === 'text')?.text,
         );
       return result.structuredContent || result;
     },

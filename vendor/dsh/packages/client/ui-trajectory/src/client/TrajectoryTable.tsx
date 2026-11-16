@@ -2888,6 +2888,10 @@ export function TrajectoryTable({
                             data-request-run-index={requestRunIndex}
                             data-request-status={requestStatus}
                             style={requestBoundaryStyle}
+                            onKeyDown={(event) => {
+                              // Preserve native button activation before the row shortcut.
+                              if (event.key === 'Enter' || event.key === ' ') event.stopPropagation()
+                            }}
                             onClick={(event) => {
                               event.stopPropagation()
                               if (requestInfo !== undefined) {

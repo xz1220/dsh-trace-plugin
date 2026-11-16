@@ -41,40 +41,41 @@ export default function Trajectory({
   onFocusApplied,
 }) {
   const t = useTranslation();
-  const groupOf = (cell) =>
-    cell.inputHistory
-      ? t.text('历史消息（请求输入）', 'History in request')
-      : cell.cellKey === 'compaction' || cell.purpose === 'compaction'
-        ? t('group.compaction', { seq: cell.seq })
-        : cell.step > 0
-          ? t('group.step', { step: cell.step })
-          : cell.group;
-  const captionOf = (cell) => {
-    if (cell.kind === 'system' && cell.cellKey === 'prompt')
-      return t.text(
-        cell.text,
-        cell.previousPromptDetail
-          ? 'Instructions and tools updated'
-          : 'Instructions and tool catalog',
-      );
-    if (cell.kind === 'compacted')
-      return cell.compactionApplied
-        ? t.text('上下文压缩已应用', 'Context compaction applied')
-        : t.text(cell.text, 'Context compaction');
-    if (cell.kind === 'message' && cell.text === '（仅工具调用）')
-      return `（${t('layout.toolCallOnly')}）`;
-    if (['user', 'context', 'message'].includes(cell.kind) && /^(图片|文件) ×/.test(cell.text)) {
-      const images = cell.sourceBlocks?.filter((block) => block.attachment).length ?? 0,
-        files = cell.sourceBlocks?.filter((block) => block.file).length ?? 0;
-      return [
-        images ? t('layout.imageCount', { count: images }) : '',
-        files ? t('layout.fileAttachments', { count: files }) : '',
-      ]
-        .filter(Boolean)
-        .join(' · ');
-    }
-    return cell.text;
-  };
+  const groupOf = useCallback(
+    (cell) =>
+      cell.inputHistory
+        ? t('codex.historyInRequest')
+        : cell.cellKey === 'compaction' || cell.purpose === 'compaction'
+          ? t('group.compaction', { seq: cell.seq })
+          : cell.step > 0
+            ? t('group.step', { step: cell.step })
+            : cell.group,
+    [t],
+  );
+  const captionOf = useCallback(
+    (cell) => {
+      if (cell.kind === 'system' && cell.cellKey === 'prompt')
+        return t(cell.previousPromptDetail ? 'codex.instructionsUpdated' : 'codex.instructions');
+      if (cell.kind === 'compacted')
+        return cell.compactionApplied
+          ? t('codex.contextCompactionApplied')
+          : t('codex.contextCompaction');
+      if (cell.kind === 'message' && cell.text === '（仅工具调用）')
+        return `（${t('layout.toolCallOnly')}）`;
+      if (['user', 'context', 'message'].includes(cell.kind) && /^(图片|文件) ×/.test(cell.text)) {
+        const images = cell.sourceBlocks?.filter((block) => block.attachment).length ?? 0,
+          files = cell.sourceBlocks?.filter((block) => block.file).length ?? 0;
+        return [
+          images ? t('layout.imageCount', { count: images }) : '',
+          files ? t('layout.fileAttachments', { count: files }) : '',
+        ]
+          .filter(Boolean)
+          .join(' · ');
+      }
+      return cell.text;
+    },
+    [t],
+  );
   const traceId = data.trace.id;
   const [cells, setCells] = useState(new Map()),
     [requests, setRequests] = useState(new Map());
@@ -157,7 +158,7 @@ export default function Trajectory({
         }
         setError('');
       } catch (e) {
-        if (active) setError(e.message);
+        if (active) setError(e);
       } finally {
         if (active) setLoading(false);
       }
@@ -180,7 +181,7 @@ export default function Trajectory({
           group: groupOf(cell),
           text: captionOf(cell),
         })),
-    [cells, thread, t],
+    [cells, thread, t, groupOf, captionOf],
   );
   const turns = useMemo(() => trajectoryTurns(visibleCells), [visibleCells]);
   const requestNumbers = useMemo(() => {
@@ -189,7 +190,7 @@ export default function Trajectory({
       .filter((request) => visible.has(request.rowId))
       .sort((a, b) => a.seq - b.seq)
       .map((request) => ({ ...request, group: groupOf(request) }));
-  }, [requests, visibleCells, t]);
+  }, [requests, visibleCells, groupOf]);
 
   const hydrate = useCallback(
     async (cell, force = false) => {
@@ -244,7 +245,7 @@ export default function Trajectory({
             setCells((current) => {
               if (current.get(cell.recordId)?.version !== cell.version) return current;
               const next = new Map(current);
-              next.set(cell.recordId, { ...cell, detailsError: e.message });
+              next.set(cell.recordId, { ...cell, detailsError: e });
               return next;
             });
         } finally {
@@ -290,7 +291,7 @@ export default function Trajectory({
             setRequests((current) => {
               if (current.get(request.rowId)?.version !== request.version) return current;
               const next = new Map(current);
-              next.set(request.rowId, { ...request, detailsError: e.message });
+              next.set(request.rowId, { ...request, detailsError: e });
               return next;
             });
         })
@@ -303,7 +304,6 @@ export default function Trajectory({
     () => [...new Set(visibleCells.map((cell) => cell.rowId))],
     [visibleCells],
   );
-  const rowKey = rowIds.join('|');
   useEffect(() => {
     if (!query.trim()) {
       setMatches(null);
@@ -329,7 +329,7 @@ export default function Trajectory({
           setError('');
         }
       } catch (e) {
-        if (active) setError(e.message);
+        if (active) setError(e);
       } finally {
         if (active) setSearchBusy(false);
       }
@@ -338,7 +338,7 @@ export default function Trajectory({
       active = false;
       clearTimeout(timer);
     };
-  }, [api, query, rowKey, data.revision, retry, t]);
+  }, [api, query, rowIds, data.revision, retry, t]);
   const searchIndexes = useMemo(
     () =>
       matches === null
@@ -377,7 +377,7 @@ export default function Trajectory({
   const allTools = toolIds.length > 0 && toolIds.every((id) => collapsedTools.has(id));
   const wrapping = useMemo(
     () => ({
-      getDefault: wrappingPreference.getSnapshot,
+      getDefault: () => wrapped,
       setDefault: wrappingPreference.set,
       label: t('record.wrapLines'),
     }),
@@ -487,14 +487,8 @@ export default function Trajectory({
       {query && (
         <div className="app-search-status" role="status">
           {searchBusy
-            ? t.text(
-                '正在搜索已加载记录的完整内容…',
-                'Searching the full content of loaded records…',
-              )
-            : t.text(
-                `${matches?.size || 0} 条匹配 · 搜索已加载记录`,
-                `${matches?.size || 0} matches in loaded records`,
-              )}
+            ? t('codex.searchingTheFullContentOfLoadedRecords')
+            : t('codex.matchesInLoadedRecords', { value1: matches?.size || 0 })}
         </div>
       )}
       <div className={`${view.ledger} app-ledger-region`}>

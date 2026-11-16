@@ -1,3 +1,4 @@
+import { apiError } from './errors.js';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   IconCopyOutlineRegular,
@@ -7,13 +8,14 @@ import {
 } from '../vendor/dsh/primitives.ts';
 import table from '../vendor/dsh/packages/client/ui-trajectory/src/client/TrajectoryTable.module.css';
 import { useTranslation } from './locale-context.jsx';
+import { errorMessage } from './errors.js';
 
 export function Failure({ error, retry }) {
   const t = useTranslation();
   return (
     <div className="app-error" role="alert">
-      <strong>{t.text('未能读取', 'Unable to read')}</strong>
-      <p>{error}</p>
+      <strong>{t('codex.unableToRead')}</strong>
+      <p>{errorMessage(error, t)}</p>
       {retry && (
         <button type="button" className="app-link" onClick={retry}>
           {t('retry')}
@@ -25,11 +27,7 @@ export function Failure({ error, retry }) {
 export function Skeleton() {
   const t = useTranslation();
   return (
-    <div
-      className="app-skeleton"
-      role="status"
-      aria-label={t.text('正在读取内容', 'Loading content')}
-    >
+    <div className="app-skeleton" role="status" aria-label={t('codex.loadingContent')}>
       <i />
       <i />
       <i />
@@ -38,32 +36,25 @@ export function Skeleton() {
 }
 
 export function compactionText(info, t) {
-  const text = t.text,
-    lines = [
-      info?.applied
-        ? text(
-            '压缩结果已应用到后续请求。',
-            'The compacted context was applied to subsequent requests.',
-          )
-        : text(
-            '已记录压缩请求；是否应用到后续请求尚未记录。',
-            'The compaction request was recorded; application to subsequent requests is not recorded.',
-          ),
-    ];
+  const lines = [
+    info?.applied
+      ? t('codex.theCompactedContextWasAppliedToSubsequent')
+      : t('codex.theCompactionRequestWasRecordedApplicationTo'),
+  ];
   const roles = {
-    user: text('用户', 'user'),
-    assistant: text('助手', 'assistant'),
-    developer: text('开发者', 'developer'),
-    system: text('系统', 'system'),
+    user: t('codex.user'),
+    assistant: t('codex.assistant'),
+    developer: t('codex.developer'),
+    system: t('codex.system'),
   };
   for (const [field, label] of [
-    ['before', text('压缩前', 'Before compaction')],
-    ['after', text('压缩后', 'After compaction')],
+    ['before', t('codex.beforeCompaction')],
+    ['after', t('codex.afterCompaction')],
   ]) {
     const value = info?.[field];
     if (value)
       lines.push(
-        `${label}：${value.items} ${text('项', 'items')}${
+        `${label}：${value.items} ${t('codex.items')}${
           Object.keys(value.roles || {}).length
             ? ` (${Object.entries(value.roles)
                 .map(([role, count]) => `${roles[role] || role} ${count}`)
@@ -72,22 +63,12 @@ export function compactionText(info, t) {
         }`,
       );
   }
-  lines.push(
-    text(
-      '时间线保留已录下的可读消息；后续请求使用压缩后的上下文。',
-      'The timeline keeps recorded readable messages; subsequent requests use the compacted context.',
-    ),
-  );
+  lines.push(t('codex.theTimelineKeepsRecordedReadableMessagesSubsequent'));
   if (info?.after?.encryptedItems || info?.output?.encryptedItems)
-    lines.push(
-      text(
-        '压缩内容含不透明加密项，无法从中还原未保留的助手原文。',
-        'The compacted context contains opaque encrypted items; missing assistant text cannot be recovered from them.',
-      ),
-    );
+    lines.push(t('codex.theCompactedContextContainsOpaqueEncryptedItems'));
   if (info?.readableSummary)
     lines.push(
-      `${text('录制的可读摘要', 'Recorded readable summary')}：\n\n${info.readableSummary}${info.readableSummaryTruncated ? `\n\n${text('摘要预览已截断，完整内容见原始响应。', 'Summary preview truncated; see the raw response for the complete content.')}` : ''}`,
+      `${t('codex.recordedReadableSummary')}：\n\n${info.readableSummary}${info.readableSummaryTruncated ? `\n\n${t('codex.summaryPreviewTruncatedSeeTheRawResponse')}` : ''}`,
     );
   return lines.join('\n\n');
 }
@@ -95,20 +76,19 @@ export async function readComplete(api, name, arguments_, isCurrent = () => true
   let text = '',
     offset = 0;
   while (offset !== null) {
-    if (!isCurrent()) throw new Error('读取已取消');
+    if (!isCurrent()) throw apiError({ errorCode: 'cancelled' });
     const result = await api(name, { ...arguments_, offset });
     if (result.available === false) return null;
     text += result.text;
     if (result.nextOffset !== null && result.nextOffset <= offset)
-      throw new Error('内容分页没有前进，请重新打开录制。');
+      throw apiError({ errorCode: 'paging_stalled' });
     offset = result.nextOffset;
   }
   return text;
 }
 
 export function TextContent({ rowId, section, itemIndex, api, copy, label }) {
-  const t = useTranslation(),
-    text = t.text;
+  const t = useTranslation();
   const labels = {
     copyValue: t('copy.value'),
     copyJson: t('copy.json'),
@@ -148,7 +128,7 @@ export function TextContent({ rowId, section, itemIndex, api, copy, label }) {
         dataRef.current = next;
         setData(next);
       } catch (e) {
-        if (id === ticket.current) setError(e.message);
+        if (id === ticket.current) setError(e);
       } finally {
         if (id === ticket.current) setBusy(false);
       }
@@ -156,12 +136,13 @@ export function TextContent({ rowId, section, itemIndex, api, copy, label }) {
     [api, rowId, section, itemIndex],
   );
   useEffect(() => {
+    ticket.current += 1;
     setData(null);
     dataRef.current = null;
     setError('');
     load();
     return () => {
-      ticket.current++;
+      ticket.current += 1;
     };
   }, [load]);
   async function copyAll() {
@@ -177,7 +158,7 @@ export function TextContent({ rowId, section, itemIndex, api, copy, label }) {
       );
       if (text !== null) await copy(text);
     } catch (e) {
-      if (ticket.current === id) setError(e.message);
+      if (ticket.current === id) setError(e);
     } finally {
       if (ticket.current === id) setBusy(false);
     }
@@ -193,7 +174,7 @@ export function TextContent({ rowId, section, itemIndex, api, copy, label }) {
       <div className="app-content-toolbar">
         <span>
           {label}
-          {data && ` · ${data.totalChars.toLocaleString()} ${text('字符', 'characters')}`}
+          {data && ` · ${data.totalChars.toLocaleString()} ${t('codex.characters')}`}
         </span>
         <div>
           {json !== undefined && (
@@ -203,7 +184,7 @@ export function TextContent({ rowId, section, itemIndex, api, copy, label }) {
               aria-pressed={tree}
               onClick={() => setTree(!tree)}
             >
-              {tree ? text('原文', 'Raw') : text('树形', 'Tree')}
+              {tree ? t('codex.raw') : t('codex.tree')}
             </button>
           )}
           <button
@@ -212,14 +193,14 @@ export function TextContent({ rowId, section, itemIndex, api, copy, label }) {
             aria-pressed={wrap}
             onClick={() => setWrap(!wrap)}
           >
-            {text('换行', 'Wrap')}
+            {t('codex.wrap')}
           </button>
           <button
             type="button"
             className="app-icon"
             disabled={busy || data?.available === false}
-            aria-label={text(`复制完整${label}`, `Copy complete ${label}`)}
-            title={text(`复制完整${label}`, `Copy complete ${label}`)}
+            aria-label={t('codex.copyComplete', { value1: label })}
+            title={t('codex.copyComplete', { value1: label })}
             onClick={copyAll}
           >
             <IconCopyOutlineRegular size={14} />
@@ -230,9 +211,7 @@ export function TextContent({ rowId, section, itemIndex, api, copy, label }) {
       {!data && !error ? (
         <Skeleton />
       ) : data?.available === false ? (
-        <p className={table.noPayload}>
-          {text('录制中没有此内容。', 'This content is not in the recording.')}
-        </p>
+        <p className={table.noPayload}>{t('codex.thisContentIsNotInTheRecording')}</p>
       ) : json !== undefined && tree ? (
         <JsonTree
           data={json}
@@ -249,11 +228,11 @@ export function TextContent({ rowId, section, itemIndex, api, copy, label }) {
       {data?.nextOffset !== null && data?.nextOffset !== undefined && (
         <button className="app-load-more" disabled={busy} onClick={() => load(data.nextOffset)}>
           {busy
-            ? text('正在读取…', 'Loading…')
-            : text(
-                `继续加载（${data.nextOffset.toLocaleString()} / ${data.totalChars.toLocaleString()} 字符）`,
-                `Load more (${data.nextOffset.toLocaleString()} / ${data.totalChars.toLocaleString()} characters)`,
-              )}
+            ? t('codex.loading')
+            : t('codex.loadMoreCharacters', {
+                value1: data.nextOffset.toLocaleString(),
+                value2: data.totalChars.toLocaleString(),
+              })}
         </button>
       )}
     </section>
@@ -261,8 +240,7 @@ export function TextContent({ rowId, section, itemIndex, api, copy, label }) {
 }
 
 function PromptContext({ request, detail, api, copy }) {
-  const t = useTranslation(),
-    text = t.text;
+  const t = useTranslation();
   const [mode, setMode] = useState('full'),
     [role, setRole] = useState('all'),
     [expanded, setExpanded] = useState(null);
@@ -286,7 +264,7 @@ function PromptContext({ request, detail, api, copy }) {
       });
       await copy(text || '');
     } catch (e) {
-      setError(e.message);
+      setError(e);
     } finally {
       setCopying(false);
     }
@@ -296,47 +274,29 @@ function PromptContext({ request, detail, api, copy }) {
       <div className="app-context-note" data-incomplete={!context.complete || undefined}>
         <strong>
           {!context.complete
-            ? text(
-                '前序录制缺失，以下是已知上下文',
-                'Earlier recording missing; showing known context',
-              )
+            ? t('codex.earlierRecordingMissingShowingKnownContext')
             : context.incremental
-              ? text(
-                  '已沿响应链恢复完整上下文',
-                  'Complete context restored along the response chain',
-                )
-              : text('客户端实际请求输入', 'Recorded client request input')}
+              ? t('codex.completeContextRestoredAlongTheResponseChain')
+              : t('codex.recordedClientRequestInput')}
         </strong>
         <span>
           {context.incremental
-            ? text(
-                '继承输入、前序模型输出和本次增量分别标记。',
-                'Inherited input, previous output and current increment are labelled.',
-              )
-            : text(
-                '按录制保留原始角色和输入顺序。',
-                'Original roles and input order are preserved.',
-              )}
+            ? t('codex.inheritedInputPreviousOutputAndCurrentIncrement')
+            : t('codex.originalRolesAndInputOrderArePreserved')}
         </span>
         {messages.some((message) => message.type === 'compaction') && (
-          <span>
-            {text(
-              '此请求使用压缩后的上下文快照；它不是完整的对话回放。历史正文仅在录制保留了原文时可查看。',
-              'This request uses a compacted context snapshot. Historical message text is available only where it was preserved in the recording.',
-            )}
-          </span>
+          <span>{t('codex.thisRequestUsesACompactedContextSnapshot')}</span>
         )}
       </div>
       <div className="app-prompt-controls">
-        <div role="group" aria-label={text('上下文范围', 'Context scope')}>
+        <div role="group" aria-label={t('codex.contextScope')}>
           <button
             type="button"
             className="app-button"
             aria-pressed={mode === 'full'}
             onClick={() => setMode('full')}
           >
-            {context.complete ? t('codex.prompt') : text('已知上下文', 'Known context')}{' '}
-            {messages.length}
+            {context.complete ? t('codex.prompt') : t('codex.knownContext')} {messages.length}
           </button>
           {context.incremental && (
             <button
@@ -345,7 +305,7 @@ function PromptContext({ request, detail, api, copy }) {
               aria-pressed={mode === 'delta'}
               onClick={() => setMode('delta')}
             >
-              {text('本次增量', 'Current increment')} {messages.filter((m) => !m.inherited).length}
+              {t('codex.currentIncrement')} {messages.filter((m) => !m.inherited).length}
             </button>
           )}
         </div>
@@ -354,9 +314,7 @@ function PromptContext({ request, detail, api, copy }) {
           className="app-icon"
           disabled={copying}
           aria-label={
-            context.complete
-              ? text('复制完整上下文', 'Copy complete context')
-              : text('复制已知上下文', 'Copy known context')
+            context.complete ? t('codex.copyCompleteContext') : t('codex.copyKnownContext')
           }
           onClick={copyContext}
         >
@@ -365,14 +323,14 @@ function PromptContext({ request, detail, api, copy }) {
       </div>
       <div className="app-prompt-filter">
         <select
-          aria-label={text('筛选提示词角色', 'Filter input roles')}
+          aria-label={t('codex.filterInputRoles')}
           value={role}
           onChange={(e) => {
             setRole(e.target.value);
             setExpanded(null);
           }}
         >
-          <option value="all">{text('全部角色', 'All roles')}</option>
+          <option value="all">{t('codex.allRoles')}</option>
           {[...new Set(messages.map((m) => m.role))].map((value) => (
             <option key={value} value={value}>
               {value}
@@ -380,7 +338,7 @@ function PromptContext({ request, detail, api, copy }) {
           ))}
         </select>
         <span>
-          {visible.length} {text('条输入', 'items')}
+          {visible.length} {t('codex.items2')}
         </span>
       </div>
       {error && <Failure error={error} retry={copyContext} />}
@@ -400,23 +358,21 @@ function PromptContext({ request, detail, api, copy }) {
             <strong title={message.preview || message.label}>
               {message.preview || message.label}
             </strong>
-            <em>{message.inherited ? text('继承', 'Inherited') : ''}</em>
+            <em>{message.inherited ? t('codex.inherited') : ''}</em>
             <small>
-              {message.chars.toLocaleString()} {text('字', 'chars')}
+              {message.chars.toLocaleString()} {t('codex.chars')}
             </small>
           </button>
           {opened === message.index && (
             <>
               <div className="app-message-origin">
-                {text('输入项', 'Item')} {message.index + 1} ·{' '}
+                {t('codex.item')} {message.index + 1} ·{' '}
                 {message.origin === 'response'
-                  ? text('前序模型输出', 'Previous model output')
-                  : text('请求输入', 'Request input')}
+                  ? t('codex.previousModelOutput')
+                  : t('codex.requestInput')}
               </div>
               {message.hasEncryptedContent && (
-                <p className="app-note">
-                  {text('包含不透明的加密数据。', 'Contains opaque encrypted data.')}
-                </p>
+                <p className="app-note">{t('codex.containsOpaqueEncryptedData')}</p>
               )}
               <TextContent
                 key={message.index}
@@ -431,19 +387,15 @@ function PromptContext({ request, detail, api, copy }) {
           )}
         </section>
       ))}
-      {!visible.length && (
-        <p className={table.noPayload}>
-          {text('没有符合此角色的输入项。', 'No input items match this role.')}
-        </p>
-      )}
+      {!visible.length && <p className={table.noPayload}>{t('codex.noInputItemsMatchThisRole')}</p>}
       <details className="app-tool-catalog">
-        <summary>{text('工具声明', 'Tool declarations')}</summary>
+        <summary>{t('codex.toolDeclarations')}</summary>
         <TextContent
           rowId={request.rowId}
           section="tools"
           api={api}
           copy={copy}
-          label={text('工具声明 JSON', 'Tool declarations JSON')}
+          label={t('codex.toolDeclarationsJSON')}
         />
       </details>
     </>
@@ -466,7 +418,7 @@ export function RequestContent({ traceId, request, tab, call, copy }) {
           if (active) setDetail(value);
         })
         .catch((e) => {
-          if (active) setError(e.message);
+          if (active) setError(e);
         });
     return () => {
       active = false;
@@ -487,7 +439,7 @@ export function RequestContent({ traceId, request, tab, call, copy }) {
     return error ? (
       <Failure error={error} retry={() => setRetry((v) => v + 1)} />
     ) : detail ? (
-      <section className="app-context-note" aria-label={t.text('上下文压缩', 'Context compaction')}>
+      <section className="app-context-note" aria-label={t('codex.contextCompaction')}>
         <MarkdownText text={compactionText(detail.compaction, t)} />
       </section>
     ) : (

@@ -1,3 +1,4 @@
+import { apiError } from './errors.js';
 import React from 'react';
 import { ImageGallery } from '../vendor/dsh/packages/client/ui-attachment/src/MessageImage.tsx';
 import { FileTransfers } from '../vendor/dsh/packages/client/ui-file-drag/src/client/transfers.ts';
@@ -16,7 +17,7 @@ export const loadImage = (attachment) => {
     .then(async () => {
       const url = attachment.recordedUrl;
       if (typeof url !== 'string' || !url.startsWith('data:image/'))
-        throw new Error('图片内容未保存在录制中');
+        throw apiError({ errorCode: 'image_unavailable' });
       const probe = new Image();
       probe.src = url;
       await probe.decode();
@@ -41,7 +42,9 @@ loadImage.peek = (attachment) => cache.get(attachment.attachmentId)?.url ?? unde
 
 const reportDragFailure = () =>
   window.dispatchEvent(
-    new CustomEvent('rollout-viewer:notice', { detail: '图片暂时无法拖出，请重试。' }),
+    new CustomEvent('rollout-viewer:notice', {
+      detail: apiError({ errorCode: 'image_drag_failed' }),
+    }),
   );
 let transfers;
 const fileDrag = {
@@ -49,7 +52,7 @@ const fileDrag = {
     if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
     let blob = source.blob;
     if (!blob) {
-      if (!source.url.startsWith('data:image/')) throw new Error('没有记录原图内容');
+      if (!source.url.startsWith('data:image/')) throw apiError({ errorCode: 'image_unavailable' });
       const comma = source.url.indexOf(','),
         header = source.url.slice(0, comma),
         encoded = source.url.slice(comma + 1);
@@ -72,17 +75,16 @@ export function disposeImageTransfers() {
 }
 const getTriggerProps = () => ({});
 function RecordedGallery(props) {
-  const t = useTranslation(),
-    text = t.text;
+  const t = useTranslation();
   const labels = {
-    image: text('图片', 'Image'),
-    open: text('查看原图', 'View original image'),
-    openNamed: (label) => text(`${label}，点击查看原图`, `${label}, view original image`),
-    loading: text('图片加载中…', 'Loading image…'),
-    loadFailed: text('图片加载失败，点击重试', 'Image failed to load; retry'),
+    image: t('codex.image'),
+    open: t('codex.viewOriginalImage'),
+    openNamed: (label) => t('codex.viewOriginalImage2', { value1: label }),
+    loading: t('codex.loadingImage'),
+    loadFailed: t('codex.imageFailedToLoadRetry'),
     lightbox: {
-      dialog: text('原图预览', 'Original image preview'),
-      close: text('关闭原图预览', 'Close original image preview'),
+      dialog: t('codex.originalImagePreview'),
+      close: t('codex.closeOriginalImagePreview'),
     },
   };
   return (

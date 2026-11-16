@@ -37,8 +37,30 @@ select {
   outline-offset: -2px;
 }
 .app-frame {
+  /* Small timeline captions must meet AA contrast in both host themes. */
+  --dsw-alias-label-caption: var(--dsw-alias-label-secondary);
+  --dsw-alias-label-tertiary: var(--dsw-alias-label-secondary);
   --dsh-composer-height: 0px;
   --dsh-trajectory-bottom-clearance: 0px;
+}
+body:not([data-ds-dark-theme]) .app-frame [data-role-kind='user'] {
+  color: color-mix(
+    in srgb,
+    var(--dsw-alias-state-business-primary) 80%,
+    var(--dsw-alias-label-primary)
+  );
+}
+body:not([data-ds-dark-theme]) .app-frame [data-role-kind='message'] {
+  color: color-mix(
+    in srgb,
+    color-mix(
+        in srgb,
+        var(--dsw-alias-brand-primary-new-colorprimary-new-color) 60%,
+        var(--dsw-alias-state-error-secondary)
+      )
+      80%,
+    var(--dsw-alias-label-primary)
+  );
 }
 .app-frame > .app-ledger-region {
   --dsh-trajectory-bottom-clearance: 0px;

@@ -1,3 +1,4 @@
+import { errorMessage, apiError } from './errors.js';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../vendor/dsh/packages/client/ui-theme/src/styles/base.css';
@@ -33,10 +34,11 @@ function App() {
   latestData.current = data;
   const [locale, setLocale] = useState('zh');
   const t = useMemo(() => translatorFor(locale), [locale]);
-  const text = t.text;
   const call = useCallback(
     (name, args = {}) =>
-      host.current ? host.current.call(name, args) : Promise.reject(new Error('面板正在连接。')),
+      host.current
+        ? host.current.call(name, args)
+        : Promise.reject(apiError({ errorCode: 'connecting' })),
     [],
   );
   const notify = useCallback((text) => {
@@ -48,12 +50,12 @@ function App() {
     async (value) => {
       try {
         await navigator.clipboard.writeText(value);
-        notify(text('已复制完整内容', 'Complete content copied'));
+        notify(t('codex.completeContentCopied'));
       } catch {
-        notify(text('复制失败，请选择文本复制', 'Copy failed; select the text to copy'));
+        notify(t('codex.copyFailedSelectTheTextToCopy'));
       }
     },
-    [notify, text],
+    [notify, t],
   );
   const loadTrace = useCallback(
     async (id, focus = null, { quiet = false, preserve = false } = {}) => {
@@ -74,7 +76,7 @@ function App() {
               limit: 200,
             });
             if (!page.rows.length || page.beforeSeq >= value.beforeSeq)
-              throw new Error('历史分页没有前进，请重试。');
+              throw apiError({ errorCode: 'history_paging_stalled' });
             const rows = new Map(
               [...page.rows, ...value.rows].map((record) => [record.id, record]),
             );
@@ -92,7 +94,7 @@ function App() {
         setLoading(false);
       } catch (e) {
         if (ticket === generation.current) {
-          setError(e.message);
+          setError(e);
           setLoading(false);
         }
       }
@@ -116,7 +118,7 @@ function App() {
           loadTrace(value.trace.id, null, { quiet: true, preserve: true });
           return;
         }
-        generation.current++;
+        generation.current += 1;
         setData(value);
         setFocusCallId(null);
         setLoading(false);
@@ -124,10 +126,16 @@ function App() {
         return;
       }
       if (value.view === 'select') {
-        generation.current++;
+        generation.current += 1;
         setSelectionInfo({
           currentThreadId: value.currentThreadId,
-          unavailableReason: value.unavailableReason,
+          unavailableReason: value.unavailableReason
+            ? apiError({
+                error: value.unavailableReason,
+                errorCode: value.errorCode,
+                errorParams: value.errorParams,
+              })
+            : null,
         });
         setData(null);
         setFocusCallId(null);
@@ -138,6 +146,7 @@ function App() {
     [loadTrace],
   );
   useEffect(() => {
+    generation.current += 1;
     let active = true;
     const apply = (value) => {
       if (active) applyResult(value);
@@ -151,7 +160,7 @@ function App() {
       },
       onError: (e) => {
         if (active) {
-          setError(e.message);
+          setError(e);
           setLoading(false);
         }
       },
@@ -172,13 +181,13 @@ function App() {
       })
       .catch((e) => {
         if (active) {
-          setError(e.message);
+          setError(e);
           setLoading(false);
         }
       });
     return () => {
       active = false;
-      generation.current++;
+      generation.current += 1;
       bridge.dispose();
       clearTimeout(toastTimer.current);
     };
@@ -191,10 +200,10 @@ function App() {
     document.documentElement.lang = locale;
   }, [locale]);
   useEffect(() => {
-    const notice = (event) => notify(event.detail);
+    const notice = (event) => notify(errorMessage(event.detail, t));
     window.addEventListener('rollout-viewer:notice', notice);
     return () => window.removeEventListener('rollout-viewer:notice', notice);
-  }, [notify]);
+  }, [notify, t]);
   useEffect(() => {
     const cleanup = [];
     installIconSprite({ effect: (setup) => cleanup.push(setup()), on: () => {} }, undefined);
@@ -242,7 +251,7 @@ function App() {
             return { ...current, ...delta, rows: [...rows.values()].sort((a, b) => a.seq - b.seq) };
           });
       } catch (e) {
-        if (!stale()) setError(e.message);
+        if (!stale()) setError(e);
       } finally {
         busy = false;
       }
@@ -280,7 +289,7 @@ function App() {
       });
       return page.rows.length > 0;
     } catch (e) {
-      if (ticket === generation.current) setError(e.message);
+      if (ticket === generation.current) setError(e);
       return false;
     } finally {
       earlierBusy.current = false;
@@ -305,15 +314,13 @@ function App() {
           <section className="app-empty" aria-live="polite">
             <h2>
               {selectionInfo?.unavailableReason
-                ? text('暂时无法读取当前聊天轨迹', 'Unable to read this chat trajectory')
-                : text('当前聊天暂无轨迹', 'No trajectory for this chat yet')}
+                ? t('codex.unableToReadThisChatTrajectory')
+                : t('codex.noTrajectoryForThisChatYet')}
             </h2>
             <p>
-              {selectionInfo?.unavailableReason ||
-                text(
-                  '新的执行记录可用时会自动显示。',
-                  'New execution records will appear automatically when available.',
-                )}
+              {selectionInfo?.unavailableReason
+                ? errorMessage(selectionInfo.unavailableReason, t)
+                : t('codex.newExecutionRecordsWillAppearAutomaticallyWhen')}
             </p>
           </section>
         ) : (
