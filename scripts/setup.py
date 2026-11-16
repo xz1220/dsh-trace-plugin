@@ -227,7 +227,7 @@ class Installer:
         return version
 
     def installed_plugin(self, marketplace_exists=True):
-        if not marketplace_exists:
+        if not marketplace_exists or not self.codex_home.exists():
             return None
         data = self.json_command(
             [self.codex, "plugin", "list", "--marketplace", MARKETPLACE, "--json"]
@@ -247,6 +247,14 @@ class Installer:
         )
 
     def inspect_marketplace(self):
+        safe_path(self.codex_home)
+        if not self.codex_home.exists():
+            # Codex refuses metadata commands for an absent explicit CODEX_HOME.
+            # Discovery must stay read-only; setup creates this root after consent.
+            self.observed_source = None
+            return False
+        if not self.codex_home.is_dir():
+            raise SetupError(f"Expected a Codex configuration directory: {self.codex_home}")
         data = self.json_command([self.codex, "plugin", "marketplace", "list", "--json"])
         rows = data.get("marketplaces")
         if not isinstance(rows, list):
@@ -338,7 +346,10 @@ class Installer:
         ):
             commands.append([self.codex, "plugin", "add", PLUGIN, "--json"])
         agent_bytes = None if self.args.no_persist else self.desired_agent()
-        changes = list(bundle_plan["changes"])
+        changes = []
+        if not self.codex_home.exists():
+            changes.append({"action": "create-codex-config-root", "path": str(self.codex_home)})
+        changes.extend(bundle_plan["changes"])
         if not self.trace_root.exists():
             changes.append({"action": "create-recording-directory", "path": str(self.trace_root)})
         if current_env != str(self.trace_root):
@@ -494,6 +505,12 @@ class Installer:
         self.revalidate(plan)
         env_changed = False
         try:
+            configuration_root_was_missing = not self.codex_home.exists()
+            self.ensure_directory(self.codex_home)
+            if configuration_root_was_missing:
+                # Real Codex cannot inspect sources until its root exists. Now
+                # also catch project-scoped sources before registering anything.
+                self.revalidate(plan)
             self.bundled("apply", self.write_managed, self.ensure_directory)
             if plan["_marketplace_exists"]:
                 self.retain_bundle_source()

@@ -49,6 +49,12 @@ class FakeSystem:
             return subprocess.CompletedProcess(command, 0, "codex-cli 0.163.0\n", "")
         if words == ["plugin", "add", "--help"]:
             return subprocess.CompletedProcess(command, 0, "plugin add help", "")
+        if words[:1] == ["plugin"]:
+            root = (env or {}).get("CODEX_HOME")
+            if not root or not Path(root).is_dir():
+                return subprocess.CompletedProcess(
+                    command, 1, "", "Error: failed to resolve CODEX_HOME: directory does not exist"
+                )
         if words == ["plugin", "marketplace", "list", "--json"]:
             data = {"marketplaces": [self.marketplace] if self.marketplace else []}
         elif words == ["plugin", "list", "--marketplace", "rollout-local", "--json"]:
@@ -257,6 +263,54 @@ class SetupTests(unittest.TestCase):
         self.assertIsNone(self.system.environment)
         self.assertFalse(installer.state_path.exists())
 
+    def test_missing_config_root_dry_run_skips_cli_metadata_without_mkdir(self):
+        target = self.home / "new-codex-config"
+        installer, result = self.run_setup("--codex-home", str(target), "--dry-run")
+        self.assertEqual(result["status"], "dry-run")
+        self.assertIn("create-codex-config-root", [c["action"] for c in result["plan"]["changes"]])
+        self.assertFalse(target.exists())
+        self.assertEqual(list(self.home.iterdir()), [])
+        self.assertFalse(any("--json" in c for c in self.system.calls))
+        self.assertFalse(installer.state_path.exists())
+
+    def test_missing_config_root_doctor_is_read_only_without_metadata_commands(self):
+        target = self.home / "new-codex-config"
+        result = self.installer("doctor", "--codex-home", str(target)).doctor()
+        self.assertEqual(result["status"], "needs-setup")
+        self.assertFalse(result["pluginInstalled"])
+        self.assertFalse(target.exists())
+        self.assertEqual(list(self.home.iterdir()), [])
+        self.assertFalse(any("--json" in c for c in self.system.calls))
+
+    def test_fresh_apply_creates_config_root_before_strict_cli_calls(self):
+        target = self.home / "new-codex-config"
+        installer, result = self.run_setup("--codex-home", str(target))
+        self.assertEqual(result["status"], "configured")
+        self.assertTrue(target.is_dir())
+        self.assertIn("create-codex-config-root", [c["action"] for c in result["plan"]["changes"]])
+        self.assertTrue(installer.state_path.is_file())
+        self.assertTrue(any(c[1:4] == ["plugin", "marketplace", "add"] for c in self.system.calls))
+
+    def test_newly_inspectable_foreign_source_blocks_fresh_apply(self):
+        target = self.home / "new-codex-config"
+        original_run = self.system.run
+
+        def project_source(command, env=None):
+            if command[1:] == ["plugin", "marketplace", "list", "--json"]:
+                self.system.marketplace = {
+                    "name": "rollout-local",
+                    "marketplaceSource": {"sourceType": "local", "source": "/another/project"},
+                }
+            return original_run(command, env=env)
+
+        with patch.object(self.system, "run", side_effect=project_source):
+            with contextlib.redirect_stderr(io.StringIO()):
+                with self.assertRaisesRegex(setup.SetupError, "different or unknown source"):
+                    self.installer("--codex-home", str(target)).setup()
+        self.assertFalse(target.exists())
+        self.assertIsNone(self.system.plugin)
+        self.assertIsNone(self.system.environment)
+
     def test_custom_codex_home_is_passed_to_every_cli_subprocess(self):
         custom = self.home / "separate codex config"
         installer, result = self.run_setup("--codex-home", str(custom))
@@ -296,6 +350,7 @@ class SetupTests(unittest.TestCase):
         self.assertNotIn("HOME", environment)
 
     def test_foreign_marketplace_is_not_overwritten_even_with_yes(self):
+        (self.home / ".codex").mkdir()
         local = self.home / "unrelated-local-source"
         (local / ".agents/plugins").mkdir(parents=True)
         (local / ".agents/plugins/marketplace.json").write_text(
