@@ -6,3 +6,15 @@ __pycache__/
 *.pyc
 reports/screenshots/
 local-context/
+.venv/
+.ruff_cache/
+.mypy_cache/
+.coverage*
+coverage/
+htmlcov/
+dist/
+playwright-report/
+test-results/
+.env
+.env.*
+!.env.example

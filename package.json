@@ -4,10 +4,23 @@
   "version": "0.2.19",
   "scripts": {
     "build": "node scripts/build-plugin.mjs",
-    "test": "python3 -m unittest discover -s tests -v && node --test tests/test_file_drag.mjs tests/test_host.mjs tests/test_locale.mjs tests/test_preferences.mjs tests/test_trajectory_order.mjs",
+    "test": "npm run test:python && npm run test:node",
     "build:design": "node design/build.mjs",
     "build:analysis": "node design/build-analysis.mjs",
-    "build:mock": "node design/build-dsh-mock.mjs"
+    "build:mock": "node design/build-dsh-mock.mjs",
+    "test:python": "python3 -m unittest discover -s tests -v",
+    "test:node": "node --test tests/*.mjs",
+    "test:e2e": "playwright test",
+    "test:coverage": "uv run coverage run -m unittest discover -s tests && uv run coverage report && c8 --include=src/host.js --include=src/trajectory-order.js --include=src/errors.js --check-coverage --lines=80 --branches=65 --functions=80 node --test tests/*.mjs",
+    "lint": "eslint src scripts tests *.js && uv run ruff check",
+    "format": "prettier --write . && uv run ruff format",
+    "format:check": "prettier --check . && uv run ruff format --check",
+    "typecheck": "uv run mypy",
+    "check:generated": "node scripts/check-generated.mjs",
+    "package": "node scripts/package-plugin.mjs",
+    "demo": "python3 scripts/demo.py",
+    "benchmark": "python3 scripts/benchmark.py",
+    "check": "npm run lint && npm run format:check && npm run typecheck && npm test && npm run check:generated"
   },
   "dependencies": {
     "@shikijs/langs": "4.4.3",
@@ -34,6 +47,24 @@
     "simple-icons": "16.31.0"
   },
   "devDependencies": {
-    "esbuild": "0.25.5"
+    "@axe-core/playwright": "4.14.0",
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.65.1",
+    "c8": "12.0.0",
+    "esbuild": "0.25.5",
+    "eslint": "10.15.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.14.0",
+    "prettier": "3.10.1"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=20.19"
+  },
+  "overrides": {
+    "test-exclude": {
+      "glob": "^14.0.6",
+      "minimatch": "^11.0.1"
+    }
   }
 }

@@ -1,0 +1,17 @@
+node_modules/
+vendor/
+design/
+local-context/
+reports/
+coverage/
+playwright-report/
+test-results/
+dist/
+plugins/codex-dsh-trace/assets/
+plugins/codex-dsh-trace/THIRD_PARTY_NOTICES.txt
+plugins/codex-dsh-trace/server/trajectory-locales.json
+uv.lock
+src/version.js
+plugins/codex-dsh-trace/LICENSE
+plugins/codex-dsh-trace/.codex-plugin/plugin.json
+licenses/OFL-1.1.txt

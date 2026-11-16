@@ -2,10 +2,12 @@
 
 import argparse
 import json
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-REVIEW = ROOT / "local-context/review"
+REVIEW = None
+SCHEMA = 1
 
 
 class Capture:
@@ -14,12 +16,14 @@ class Capture:
         self.root = REVIEW / "recordings" / name
         self.root.mkdir(parents=True, exist_ok=True)
         (self.root / "payloads").mkdir(exist_ok=True)
+        self.schema = SCHEMA
         self.seq = 0
         self.raw = 0
         self.clock = 1700000000000
         self.thread = "review-root"
         self.turn = "turn-1"
         if resume:
+            self.schema = json.loads((self.root / "manifest.json").read_text())["schema_version"]
             lines = (self.root / "trace.jsonl").read_text().splitlines()
             last = json.loads(lines[-1])
             self.seq = last["seq"]
@@ -31,7 +35,7 @@ class Capture:
             (self.root / "manifest.json").write_text(
                 json.dumps(
                     {
-                        "schema_version": 1,
+                        "schema_version": self.schema,
                         "trace_id": name,
                         "rollout_id": name,
                         "root_thread_id": self.thread,
@@ -61,7 +65,7 @@ class Capture:
         self.seq += 1
         self.clock += 100
         value = {
-            "schema_version": 1,
+            "schema_version": self.schema,
             "seq": self.seq,
             "wall_time_unix_ms": self.clock,
             "rollout_id": self.name,
@@ -521,7 +525,7 @@ def build():
     multi.turn = "turn-1"
     multi.end()
     config = {
-        "roots": [str(REVIEW / "recordings"), str(ROOT / "local-context/recordings")],
+        "roots": [str(REVIEW / "recordings")],
         "labels": {
             name: f"受控测试：{label}"
             for name, label in [
@@ -572,8 +576,27 @@ def advance():
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--output",
+        type=Path,
+        help="Isolated output directory (defaults to a new temporary directory).",
+    )
+    parser.add_argument("--schema", type=int, choices=[1, 2])
     parser.add_argument("--advance-live", action="store_true")
     parser.add_argument("--reset-live", action="store_true")
     args = parser.parse_args()
+    if (args.advance_live or args.reset_live) and not args.output:
+        parser.error("--advance-live and --reset-live require --output")
+    REVIEW = (
+        args.output.resolve()
+        if args.output
+        else Path(tempfile.mkdtemp(prefix="codex-trace-fixtures-"))
+    )
+    existing = REVIEW / "recordings/review-live/manifest.json"
+    SCHEMA = args.schema or (
+        json.loads(existing.read_text())["schema_version"]
+        if (args.advance_live or args.reset_live) and existing.is_file()
+        else 1
+    )
     advance() if args.advance_live else build_live() if args.reset_live else build()
