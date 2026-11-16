@@ -1,0 +1,6 @@
+{
+  "name": "antigravity-dsh-trace",
+  "displayName": "DSH Trace",
+  "description": "Inspect the current Antigravity conversation's execution trace in the side pane.",
+  "version": "0.2.18"
+}

@@ -1,0 +1,13 @@
+{
+  "command": "node",
+  "args": ["main.mjs"],
+  "restart_policy": "always",
+  "display_name": "DSH Trace",
+  "description": "Messages, tool calls and execution timing for the conversation this pane belongs to.",
+  "has_web_ui": true,
+  "agent_permissions": {"allows_user_interactions": false},
+  "ui_config": {
+    "display_name": "DSH Trace",
+    "views": [{"path": "/", "entrypoint": "SIDECAR_UI_ENTRYPOINT_AUX_PANE", "title": "DSH Trace"}]
+  }
+}
