@@ -1,5 +1,12 @@
 # 从这里继续：Codex Rollout Viewer
 
+## 2026-11-16：子 Agent 审查与临时文件清理
+
+- 子 Agent 独立审查后删除 `local-context/npm-cache/`：422 个可再生成缓存文件，42,410,450 字节；该目录已由 `local-context/` 忽略规则覆盖。
+- 删除无引用的遗留组件 `src/ui.jsx`（8,306 字节）：生产和三个设计构建都不导入它，其旧 `rv-*` 样式已不在生产 CSS 中。下方源码位置表已更新。
+- 保留真实录制、截图、验收日志、归档、仍有文档/构建引用的设计原型、DSH 源缓存和 `node_modules`。仓库自身没有待清理的 Python 字节码缓存。
+- 81 项检查（63 Python +18 Node）、构建和 DSH 完整性检查通过。生产 `viewer.html` 的 SHA-256 仍为 `fd036746524638956e63ca3b9091190afb99cb1ce4fdefb6f8cbe2e7834d41a7`，版本保持0.2.16。验证使用临时 npm 缓存并关闭 Python 字节码写入，未在仓库重新产生缓存。
+
 ## 最新：0.2.16 直接显示轨迹，整行导航/设置已删除
 
 用户进一步澄清：DSH没有高级设置，连「轨迹 / ···」整行都没有必要。此要求覆盖此前0.2.15的折叠菜单方案，后续不要再把录制管理塞回侧栏。当前分支仍为 `codex/design-prototype`，无远端，本轮起始干净。
@@ -225,7 +232,7 @@ CUA 先前明确禁止直接控制 Codex 主窗口，不能用系统脚本/CDP �
 | 资料 | 路径 |
 |---|---|
 | 插件源码、声明与可安装产物 | `plugins/rollout-viewer/`、`.agents/plugins/marketplace.json` |
-| React 界面、宿主桥接、布局 | `src/viewer.jsx`、`src/host.js`、`src/ui.jsx`、`src/viewer.css` |
+| React 界面、宿主桥接、布局 | `src/viewer.jsx`、`src/Trajectory.jsx`、`src/content.jsx`、`src/host.js`、`src/viewer.css` |
 | 构建、录制、性能和安装验证脚本 | `scripts/` |
 | 数据层测试 | `tests/test_store.py` |
 | 产品与设计约定 | `PRODUCT.md`、`DESIGN.md` |
