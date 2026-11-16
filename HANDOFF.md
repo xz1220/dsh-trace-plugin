@@ -5,7 +5,9 @@
 本分支为 `codex/antigravity-plugin`，持续接收本地 `main` / `origin/main` 的变更，
 暂不合回主分支。先读 [AGENTS.md](AGENTS.md) 和
 [Antigravity 适配记录](docs/ANTIGRAVITY.md)。主分支以下历史实现与验收结论继续有效；
-Antigravity 自定义面板尚未实现或原生验收，不能将 Codex 验收记录视作其通过。
+Antigravity 适配已实现，147 项自动检查和受控浏览器验证通过；原生面板已显示真实
+轨迹且获用户确认。最终版本重载后的原生复验仍待用户提醒，期间暂停窗口操作。
+不设置定时任务，不把本地测试或旧实例显示当作最终原生通过。
 
 ## 最新：0.2.18 项目改名与私有远端
 

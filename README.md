@@ -63,6 +63,12 @@ local preview is not evidence of an updated native panel.
 
 ## Run and install
 
+Antigravity 的独立适配位于
+[plugins/antigravity-dsh-trace](plugins/antigravity-dsh-trace/README.md)。
+使用 `npm run build:antigravity` 和 `python3 scripts/install-antigravity.py`
+安装到原生 Extensions 面板。该适配读取当前 Antigravity 会话的原生步骤，
+开发及验收状态见 [docs/ANTIGRAVITY.md](docs/ANTIGRAVITY.md)。
+
 ```sh
 git clone https://github.com/xz1220/codex-dsh-trace.git
 cd codex-dsh-trace

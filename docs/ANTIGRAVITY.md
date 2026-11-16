@@ -1,65 +1,61 @@
 # Antigravity 插件适配
 
-本分支负责把现有 Trace Viewer 接入 Antigravity 的右侧 Extensions 面板。
-开发分支为 `codex/antigravity-plugin`；持续接收 `main` 的变更，暂不合回主分支。
+独立开发分支为 `codex/antigravity-plugin`，worktree 为
+`~/.codex/worktrees/antigravity-plugin/codex-rollout-viewer`。主分支变更只单向
+合入此分支，暂不合回 `main`，不创建合并 PR。不设置定时任务，由用户提醒同步或
+发布新任务。
 
-## 主分支同步
+## 已完成的实现
 
-主仓库与适配 worktree 各自保留工作目录。开始工作前先检查当前分支、未提交
-修改和进行中的 Git 操作，再 fetch `origin`。同时比较本地 `main` 和
-`origin/main`，只把尚未包含的提交合入适配分支。
+`plugins/antigravity-dsh-trace/` 提供原生 Extensions → DSH Trace 面板。
+Sidecar 使用 Antigravity 自带 SDK，外层页面托管共享 viewer，Python 子进程
+提供独立的原生步骤读取接口。DSH 核心源码及 CSS 保持既有校验状态。
 
-有未提交工作或其他任务正在修改此 worktree 时，不覆盖、不自动暂存他人的
-修改。同步后的验证按变更范围执行；出现需要取舍的冲突时保留两边成果并记录
-问题。所有推送明确指定 `codex/antigravity-plugin`，不推送 `main`，不强推。
+- 每个面板精确绑定自己的 Antigravity conversation ID；跨会话 thread/trace
+  参数会被拒绝。
+- 原生 reader 优先读取 `transcript_full.jsonl`；只有 compact transcript 时
+  明确标记来源。没有记录时等待，记录出现后自动加载。
+- 支持用户/助手消息、已记录的 thinking、工具参数与结果、错误和取消、搜索、
+  历史分页、实时追加、延迟结果更新、Unicode 分块及重写后的重新同步。
+- 界面区分原生步骤与模型原始请求。未记录的完整模型输入、工具声明、操作耗时
+  及 TTFT 明确显示不可用，不从相邻步骤时间差推算。
+- 主题桥接支持明确明暗提示及 CSS 颜色转换，覆盖 RGB、OKLCH/OKLAB、display-p3；
+  语言使用可用的宿主通知，无通知时使用浏览器语言。
+- 提供构建和可恢复安装/卸载脚本；旧安装移到独立备份目录，安装文件按 SHA-256
+  核对。运行中的插件更新后需关闭再开启，不能把文件安装成功等同于原生已重载。
 
-Codex 当前聊天已启用「跟进 Antigravity 适配分支」，每 4 小时检查主分支更新、
-同步适配分支及验证兼容性。没有新的主分支提交时不产生空提交；适配进度与
-验收结果在本文中继续记录。
+安装与开发命令见 [插件说明](../plugins/antigravity-dsh-trace/README.md)。
 
-## 本机已确认的接入机制
+## 验收证据
 
-检查对象：Antigravity 2.32.1；Antigravity IDE 的 VS Code 扩展是独立机制。
+2026-11-16 的自动检查：120 项 Python + 27 项 Node，共 **147 项通过**。
+`npm run build:antigravity` 通过；DSH 99 个原样文件及 5 个既有适配校验一致。
 
-- 自定义 UI sidecar 可放在 `~/.gemini/config/sidecars/<id>/`，也可随插件放在
-  `~/.gemini/config/plugins/<plugin>/sidecars/<id>/`。
-- `sidecar.json` 声明启动命令、`has_web_ui: true` 以及
-  `ui_config.views[].entrypoint: SIDECAR_UI_ENTRYPOINT_AUX_PANE`。
-- 内置 Swarm 用 `SidecarApp` 注册 HTML、JS、CSS 和数据 API，由 `app.run()`
-  启动；界面通过宿主注入的 `window.sidecar` 访问接口和宿主操作。
-- 另有 MCP Apps 接入方式：在工具 `_meta` 中声明 `ui.resourceUri` 和
-  `com.google.antigravity/ui.entrypoints`，其中 `aux_pane` 对应右侧面板。
+受控浏览器检查使用完全合成的数据，实际点击验证了工具输入/结果、原生步骤
+JSON、复制、搜索、折叠、未记录上下文说明；验证了实时追加保留选中详情、
+两个面板隔离、空会话转为有记录，以及 302 条记录的早期历史加载。
+1224/745/520/360px 下无页面横向溢出，工具栏从 y=0 开始，360px 详情抽屉可用。
+明暗主题和中英文通知通过；OKLCH 浅色误判已修复并补了回归。
 
-证据来自本机 `~/.gemini/antigravity/builtin/` 中的
-`skills/ui-plugin-navigation/SKILL.md`、`skills/mcp-app-development/SKILL.md`
-以及 `plugins/swarm/sidecars/swarm_board/`。以上确认了文档和内置示例的接入
-机制，尚未注册本项目的自定义面板，也未完成原生验收。
+原生 Antigravity 2.32.1 已自动发现并启动插件；通过桌面 Extensions 菜单打开
+面板，看到真实会话的用户输入与助手回复。用户也明确确认“已打开，能看到轨迹”。
+真实日志只读检查通过，未把正文、token 或真实会话文件提交到 Git。
 
-## 第一阶段：面板接入
+**最新版原生复验仍待继续。** 运行中的服务 cwd 指向更新前的备份目录，首次
+原生观察也仍出现旧标签；安装文件的校验不能证明当前面板加载了最终代码。
+用户正在使用 Antigravity，并明确表示“我稍后提醒你”。后续应等用户提醒，再
+关闭/开启 DSH Trace 插件，验证最终版本及主题、详情和实时更新。不得自行重启
+桌面或继续操作窗口。
 
-优先在独立目录编写 Antigravity 适配器，复用
-`plugins/codex-dsh-trace/assets/viewer.html` 和现有 Python MCP 后端，避免复制
-DSH 源码或改变 Codex 插件的默认运行行为。
+受控浏览器空间 56 已 finish 一次、keep=[]；临时验证服务端口 49594 已停止。
+不要再操作该空间，也不要停止 Antigravity 的原生服务。测试浏览器提示有更新，
+本次沿用现有版本，未升级。
 
-先验证 Sidecar SDK 的可用入口、启动约定和主题/语言桥接，再完成插件 manifest、
-服务入口及安装/卸载说明。若用 wrapper iframe 托管原 viewer，需验证来源窗口、
-JSON-RPC 请求/响应、错误和关闭生命周期；MCP 后端只经显式绑定读取数据。
+## 后续工作和同步规则
 
-现有 viewer 的 `open_rollout_viewer` 依赖 Codex 的 `thread_id` / `threadId`。
-Antigravity 的 conversation ID 不能用于这一匹配。第一阶段若展示既有 Codex
-官方录制，必须显式选择或配置对应 trace/thread，不自动打开“最新录制”。
+开始工作先检查分支、工作区修改和进行中的 Git 操作，再 fetch origin，比较
+本地 main 与 origin/main 的新提交，仅正常合并到适配分支。保留已发布历史，
+不覆盖用户工作，不强推，只推送 `origin/codex/antigravity-plugin`。
 
-## 第二阶段：Antigravity 原生数据
-
-单独调查 Antigravity 可用的轨迹数据与读取接口，确认请求上下文、消息、工具
-调用及耗时的来源和完整性，再设计数据适配层。现有 Codex 官方 rollout-trace
-解析器不构成对 Antigravity 原生轨迹格式的支持。
-
-## 验证与进度
-
-- 2026-11-16：从 `origin/main` 的 `9d9d892` 创建独立 worktree 和分支，完成
-  接入机制调查及开发约束。实现与原生验收待继续。
-- 基线验证通过：依赖已用 `npm ci` 初始化；`npm test` 的 104 项 Python 与
-  18 项 Node 检查全部通过；`npm run build` 通过，DSH 99 个原样文件与 5 个
-  既有适配校验一致。npm 默认缓存存在权限问题，本次使用独立临时缓存，未更改
-  系统缓存所有权。后续按实际适配增加协议和绑定验证，原生面板验收另行记录。
+本轮开发期间主分支新增了 `8f0848e` 和 `d8f7c18`，涉及 Codex Trace 品牌及
+0.2.19 版本；适配分支正在接入并验证这些变更。最终构建和原生复验状态应分别记录。
