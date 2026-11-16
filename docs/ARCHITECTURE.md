@@ -56,9 +56,9 @@ The display name is **Codex Trace**. The repository is `dsh-trace-plugin`; the p
 - the legacy `ui://rollout-viewer/viewer.html` resource alias.
 
 These are internal development identifiers, not a public compatibility contract.
-The project has not had its first public release and has no migration users.
-Before that release, simplify or rename these identifiers directly when needed;
-do not build migration paths for internal development installations.
+The GitHub source is now public, but no npm version has been formally distributed
+and there are no existing release users. Do not build migration paths for internal
+development installations; establish the release contract with the first npm version.
 
 ## Verification scope
 

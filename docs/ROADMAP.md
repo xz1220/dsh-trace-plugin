@@ -1,9 +1,9 @@
 # Roadmap
 
-The project has not had its first public release and has no migration users.
-Pre-public development should favor a clean current implementation over migration
-paths or backward compatibility with internal development versions. Define the
-public compatibility policy when the first public release actually happens.
+The GitHub repository became public on 2026-11-16. The npm package has not been
+published and there are no existing release users to migrate. Do not add migration
+paths for internal development versions; define the ongoing compatibility policy
+with the first formally distributed npm version.
 
 This is a direction for future work, not a release schedule. Small reproducible issues and focused contributions are welcome.
 
