@@ -26,7 +26,7 @@ class TraceError(ValueError):
 class TraceFormatError(TraceError):
     def __init__(self, trace_id, thread_id, version):
         label=str(version) if type(version) is int else '未知'
-        super().__init__(f'录制格式版本 {label} 暂不支持，请更新 Rollout Viewer。')
+        super().__init__(f'录制格式版本 {label} 暂不支持，请更新 Codex DSH Trace。')
         self.info={'traceId':trace_id,'threadId':thread_id,'schemaVersion':version if type(version) is int else None,'message':str(self)}
 
 

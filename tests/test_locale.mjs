@@ -30,6 +30,6 @@ test('all eight host locales resolve core controls and request evidence tabs',()
   assert.equal(translatorFor('unsupported').locale,'en');
 });
 test('backend search group templates match the displayed pinned dictionaries',async()=>{
-  const labels=JSON.parse(await readFile(new URL('../plugins/rollout-viewer/server/trajectory-locales.json',import.meta.url),'utf8'));
+  const labels=JSON.parse(await readFile(new URL('../plugins/codex-dsh-trace/server/trajectory-locales.json',import.meta.url),'utf8'));
   for(const locale of supportedLocales)assert.deepEqual(labels[locale],{step:dictionaries[locale]['group.step'],compaction:dictionaries[locale]['group.compaction']});
 });

@@ -95,7 +95,7 @@ try:
     current_uri=entry['_meta']['ui']['resourceUri']
     current_resource=rpc('resources/read',{'uri':current_uri})['contents'][0]
     assert version in current_uri and current_resource['text']==resource['text']
-    source=Path(__file__).resolve().parents[1]/'plugins/rollout-viewer'
+    source=Path(__file__).resolve().parents[1]/'plugins/codex-dsh-trace'
     files=['server/main.py','server/store.py','server/thread_index.py','server/projection.py','server/trajectory-locales.json','assets/viewer.html','.mcp.json','.codex-plugin/plugin.json','README.md']
     same=all(hashlib.sha256((source/f).read_bytes()).digest()==hashlib.sha256((root/f).read_bytes()).digest() for f in files)
     assert same,'Installed files differ from the current source'

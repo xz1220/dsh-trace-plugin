@@ -1,4 +1,11 @@
-# 从这里继续：Codex Rollout Viewer
+# 从这里继续：Codex DSH Trace
+
+## 最新：0.2.18 项目改名与私有远端
+
+- 用户选定名称 **Codex DSH Trace**，仓库/插件发行标识为`codex-dsh-trace`。GitHub私有仓库已创建并核实可见性：`https://github.com/xz1220/codex-dsh-trace`，origin为对应HTTPS Git地址；远端主分支约定为`main`，原`codex/design-prototype`开发分支保留在本地。
+- 插件目录已迁为`plugins/codex-dsh-trace/`，package、manifest、marketplace入口、界面/资源标题和文档同步改名，版本0.2.18。保留MCP server key `rollout-viewer`、15个工具API名、资源URI namespace、用户配置与偏好键，避免旧数据或调用失联。历史报告/旧缓存路径不改写，本地工作区目录仍是原路径。
+- 122项检查、构建/DSH完整性校验及新目录stdio/RPC验证通过，真实完整上下文仍为81,919字符及原SHA。该RPC检查运行的是源码插件目录，并非本机新ID的已安装缓存；本轮没有迁移/卸载旧插件，不能声称已完成新名称的原生验收。
+- 子Agent审查29个提交/423个历史blob及改名后差异，没有发现凭证或真实会话正文进入Git。录制、截图、实验和依赖均被忽略；生产打包HTML、许可证、验收摘要和现有历史保留。没有重写历史或公开发布。
 
 ## 最新：0.2.17 修复子工具声明、fork历史重放，补齐compact事实
 
@@ -247,7 +254,7 @@ CUA 先前明确禁止直接控制 Codex 主窗口，不能用系统脚本/CDP �
 
 | 资料 | 路径 |
 |---|---|
-| 插件源码、声明与可安装产物 | `plugins/rollout-viewer/`、`.agents/plugins/marketplace.json` |
+| 插件源码、声明与可安装产物 | `plugins/codex-dsh-trace/`、`.agents/plugins/marketplace.json` |
 | React 界面、宿主桥接、布局 | `src/viewer.jsx`、`src/Trajectory.jsx`、`src/content.jsx`、`src/host.js`、`src/viewer.css` |
 | 构建、录制、性能和安装验证脚本 | `scripts/` |
 | 数据层测试 | `tests/test_store.py` |

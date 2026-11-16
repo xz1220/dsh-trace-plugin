@@ -1,5 +1,12 @@
 # Design system
 
+## Product identity, 2026-11-16
+
+Version 0.2.18 is named Codex DSH Trace; its repository and plugin distribution
+slug is codex-dsh-trace. Product titles use the new name. Existing MCP identifiers,
+recording configuration and preference keys stay compatible. Historical design
+artifacts retain their original names and evidence.
+
 ## Recorded provenance across subtools and compaction, 2026-11-16
 
 Version 0.2.17 renders a nested tool's recorded TypeScript declaration when no

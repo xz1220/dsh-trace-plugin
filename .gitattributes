@@ -1,2 +1,2 @@
 # Bundled dependencies contain meaningful whitespace inside JavaScript strings.
-plugins/rollout-viewer/assets/viewer.html -whitespace linguist-generated=true
+plugins/codex-dsh-trace/assets/viewer.html -whitespace linguist-generated=true

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local MCP Apps server and authenticated loopback preview for Rollout Viewer."""
+"""Local MCP Apps server and authenticated loopback preview for Codex DSH Trace."""
 from __future__ import annotations
 
 import argparse
@@ -19,7 +19,7 @@ from urllib.parse import urlparse
 from store import Store, TraceError, identifier
 
 PLUGIN = Path(__file__).resolve().parents[1]
-VERSION = '0.2.17'
+VERSION = '0.2.18'
 URI = f'ui://rollout-viewer/viewer-{VERSION}.html'
 LEGACY_URI = 'ui://rollout-viewer/viewer.html'
 STORE = Store()
@@ -48,7 +48,7 @@ CELL = {**ROW, 'cellKey': STRING}
 TOOLS = [
     definition('list_rollout_traces', 'List official rollout recordings', {'refresh': {'type': 'boolean'}}),
     definition('show_rollout_trace', 'Show an official rollout trace', {**TRACE, 'threadId': STRING, 'callId': STRING}, ui=True),
-    definition('open_rollout_viewer', 'Rollout Viewer', app=True, ui=True, entry=True),
+    definition('open_rollout_viewer', 'Codex DSH Trace', app=True, ui=True, entry=True),
     definition('get_rollout_binding', 'Resolve the current chat recording without reading message bodies', {'threadId':STRING}, ['threadId'], app=True),
     definition('get_rollout_overview', 'Read paged execution records', {**TRACE, 'beforeSeq': {'type': 'integer'}, 'limit': {'type': 'integer', 'minimum': 1, 'maximum': 500}}, ['traceId'], app=True),
     definition('get_rollout_delta', 'Read new execution events', {**TRACE, 'revision': STRING}, ['traceId', 'revision'], app=True),
@@ -146,7 +146,7 @@ def call(name, args, metadata=None):
 
 def envelope(name, data):
     result = {'structuredContent': data, 'content': [{'type': 'text', 'text':
-              'Rollout Viewer is ready.' if data.get('view') else 'Local recording data loaded.'}]}
+              'Codex DSH Trace is ready.' if data.get('view') else 'Local recording data loaded.'}]}
     if name in ('show_rollout_trace', 'open_rollout_viewer'):
         result['_meta'] = {'ui': {'resourceUri': URI}}
     return result
@@ -169,7 +169,7 @@ def handle(method, params):
             text = str(exc) if isinstance(exc, TraceError) else '无法读取本地录制文件。'
             return {'isError': True, 'content': [{'type': 'text', 'text': text}], 'structuredContent': {'error': text}}
     if method == 'resources/list':
-        return {'resources': [{'uri': URI, 'name': 'Rollout Viewer', 'mimeType': 'text/html;profile=mcp-app'}]}
+        return {'resources': [{'uri': URI, 'name': 'Codex DSH Trace', 'mimeType': 'text/html;profile=mcp-app'}]}
     if method in ('resources/templates/list','prompts/list'):
         return {'resourceTemplates' if method.startswith('resources') else 'prompts': []}
     if method == 'resources/read' and params.get('uri') in (URI,LEGACY_URI):
@@ -244,7 +244,7 @@ def preview_server(port, trace_id=None):
                 meta=STORE.catalog.find(trace_id=trace_id) if trace_id else None
                 bound=json.dumps(meta['threadId'] if meta else None).replace('<','\\u003c')
                 cold='true' if urlparse(self.path).query=='cold=1' else 'false'
-                html = '''<!doctype html><html><head><meta charset="utf-8"><title>MCP Apps handshake validation</title></head><body style="margin:0"><iframe title="Rollout Viewer native bridge" src="/native-frame" style="border:0;width:100vw;height:100vh"></iframe><script>
+                html = '''<!doctype html><html><head><meta charset="utf-8"><title>MCP Apps handshake validation</title></head><body style="margin:0"><iframe title="Codex DSH Trace native bridge" src="/native-frame" style="border:0;width:100vw;height:100vh"></iframe><script>
 const frame=document.querySelector('iframe');window.bridgeCalls=[];
 async function invoke(name,args){const response=await fetch('/api',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,arguments:args,_meta:{threadId:BOUND_THREAD}})});const result=await response.json();return response.ok?result:{isError:true,content:[{type:'text',text:result.error||'Local preview request failed'}],structuredContent:{error:result.error||'Local preview request failed'}};}
 addEventListener('message',async event=>{if(event.source!==frame.contentWindow||event.data?.jsonrpc!=='2.0')return;const m=event.data;const send=value=>frame.contentWindow.postMessage({jsonrpc:'2.0',...value},location.origin);

@@ -124,7 +124,7 @@ function App(){
       return page.rows.length>0;
     }catch(e){if(ticket===generation.current)setError(e.message);return false;}finally{earlierBusy.current=false;}
   },[data,call]);
-  return <LocaleContext.Provider value={t}><main className={`${view.root} app-frame`} aria-label="Rollout Viewer">
+  return <LocaleContext.Provider value={t}><main className={`${view.root} app-frame`} aria-label="Codex DSH Trace">
     {error&&<Failure error={error} retry={()=>data?loadTrace(data.trace.id,null,{quiet:true,preserve:true}):location.reload()}/>}
     {loading?<Skeleton/>:!data?<section className="app-empty" aria-live="polite">
       <h2>{selectionInfo?.unavailableReason?text('暂时无法读取当前聊天轨迹','Unable to read this chat trajectory'):text('当前聊天暂无轨迹','No trajectory for this chat yet')}</h2>
