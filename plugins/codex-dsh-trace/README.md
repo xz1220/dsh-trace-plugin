@@ -1,4 +1,4 @@
-# Codex DSH Trace
+# Codex Trace
 
 Plugin ID: `codex-dsh-trace@rollout-local`.
 
@@ -6,7 +6,7 @@ A local Codex sidebar app for official `rollout-trace` recordings. The interface
 uses DSH's theme and trajectory styles, with a paged execution ledger, timing
 overview, reconstructed request context, and tool inspectors.
 
-Version 0.2.18 uses the upstream DSH runtime: turn/step grouping, request boundaries,
+Version 0.2.19 uses the upstream DSH runtime: turn/step grouping, request boundaries,
 three levels of folding, full-content search, interactive timing overview,
 virtualized rows, a resizable inspector, Markdown/code/JSON views, prompt/tool
 diffs, and the original image gallery. Complete Codex context and original request
@@ -44,6 +44,10 @@ The 0.2.18 name change preserves the `rollout-viewer` MCP namespace, tool API
 names, existing recording configuration and saved display preferences. The new
 plugin ID is distinct from earlier cached installations.
 
+Version 0.2.19 displays **Codex Trace** with an execution-path composer icon and
+light/dark plugin logos. Its plugin ID remains `codex-dsh-trace`. This branding
+update has not been installed or verified in the native Codex panel yet.
+
 Subtool Schema inspection prefers the recorded JSON declaration. For code-mode
 subtools whose declaration exists only inside the parent request's recorded
 `functions.exec` description, it displays that original TypeScript section.
@@ -58,7 +62,7 @@ opaque encrypted items are identified without inventing missing historical text.
 ## Open
 
 In a Codex conversation's right panel, choose **+ → More tools… → Plugins and
-MCPs → Codex DSH Trace**. The native entry joins only official recordings whose
+MCPs → Codex Trace**. The native entry joins only official recordings whose
 root thread ID matches the caller. If none exist, it shows a brief
 empty state. It never substitutes the latest task or asks the user to pick a
 recording in the sidebar.

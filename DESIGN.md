@@ -1,5 +1,25 @@
 # Design system
 
+## Panel identity, 2026-11-16
+
+The panel title is **Codex Trace**. The shorter label fits the native Codex tab;
+DSH remains the source of the trajectory interface, not part of the panel title.
+The repository and plugin distribution slug remain `codex-dsh-trace`.
+
+The icon is one continuous, rounded execution path connecting three nodes.
+Its terminal node uses mint to mark the current point in the sequence. It has
+no lettering or fine detail. The primary mark uses a graphite tile (#181C1B),
+white path (#F4F7F6), and mint endpoint (#64DFC2). The dark-surface logo uses a
+light tile (#F0F5F3), dark path (#18231F), and teal endpoint (#087C65).
+
+Editable SVG and transparent PNG exports live in the plugin's `assets/` folder.
+`icon.png` is 64 px; both logo variants are 256 px. Regenerate all exports with
+`node scripts/build-brand-assets.mjs`; it has no additional dependencies.
+The 64-unit grid uses a 4.5-unit path and generous margins for 16–32 px display.
+Use the mark alongside the native title; keep the trajectory surface free of an
+additional branded header. `design/brand-preview.png` is a design preview,
+not evidence of an updated native Codex panel.
+
 ## Product identity, 2026-11-16
 
 Version 0.2.18 is named Codex DSH Trace; its repository and plugin distribution

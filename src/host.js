@@ -35,7 +35,7 @@ export function createHost({onResult,onContext,onError}) {
     connecting=Promise.resolve().then(async()=>{
       window.addEventListener('message',receive);window.addEventListener('openai:set_globals',globals);
       if(window.openai?.toolOutput)deliver({structuredContent:window.openai.toolOutput});
-      return request('ui/initialize',{protocolVersion:'2026-01-26',appInfo:{name:'Codex DSH Trace',version:'0.2.18'},appCapabilities:{}});
+      return request('ui/initialize',{protocolVersion:'2026-01-26',appInfo:{name:'Codex Trace',version:'0.2.19'},appCapabilities:{}});
     }).then(async result=>{
       if(result.protocolVersion!=='2026-01-26')throw new Error('宿主版本不支持此面板。');
       ready=true;onContext(result.hostContext||{});post({method:'ui/notifications/initialized'});

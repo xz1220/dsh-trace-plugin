@@ -1,4 +1,12 @@
-# 从这里继续：Codex DSH Trace
+# 从这里继续：Codex Trace
+
+## 最新：0.2.19 图标与展示名称
+
+- 产品展示名改为 **Codex Trace**；manifest、原生入口工具标题、资源名称、MCP Apps 握手、HTML 标题和无障碍标签同步。插件配置接入执行路径图标与浅色/深色 logo。
+- package、manifest、后台和前端版本同步为 **0.2.19**。仓库与插件发行 ID `codex-dsh-trace`、marketplace ID `rollout-local`、MCP namespace、工具 API、资源 URI namespace、录制配置与偏好键保持兼容。
+- 已提供可编辑 SVG、64px 图标、256px 浅色/深色 logo，以及 `design/brand-preview.png` 标签栏设计预览。无额外依赖的 `scripts/build-brand-assets.mjs` 随 `npm run build` 自动再生成图标资源。
+- 构建和 DSH 完整性校验（99 原样文件 + 5 既有适配）、104 Python + 18 Node = **122 项现有检查**通过。源码 stdio/RPC 核对入口/资源名称、0.2.19 版本与 HTML 标题；PNG 尺寸/RGBA/透明边缘、SVG 结构与 PNG CRC 均通过。独立审查确认生成 HTML 仅改名称和版本，归一化后与原文件逐字节相同。
+- 本轮未安装插件、未重启 Codex，尚未验证原生面板的新名称或图标。预览已目视核对浅色/深色及 16/20/24/32px，不作为原生面板验收证据。
 
 ## 最新：0.2.18 项目改名与私有远端
 
