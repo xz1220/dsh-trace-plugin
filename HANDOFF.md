@@ -1,5 +1,21 @@
 # 从这里继续：Codex Rollout Viewer
 
+## 最新：0.2.17 修复子工具声明、fork历史重放，补齐compact事实
+
+用户报告两个截图问题：exec_command子工具Schema不可用；当前聊天第24轮后出现第1-17轮user-only历史，并询问compact处理。已用真实官方录制定位、修复、构建并通过官方接口安装0.2.17。分支仍为`codex/design-prototype`，无远端。
+
+- **Schema**：真实录制的exec_command没有独立JSON Schema，其完整TS声明在当时`functions.exec.description`中。结构化声明优先；对子工具仅提取同一父请求中唯一、完整、精确匹配的录制TS段。缺失/截断/歧义/不同namespace继续不可用，不使用当前工具定义，不扩充正式工具目录。真实schema1/schema2的exec_command均恢复1804字符声明。
+- **24→1根因**：三个子Agent首次请求继承主聊天快照，旧逻辑只按同thread前序请求去重，首次fork没有前序，于是把继承的1-17轮重新画入账本。现按已记录agent_path严格祖先关系、过去最近祖先请求及其已完成响应去重，保留子任务、新ID同文消息与实际输出；不借同级/无关聊天/未来内容。同毫秒还检查同源事件先后，跨源同毫秒保守保留。fork缓存含祖先依赖，晚补旧源/迟到关系元数据可重建。
+- **轮次**：用户输入有turn_id时，必须与该请求当前turn相符才开启轮次；只有缺少turn_id才按最后用户消息回退，防止继承末条用户被误当新输入。
+- **为什么user-only**：它是压缩后的继承快照，用户原文仍在，旧助手进入不透明compaction项。大部分旧助手在更早官方录制仍有可读原文，应保留在原账本；最早少数轮次在首份可用录制前已压缩，现有密文无法还原。不能笼统说1-17原本没有助手，也不能补造正文。
+- **compact**：精确关联compaction_installed到同thread/id唯一已成功请求，记录applied/installedAt与私有checkpoint引用，保留原模型请求耗时。详情才读checkpoint，展示前后项数/消息角色计数及加密事实；有可读摘要才展示，4096字符预览显式标截断。普通请求上下文仍是原始replacement快照，账本不因压缩清空，也不把继承replacement当新聊天。概要显示事实，原始输出tab/sourceBlocks与raw request/response接口继续保留原文。
+- **真实数据复验**：截图对应root的三个fork输入26U/19A、27U/23A、28U/25A，去重后输入账本均0U/0A、实际模型输出各保留1。两次compact均已应用：1133→16、1137→27项，耗时109299/147635ms不变，均无可读压缩摘要。
+- **122项检查通过（104 Python+18 Node）**。新增Schema10、fork15、compact16项回归。构建/99原样+5既有适配通过，DSH核心CSS未改。安装根`/Users/danielxing/.codex/plugins/cache/rollout-local/rollout-viewer/0.2.17`，9关键文件一致、15工具及新旧资源URI通过；旧归档完整上下文81,919字符及原SHA不变。
+- 已安装0.2.17的本地协议页面实点：子工具Schema显示cmd/workdir；主消息与旧回复各一次、子任务/回复保留；compact概览显示已应用与4→3项、旧助手仍在；原始输出保留不透明值；完整上下文解释压缩快照，原始请求切换原文后可读；360px深色Schema无内部页面横向溢出。一次脚本等待失败是折叠JSON未展开，已实际切原文验证，未改产品迎合断言。
+- **当前模型MCP连接仍报告0.2.16**，0.2.17安装和配置重读成功不代表现有原生连接已更新；新版原生点击尚未验收。本轮未调CUA，不重复此前旧界面诊断completion_summary。用户截图已有直接工具栏，勿再用0.2.16之前的旧导航36px描述当前截图。
+- Ego空间**44已finish一次**、keep=[]，不得复用。仅一个鉴权loopback服务，PTY94215已停止；未改用户浏览器状态或升级Ego。当前workspace-write权限下，安装/启动本机浏览器与loopback服务经自动审查批准；没有审批拒绝，也没有停止桌面/daemon。
+- 报告`reports/schema-history-0217-validation.json`。私有夹具/检查脚本/真实数据计数在`local-context/review/schema-history-0217/`；截图`reports/screenshots/schema-history-0217-{schema,compaction,dark-360}.png`均为本地受控数据、非原生Codex截图。原生新版仍待新连接加载，不标整体目标complete。
+
 ## 2026-11-16：子 Agent 审查与临时文件清理
 
 - 子 Agent 独立审查后删除 `local-context/npm-cache/`：422 个可再生成缓存文件，42,410,450 字节；该目录已由 `local-context/` 忽略规则覆盖。

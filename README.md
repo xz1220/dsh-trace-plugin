@@ -6,7 +6,7 @@ Native Codex sidebar plugin for official rollout-trace, using the approved
 DSH-style interface. It shows complete recorded client context, original
 incremental requests, tool input/output and caller relationships, and timing.
 
-The current implementation is **0.2.16**. It opens directly into the original DSH
+The current implementation is **0.2.17**. It opens directly into the original DSH
 toolbar and timeline, with the current chat and live updates selected automatically.
 There is no extra trajectory header, ellipsis menu or settings panel. Theme and
 language follow Codex. Recording maintenance stays outside the chat viewing surface.
@@ -36,13 +36,18 @@ their own group and source; they are not presented as the current inference's
 response or assigned its token usage and timing. The regression evidence is in
 `reports/history-assistant-0212-validation.json`.
 
-**81 automated checks pass.** Installed 0.2.16 clicks cover direct cold startup,
+**122 automated checks pass.** Installed 0.2.16 clicks cover direct cold startup,
 duration/turn controls, search, details, automatic live appends, host theme/locale,
 empty-to-live transitions and transient-error recovery. At 1224/745/520/360px,
 the toolbar starts at y=0 with no horizontal overflow. Earlier installed builds
 also cover 301-record call navigation, copying and image export. See
-`reports/direct-view-0216-validation.json`. Native acceptance remains pending a
-reload of the existing app, whose old navigation still places the toolbar at y=36.
+`reports/direct-view-0216-validation.json`.
+
+Version 0.2.17 restores recorded code-mode subtool declarations, deduplicates fork
+history against confirmed ancestors, and explains applied compaction snapshots
+without changing original request/response data. Installed local clicks and real
+recording checks are in `reports/schema-history-0217-validation.json`. The current
+model connection still reports 0.2.16; native acceptance of 0.2.17 is pending reload.
 [The current acceptance ledger](docs/DSH_PARITY.md) and
 `reports/dsh-alignment-028.json` record the earlier interaction evidence. The native
 panel has been observed live, and after the user's restart the connected backend
@@ -93,9 +98,9 @@ Use `launchctl unsetenv CODEX_ROLLOUT_TRACE_ROOT` and restart Codex to turn it o
 - Current DSH integration checks and backend timings are in
   `reports/dsh-installed-validation.json` and `reports/dsh-performance.json`.
   Browser evidence and remaining UI gates are in `reports/dsh-parity-validation.json`.
-- Native mounting and schema-2 reading have been observed. The existing native
-  page still shows the old navigation; 0.2.16 requires a fresh app load for native
-  acceptance. Installed preview checks do not substitute for that host result.
+- Native mounting and schema-2 reading have been observed. Installed preview
+  checks do not substitute for native acceptance of the current release; the
+  existing model connection still reports 0.2.16.
 
 The optional local preview uses the installed MCP App frontend and backend,
 with a private loopback cookie. It is not a mock data implementation.

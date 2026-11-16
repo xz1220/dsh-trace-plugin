@@ -361,12 +361,23 @@ class BundleIndex:
             self.row(key, event, type='compaction', kind='context', name='上下文压缩',
                      threadId=payload.get('thread_id', thread),turnId=payload.get('codex_turn_id'),
                      model=payload.get('model'),provider=payload.get('provider_name'),
-                     _request=payload.get('request_payload'), _response=None)
+                     _request=payload.get('request_payload'), _response=None,
+                     _compactionId=payload.get('compaction_id'))
         elif kind in ('compaction_request_completed', 'compaction_request_failed'):
             key = 'compaction:' + payload.get('compaction_request_id', '')
             if key in self.rows:
                 self.row(key, event, end=now, status='error' if kind.endswith('failed') else 'complete',
                          _response=payload.get('response_payload'), _error=payload.get('error'))
+        elif kind == 'compaction_installed':
+            compaction_id=payload.get('compaction_id')
+            checkpoint=payload.get('checkpoint_payload')
+            if isinstance(compaction_id,str) and compaction_id and isinstance(checkpoint,dict):
+                candidates=[row for row in self.rows.values()
+                            if row.get('type')=='compaction' and row.get('status')=='complete'
+                            and row.get('_compactionId')==compaction_id and row.get('threadId')==thread]
+                if len(candidates)==1 and not candidates[0].get('compactionApplied'):
+                    self.row(candidates[0]['id'],event,compactionApplied=True,
+                             installedAt=now,_checkpoint=checkpoint)
 
     def public_row(self, row):
         data = {k: v for k, v in row.items() if not k.startswith('_')}
@@ -562,6 +573,45 @@ def unpack(value, code=False):
     return value
 
 
+def compaction_info(index, row):
+    """Lazy, bounded facts about recorded context replacement, never decryption."""
+    def counts(items):
+        if not isinstance(items,list):return None
+        roles={};encrypted=0
+        for item in items:
+            if not isinstance(item,dict):continue
+            role=item.get('role')
+            if item.get('type') in ('message','input_message') and isinstance(role,str):
+                roles[role]=roles.get(role,0)+1
+            if isinstance(item.get('encrypted_content'),str) and item['encrypted_content']:
+                encrypted+=1
+        return {'items':len(items),'roles':roles,'encryptedItems':encrypted}
+
+    def text_parts(value):
+        if isinstance(value,str):return [value] if value else []
+        if isinstance(value,list):return [part for item in value for part in text_parts(item)]
+        if isinstance(value,dict) and isinstance(value.get('text'),str):return [value['text']]
+        return []
+
+    checkpoint=index.payload(row.get('_checkpoint')) if row.get('_checkpoint') else None
+    before=checkpoint.get('input_history') if isinstance(checkpoint,dict) else None
+    after=checkpoint.get('replacement_history') if isinstance(checkpoint,dict) else None
+    if not isinstance(before,list):
+        request=index.payload(row.get('_request'))
+        before=request.get('input') if isinstance(request,dict) else None
+    response=index.payload(row.get('_response'))
+    output=response.get('output_items') if isinstance(response,dict) else None
+    parts=[]
+    for item in output if isinstance(output,list) else []:
+        if isinstance(item,dict) and item.get('type')=='compaction':
+            for field in ('summary','text','content'):parts.extend(text_parts(item.get(field)))
+    summary='\n\n'.join(dict.fromkeys(parts))
+    return {'applied':row.get('compactionApplied') is True,'installedAt':row.get('installedAt'),
+            'before':counts(before),'after':counts(after),'output':counts(output),
+            'readableSummary':summary[:4096],'readableSummaryChars':len(summary),
+            'readableSummaryTruncated':len(summary)>4096}
+
+
 class Store:
     def __init__(self, config_file=None):
         self.catalog = Catalog(config_file)
@@ -707,6 +757,9 @@ class Store:
                             childIds=[r['id'] for r in index.rows.values() if r.get('parentId') == row_id],
                             nextRequestId=self.next_request(index, row))
                 data['sections'] = ['code' if row['type'] == 'code' else 'arguments', 'result', 'raw_result', 'runtime']
+            elif row.get('type') == 'compaction':
+                data['compaction']=compaction_info(index,row)
+                data['sections']=['raw_request','response']
             else:
                 data['sections'] = ['raw_request', 'response']
             return data

@@ -1,5 +1,23 @@
 # Design system
 
+## Recorded provenance across subtools and compaction, 2026-11-16
+
+Version 0.2.17 renders a nested tool's recorded TypeScript declaration when no
+structured schema exists. Read it only from the same parent request's effective
+functions.exec description; retain JSON-schema priority and reject missing,
+truncated, namespace-mismatched or ambiguous matches. Do not add runtime tools to
+the model's tool catalog or substitute today's definitions for historical ones.
+
+A fork's inherited request context is not a new conversation segment. Deduplicate
+it against a confirmed recorded ancestor at the fork boundary while preserving
+new child work and raw request input. Current-turn metadata controls turn opening.
+Keep inherited context and actual event chronology separate.
+
+Compaction details show whether a replacement was applied, before/after item and
+role counts, and opaque encryption explicitly. Keep earlier recorded readable
+messages in the ledger. Original request/response and raw-output views retain
+their actual data. Do not invent historical assistant text from an opaque item.
+
 ## Direct trajectory view, 2026-11-15
 
 Version 0.2.16 supersedes the menu-based designs below. The user wants the

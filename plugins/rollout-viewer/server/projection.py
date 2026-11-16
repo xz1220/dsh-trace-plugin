@@ -4,11 +4,12 @@ from __future__ import annotations
 import hashlib
 import base64
 import json
+import re
 from collections import OrderedDict
 from itertools import islice
 from pathlib import Path
 
-from store import TraceError, item_text, preview, unpack
+from store import TraceError, item_text, preview, unpack, compaction_info
 
 GROUP_LABELS=json.loads(Path(__file__).with_name('trajectory-locales.json').read_text(encoding='utf-8'))
 
@@ -71,6 +72,24 @@ def catalog_tools(value):
             tools.append({**tool, 'name': tool.get('name', entry.get('type', 'unknown')),
                           'parameters': tool.get('parameters', tool.get('input_schema', tool.get('format', {})))})
     return tools
+
+
+def recorded_tool_declaration(tools, name):
+    """Read one complete runtime declaration from this request's recorded docs."""
+    if not isinstance(name,str) or not re.fullmatch(r'[A-Za-z_$][\w$]*',name):
+        return ''
+    matches=set()
+    signature=re.compile(r'\A\s*declare\s+const\s+tools\s*:\s*\{\s*'+re.escape(name)+r'\s*\(')
+    for tool in tools:
+        if tool.get('name')!='functions.exec' or not isinstance(tool.get('description'),str):
+            continue
+        for section in re.finditer(r'^### `([^`\r\n]+)`[^\S\r\n]*\r?\n(.*?)(?=^### |\Z)',tool['description'],re.M|re.S):
+            if section[1]!=name:
+                continue
+            blocks=list(re.finditer(r'^```(?:ts|typescript)[^\S\r\n]*\r?\n(.*?)^```[^\S\r\n]*\r?$',section[2],re.M|re.S))
+            if len(blocks)==1 and signature.match(blocks[0][1]) and blocks[0][1].rstrip().endswith('};'):
+                matches.add(section[0].strip())
+    return next(iter(matches)) if len(matches)==1 else ''
 
 
 def source_blocks(item, owner, label, metadata_only=False):
@@ -177,6 +196,7 @@ class Projection:
         self.request_numbers = {}
         self.request_steps = {}
         self.previous_requests = {}
+        self.inherited_requests = {}
         self.turn_numbers = {}
         self.locations = {}
         self.history_turn_key = None
@@ -209,8 +229,10 @@ class Projection:
             self.turn_numbers = {key:number+1 for number,key in enumerate(turn_ids)}
             self.request_steps = {}
             self.previous_requests = {}
+            self.inherited_requests = {}
             self.locations = {}
             counters, previous = {}, {}
+            root_path = self.index.threads.get(self.index.meta.get('threadId'))
             for row in self.request_rows:
                 if row.get('type') != 'request':
                     continue
@@ -218,6 +240,18 @@ class Projection:
                 counters[key] = counters.get(key,0)+1
                 self.request_steps[row['id']] = counters[key]
                 self.previous_requests[row['id']] = previous.get(row['threadId'])
+                if row['threadId'] not in previous and isinstance(root_path,str) and root_path.startswith('/'):
+                    path = self.index.threads.get(row['threadId'])
+                    if isinstance(path,str) and path.startswith(root_path.rstrip('/')+'/'):
+                        ancestors = []
+                        for thread, candidate in previous.items():
+                            ancestor_path = self.index.threads.get(thread)
+                            if (isinstance(ancestor_path,str) and ancestor_path.startswith('/')
+                                    and path.startswith(ancestor_path.rstrip('/')+'/')
+                                    and candidate['start'] <= row['start']):
+                                ancestors.append((len(ancestor_path),candidate['seq'],candidate))
+                        if ancestors:
+                            self.inherited_requests[row['id']] = max(ancestors,key=lambda item:item[:2])[2]
                 previous[row['threadId']] = row
             self.structure_stamp = stamp
         return self.request_rows
@@ -300,7 +334,9 @@ class Projection:
 
     def cells(self, row):
         self.requests()
-        key = (row['id'], row.get('_updated'))
+        ancestor = self.inherited_requests.get(row['id'])
+        dependency = (ancestor['id'],ancestor.get('_updated')) if ancestor else None
+        key = (row['id'], row.get('_updated'), dependency)
         if key in self.cache:
             self.cache.move_to_end(key)
             return self.cache[key]
@@ -316,12 +352,20 @@ class Projection:
             inputs = raw.get('input', [])
             response = self.index.payload(row.get('_response')) or {}
             previous = self.previous_requests.get(row['id'])
+            replay_previous = previous or self.inherited_requests.get(row['id'])
             # A full request can replay an earlier prefix. Retain only newly introduced items.
             skip = 0
             known = []
-            if not raw.get('previous_response_id') and previous:
-                before = self.index.context(previous['id'])
-                output = self.index.payload(previous.get('_response')) or {}
+            if not raw.get('previous_response_id') and replay_previous:
+                before = self.index.context(replay_previous['id'])
+                # A fork may start while an ancestor is still producing its response.
+                completed = replay_previous.get('end')
+                if replay_previous.get('sourceTraceId') == row.get('sourceTraceId'):
+                    completed_before = (completed is not None and completed <= row['start']
+                        and replay_previous.get('_sourceVersion',replay_previous['_updated']) < row.get('sourceEventSeq',row['seq']))
+                else:
+                    completed_before = completed is not None and completed < row['start']
+                output = (self.index.payload(replay_previous.get('_response')) or {}) if completed_before else {}
                 known = [entry['value'] for entry in before['items']] + output.get('output_items', [])
                 while skip < min(len(inputs), len(known)) and inputs[skip] == known[skip]:
                     skip += 1
@@ -351,7 +395,7 @@ class Projection:
                 if not isinstance(metadata,dict):metadata={}
                 input_turn_id=metadata.get('turn_id')
                 input_turn=self.turn_numbers.get(input_turn_id,turn) if isinstance(input_turn_id,str) else turn
-                current_user=not context and not assistant and (bool(metadata.get('turn_id')) and metadata['turn_id']==row.get('turnId') or position==last_user)
+                current_user=not context and not assistant and (input_turn_id==row.get('turnId') if input_turn_id else position==last_user)
                 historical=assistant or not context and not current_user
                 blocks = source_blocks(item, row['id'], f'input-{position}',metadata_only=True)
                 attachments = [block for block in blocks if 'attachment' in block or 'file' in block]
@@ -390,7 +434,8 @@ class Projection:
                                                'completedTime': row.get('end'), 'usageProvided': bool(facts), 'outputTokens': facts.get('output')},
                           **{target: facts[source] for source, target in [('input','input'),('cacheRead','cacheRead'),('cacheWrite','cacheWrite'),('output','output'),('reasoning','think')] if source in facts}})
         elif row.get('type') == 'compaction':
-            cells.append({**base, 'cellKey': 'compaction', 'kind': 'compacted', 'text': '上下文压缩', 'outputDetail': ' '})
+            cells.append({**base, 'cellKey': 'compaction', 'kind': 'compacted', 'text': '上下文压缩',
+                          'compactionApplied':row.get('compactionApplied') is True, 'outputDetail': ' '})
         else:
             raw = self.index.payload(row.get('_input')) or {}
             program = row.get('type') == 'code'
@@ -494,7 +539,9 @@ class Projection:
             data.update(outputDetail='\n\n'.join(b['content'] for b in blocks if b['type'] == 'text'),
                         sourceBlocks=blocks, thinkingDetail='\n\n'.join(thinking))
         elif cell_key == 'compaction':
-            data['outputDetail'] = json_text(self.index.payload(row.get('_response')))
+            raw=json_text(self.index.payload(row.get('_response')))
+            data.update(outputDetail=raw,sourceBlocks=[{'type':'text','content':raw}],
+                        compactionInfo=compaction_info(self.index,row))
         else:
             if row.get('type') == 'code':
                 data.update(inputDetail=row.get('_code', ''), programSource=row.get('_code', ''))
@@ -513,6 +560,7 @@ class Projection:
             if request.get('type') == 'request':
                 catalog = self.prompt(request)['tools']
                 schema = next((tool for tool in catalog if tool.get('name') == data.get('qualifiedToolName')), None)
+                candidates=[]
                 if schema is None:
                     candidates = [tool for tool in catalog if (tool.get('name') == data.get('toolName')
                                   or data.get('qualifiedToolName') == data.get('toolName')
@@ -520,6 +568,11 @@ class Projection:
                     if len(candidates)==1:
                         schema=candidates[0]
                 data['schemaDetail'] = json_text(schema) if schema else ''
+                if schema is None and not candidates and row.get('kind')=='subtool':
+                    declaration=recorded_tool_declaration(catalog,data.get('qualifiedToolName'))
+                    if declaration:
+                        data['schemaDetail']=declaration
+                        data['schemaSource']={'kind':'recorded_tool_description','containerTool':'functions.exec','requestRowId':request['id']}
             if row.get('type') == 'code':
                 # Code cells are captured by the official JavaScript runtime event.
                 data['programLanguage'] = 'javascript'

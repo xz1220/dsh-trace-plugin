@@ -4,7 +4,7 @@ A local Codex sidebar app for official `rollout-trace` recordings. The interface
 uses DSH's theme and trajectory styles, with a paged execution ledger, timing
 overview, reconstructed request context, and tool inspectors.
 
-Version 0.2.16 uses the upstream DSH runtime: turn/step grouping, request boundaries,
+Version 0.2.17 uses the upstream DSH runtime: turn/step grouping, request boundaries,
 three levels of folding, full-content search, interactive timing overview,
 virtualized rows, a resizable inspector, Markdown/code/JSON views, prompt/tool
 diffs, and the original image gallery. Complete Codex context and original request
@@ -37,6 +37,17 @@ available through the backend; the sidebar has no archive-management controls.
 
 The versioned resource URI and an HTML metadata tag identify the frontend build
 without adding visible version information to the viewer.
+
+Subtool Schema inspection prefers the recorded JSON declaration. For code-mode
+subtools whose declaration exists only inside the parent request's recorded
+`functions.exec` description, it displays that original TypeScript section.
+Missing, truncated, namespace-mismatched or ambiguous declarations remain
+unavailable. Runtime subtool declarations do not inflate the model tool catalog.
+
+Forked agents keep their own new work visible without replaying the ancestor
+conversation into the ledger. Inherited snapshots remain intact in raw request
+inspection. Applied compactions show recorded before/after item and role counts;
+opaque encrypted items are identified without inventing missing historical text.
 
 ## Open
 

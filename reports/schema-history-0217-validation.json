@@ -1,0 +1,81 @@
+{
+  "version": "0.2.17",
+  "date": "2026-11-16",
+  "fixes": {
+    "recordedSubtoolTypescriptSchemaFallback": true,
+    "structuredSchemaPriority": true,
+    "noCurrentToolDefinitionSubstitution": true,
+    "modelToolCatalogUnchanged": true,
+    "forkInheritanceNotRedrawnAsConversation": true,
+    "ancestorAndEventTimeBoundaryEnforced": true,
+    "distinctNewMessagesAndChildOutputRetained": true,
+    "compactionInstallationCorrelated": true,
+    "rawDataAndMeasuredDurationPreserved": true,
+    "opaqueHistoryNotDecryptedOrInvented": true
+  },
+  "automatedChecks": {
+    "python": 104,
+    "node": 18,
+    "passed": 122,
+    "failed": 0,
+    "newSchemaCases": 10,
+    "newForkCases": 15,
+    "newCompactionCases": 16,
+    "build": true,
+    "upstreamUnchanged": 99,
+    "documentedAdapters": 5,
+    "coreDshCssChanged": false
+  },
+  "actualRecordings": {
+    "schema1And2RecordedExecCommandDeclarationsRecovered": true,
+    "declarationCharacters": 1804,
+    "forkSnapshots": [
+      {"recordedUserInputs": 26, "recordedAssistantInputs": 19, "inheritedUsersRedrawn": 0, "inheritedAssistantsRedrawn": 0, "ownResponsePreserved": true},
+      {"recordedUserInputs": 27, "recordedAssistantInputs": 23, "inheritedUsersRedrawn": 0, "inheritedAssistantsRedrawn": 0, "ownResponsePreserved": true},
+      {"recordedUserInputs": 28, "recordedAssistantInputs": 25, "inheritedUsersRedrawn": 0, "inheritedAssistantsRedrawn": 0, "ownResponsePreserved": true}
+    ],
+    "compactions": [
+      {"applied": true, "beforeItems": 1133, "afterItems": 16, "durationMs": 109299, "readableSummaryCharacters": 0},
+      {"applied": true, "beforeItems": 1137, "afterItems": 27, "durationMs": 147635, "readableSummaryCharacters": 0}
+    ],
+    "historyLimit": "Older recordings retain many readable assistant messages. Some earliest history was already opaque in the first available recording and cannot be recovered from ciphertext."
+  },
+  "installedPackage": {
+    "officialInstallAndMcpReloadAcknowledged": true,
+    "criticalFilesCompared": 9,
+    "filesMatchSource": true,
+    "tools": 15,
+    "versionedResourceAndLegacyAlias": true,
+    "fullContextCharacters": 81919,
+    "fullContextSha256": "6f4c7f2bfb58f43a7e2f00f39acc2f6999b62f9d2980164ff3d2fc14154bd043"
+  },
+  "installedLocalClicks": {
+    "frontendBuild": "0.2.17",
+    "schemaShowsRecordedCmdAndWorkdir": true,
+    "mainUsersEachAppearOnce": true,
+    "mainRepliesAndChildTaskOutputRetained": true,
+    "compactionOverviewShowsAppliedAndFourToThreeItems": true,
+    "overviewDoesNotDumpCiphertext": true,
+    "rawOutputRetainsOriginalOpaqueValue": true,
+    "compactionRequestContextExplained": true,
+    "originalRequestReadableInRawMode": true,
+    "childRawInputStillContainsItsCompactedSnapshot": true,
+    "darkNarrowSchemaCssPx": 360,
+    "narrowInternalDocumentHorizontalOverflow": false
+  },
+  "scopeAndCleanup": {
+    "nativeReleaseVerified": false,
+    "currentModelReader": "0.2.16",
+    "egoSpace": 44,
+    "finishCalls": 1,
+    "keptPages": [],
+    "ownedLoopbackServerStopped": true,
+    "guiClickRetryReason": "The original request JSON was collapsed; switching to raw text made the expected original body visible."
+  },
+  "screenshots": {
+    "schema": "reports/screenshots/schema-history-0217-schema.png",
+    "compaction": "reports/screenshots/schema-history-0217-compaction.png",
+    "dark360": "reports/screenshots/schema-history-0217-dark-360.png",
+    "nativeCodexScreenshots": false
+  }
+}

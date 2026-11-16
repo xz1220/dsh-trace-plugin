@@ -5,7 +5,7 @@ import {TrajectoryToolbar} from '../vendor/dsh/packages/client/ui-trajectory/src
 import {trajectoryTimelineFocusIndexes} from '../vendor/dsh/packages/client/ui-trajectory/src/client/timeline.ts';
 import {useTranslation} from './locale-context.jsx';
 import {renderImageSlot as renderSlot,loadImage} from './images.jsx';
-import {Failure, Skeleton, RequestContent, readComplete} from './content.jsx';
+import {Failure, Skeleton, RequestContent, readComplete, compactionText} from './content.jsx';
 import view from '../vendor/dsh/packages/client/ui-trajectory/src/client/views.module.css';
 import {durationPreference,wrappingPreference} from './preferences.js';
 import {trajectoryTurns} from './trajectory-order.js';
@@ -19,7 +19,7 @@ export default function Trajectory({data,call,earlier,copy,thread,focusCallId,on
   const groupOf=cell=>cell.inputHistory?t.text('历史消息（请求输入）','History in request'):cell.cellKey==='compaction'||cell.purpose==='compaction'?t('group.compaction',{seq:cell.seq}):cell.step>0?t('group.step',{step:cell.step}):cell.group;
   const captionOf=cell=>{
     if(cell.kind==='system'&&cell.cellKey==='prompt')return t.text(cell.text,cell.previousPromptDetail?'Instructions and tools updated':'Instructions and tool catalog');
-    if(cell.kind==='compacted')return t.text(cell.text,'Context compaction');
+    if(cell.kind==='compacted')return cell.compactionApplied?t.text('上下文压缩已应用','Context compaction applied'):t.text(cell.text,'Context compaction');
     if(cell.kind==='message'&&cell.text==='（仅工具调用）')return `（${t('layout.toolCallOnly')}）`;
     if(['user','context','message'].includes(cell.kind)&&/^(图片|文件) ×/.test(cell.text)){
       const images=cell.sourceBlocks?.filter(block=>block.attachment).length??0,files=cell.sourceBlocks?.filter(block=>block.file).length??0;
@@ -68,7 +68,7 @@ export default function Trajectory({data,call,earlier,copy,thread,focusCallId,on
   },[api,data.rows,retry]);
 
   const visibleCells=useMemo(()=>[...cells.values()].filter(cell=>thread==='all'||cell.threadId===thread)
-    .sort((a,b)=>a.seq-b.seq||a.slot-b.slot).map((cell,index)=>({...cell,index:index+1,group:groupOf(cell),text:captionOf(cell)})),[cells,thread,t]);
+    .sort((a,b)=>a.seq-b.seq||a.slot-b.slot).map((cell,index)=>({...cell,...(cell.compactionInfo?{outputDetail:compactionText(cell.compactionInfo,t)}:{}),index:index+1,group:groupOf(cell),text:captionOf(cell)})),[cells,thread,t]);
   const turns=useMemo(()=>trajectoryTurns(visibleCells),[visibleCells]);
   const requestNumbers=useMemo(()=>{const visible=new Set(visibleCells.map(cell=>cell.rowId));return [...requests.values()].filter(request=>visible.has(request.rowId)).sort((a,b)=>a.seq-b.seq).map(request=>({...request,group:groupOf(request)}));},[requests,visibleCells,t]);
 

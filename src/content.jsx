@@ -12,6 +12,19 @@ export function Skeleton() {
   const t=useTranslation();
   return <div className="app-skeleton" role="status" aria-label={t.text('正在读取内容','Loading content')}><i/><i/><i/></div>;
 }
+
+export function compactionText(info,t) {
+  const text=t.text,lines=[info?.applied?text('压缩结果已应用到后续请求。','The compacted context was applied to subsequent requests.'):text('已记录压缩请求；是否应用到后续请求尚未记录。','The compaction request was recorded; application to subsequent requests is not recorded.')];
+  const roles={user:text('用户','user'),assistant:text('助手','assistant'),developer:text('开发者','developer'),system:text('系统','system')};
+  for(const [field,label] of [['before',text('压缩前','Before compaction')],['after',text('压缩后','After compaction')]]) {
+    const value=info?.[field];
+    if(value)lines.push(`${label}：${value.items} ${text('项','items')}${Object.keys(value.roles||{}).length?` (${Object.entries(value.roles).map(([role,count])=>`${roles[role]||role} ${count}`).join(' · ')})`:''}`);
+  }
+  lines.push(text('时间线保留已录下的可读消息；后续请求使用压缩后的上下文。','The timeline keeps recorded readable messages; subsequent requests use the compacted context.'));
+  if(info?.after?.encryptedItems||info?.output?.encryptedItems)lines.push(text('压缩内容含不透明加密项，无法从中还原未保留的助手原文。','The compacted context contains opaque encrypted items; missing assistant text cannot be recovered from them.'));
+  if(info?.readableSummary)lines.push(`${text('录制的可读摘要','Recorded readable summary')}：\n\n${info.readableSummary}${info.readableSummaryTruncated?`\n\n${text('摘要预览已截断，完整内容见原始响应。','Summary preview truncated; see the raw response for the complete content.')}`:''}`);
+  return lines.join('\n\n');
+}
 export async function readComplete(api, name, arguments_, isCurrent=()=>true) {
   let text='', offset=0;
   while(offset!==null) {
@@ -84,6 +97,7 @@ function PromptContext({request,detail,api,copy}) {
     <div className="app-context-note" data-incomplete={!context.complete||undefined}>
       <strong>{!context.complete?text('前序录制缺失，以下是已知上下文','Earlier recording missing; showing known context'):context.incremental?text('已沿响应链恢复完整上下文','Complete context restored along the response chain'):text('客户端实际请求输入','Recorded client request input')}</strong>
       <span>{context.incremental?text('继承输入、前序模型输出和本次增量分别标记。','Inherited input, previous output and current increment are labelled.'):text('按录制保留原始角色和输入顺序。','Original roles and input order are preserved.')}</span>
+      {messages.some(message=>message.type==='compaction')&&<span>{text('此请求使用压缩后的上下文快照；它不是完整的对话回放。历史正文仅在录制保留了原文时可查看。','This request uses a compacted context snapshot. Historical message text is available only where it was preserved in the recording.')}</span>}
     </div>
     <div className="app-prompt-controls"><div role="group" aria-label={text('上下文范围','Context scope')}>
       <button type="button" className="app-button" aria-pressed={mode==='full'} onClick={()=>setMode('full')}>{context.complete?t('codex.prompt'):text('已知上下文','Known context')} {messages.length}</button>
@@ -118,6 +132,6 @@ export function RequestContent({traceId,request,tab,call,copy}) {
   },[api,request.rowId,tab,retry]);
   if(tab==='codex-request'||tab==='codex-response')return <TextContent rowId={request.rowId} section={tab==='codex-request'?'raw_request':'response'} api={api} copy={copy} label={`${t(tab==='codex-request'?'codex.request':'codex.response')} JSON`}/>;
   if(tab!=='codex-prompt')return null;
-  if(request.purpose==='compaction')return <TextContent rowId={request.rowId} section="raw_request" api={api} copy={copy} label={t.text('压缩请求 JSON','Compaction request JSON')}/>;
+  if(request.purpose==='compaction')return error?<Failure error={error} retry={()=>setRetry(v=>v+1)}/>:detail?<section className="app-context-note" aria-label={t.text('上下文压缩','Context compaction')}><MarkdownText text={compactionText(detail.compaction,t)}/></section>:<Skeleton/>;
   return error?<Failure error={error} retry={()=>setRetry(v=>v+1)}/>:detail?<PromptContext key={request.rowId} {...{request,detail,api,copy}}/>:<Skeleton/>;
 }
