@@ -1,13 +1,30 @@
-# 从这里继续：Codex DSH Trace
+# 从这里继续：Codex Trace
 
 ## 当前 worktree：Antigravity 插件适配
 
 本分支为 `codex/antigravity-plugin`，持续接收本地 `main` / `origin/main` 的变更，
 暂不合回主分支。先读 [AGENTS.md](AGENTS.md) 和
 [Antigravity 适配记录](docs/ANTIGRAVITY.md)。主分支以下历史实现与验收结论继续有效；
-Antigravity 适配已实现，147 项自动检查和受控浏览器验证通过；原生面板已显示真实
-轨迹且获用户确认。最终版本重载后的原生复验仍待用户提醒，期间暂停窗口操作。
+Antigravity 适配已实现，148 项自动检查和受控浏览器验证通过；原生面板已显示真实
+轨迹且获用户确认。已合入主分支至 d8f7c18，源码/构建候选为 0.2.19；原生当前仍为 0.2.18。
+0.2.19 安装、重载后的原生复验待用户提醒，期间暂停窗口操作。
 不设置定时任务，不把本地测试或旧实例显示当作最终原生通过。
+
+## 当前：0.2.19 已安装，等待重新打开原生面板
+
+- 用户明确要求更新安装并让当前面板显示新名称/图标。已通过官方 CLI 安装 `codex-dsh-trace@rollout-local` **0.2.19**，缓存目录 `/Users/danielxing/.codex/plugins/cache/rollout-local/codex-dsh-trace/0.2.19`。
+- 官方桌面 app-server 的 `plugin/list` 已返回新名称 **Codex Trace**、版本 0.2.19、installed/enabled=true，以及三个正确的图标路径。七个安装文件与源码 SHA-256 一致，安装包 stdio/RPC 的入口标题、资源 URI 与 HTML 标题通过。
+- 新旧插件 ID 不同。已通过官方 `config/value/write` 将 `rollout-viewer@rollout-local.enabled` 设为 false，新 ID 保持 enabled=true；旧缓存及录制数据未删除。`config/mcpServer/reload` 已确认。
+- **原生新标签未验收**：旧面板停止后，MCP Apps tab 列表为空；本轮模型工具连接仍返回旧名称，不能用它打开新 ID。Computer Use 明确拒绝控制 `com.openai.codex` 主窗口，未绕过限制、未重启桌面或后台。已请用户关闭旧标签，从右侧 `+ → 更多工具 → Plugins and MCPs → Codex Trace` 重新打开，等待用户操作后再核对。
+- 安装证据在 `reports/branding-install-0219-validation.json`；详细本地回执在 `local-context/review/branding-install-0219/`。后续先用 CUA `listTabs` 找新 tab，不复用已失效的旧 tab1。用户重新打开之前，不得声称新图标与标题已显示。
+
+## 最新：0.2.19 图标与展示名称
+
+- 产品展示名改为 **Codex Trace**；manifest、原生入口工具标题、资源名称、MCP Apps 握手、HTML 标题和无障碍标签同步。插件配置接入执行路径图标与浅色/深色 logo。
+- package、manifest、后台和前端版本同步为 **0.2.19**。仓库与插件发行 ID `codex-dsh-trace`、marketplace ID `rollout-local`、MCP namespace、工具 API、资源 URI namespace、录制配置与偏好键保持兼容。
+- 已提供可编辑 SVG、64px 图标、256px 浅色/深色 logo，以及 `design/brand-preview.png` 标签栏设计预览。无额外依赖的 `scripts/build-brand-assets.mjs` 随 `npm run build` 自动再生成图标资源。
+- 构建和 DSH 完整性校验（99 原样文件 + 5 既有适配）、104 Python + 18 Node = **122 项现有检查**通过。源码 stdio/RPC 核对入口/资源名称、0.2.19 版本与 HTML 标题；PNG 尺寸/RGBA/透明边缘、SVG 结构与 PNG CRC 均通过。独立审查确认生成 HTML 仅改名称和版本，归一化后与原文件逐字节相同。
+- 本轮未安装插件、未重启 Codex，尚未验证原生面板的新名称或图标。预览已目视核对浅色/深色及 16/20/24/32px，不作为原生面板验收证据。
 
 ## 最新：0.2.18 项目改名与私有远端
 

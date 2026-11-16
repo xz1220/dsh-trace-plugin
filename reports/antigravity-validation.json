@@ -1,0 +1,154 @@
+{
+  "recordedAt": "2026-11-16T07:31:32.298194+00:00",
+  "branch": "codex/antigravity-plugin",
+  "adapterSourceVersion": "0.2.19",
+  "status": "implementation-tested-awaiting-user-reminder-for-final-native-install-and-verification",
+  "mainSync": {
+    "incomingCommits": [
+      "8f0848e",
+      "d8f7c18"
+    ],
+    "direction": "main into adaptation only",
+    "mergedIntoMain": false
+  },
+  "automation": {
+    "enabled": false,
+    "userPreference": "User will remind synchronization and publish tasks."
+  },
+  "automated": {
+    "python": 120,
+    "node": 28,
+    "total": 148,
+    "command": "npm test",
+    "passed": true
+  },
+  "build": {
+    "command": "npm run build:antigravity",
+    "passed": true,
+    "dshUnchangedFiles": 99,
+    "existingDshAdapters": 5,
+    "nativeAssetSha256": "ddc04abf9055c0285e1d5f129ff59c43bd735b768b94eb6c4170a2f2214a7841"
+  },
+  "controlledBrowser": {
+    "testedVersion": "0.2.18",
+    "data": "synthetic only",
+    "passed": true,
+    "checks": [
+      "native messages and thinking",
+      "tool arguments and raw/rendered results",
+      "native step JSON and copy callback",
+      "missing model context and request notices",
+      "full-text search",
+      "turn collapse and expansion",
+      "unknown duration mode",
+      "live append preserving selected tool details",
+      "two-pane conversation isolation",
+      "empty to live transition",
+      "302-record history pagination",
+      "light/dark host notifications",
+      "Chinese/English locale notifications",
+      "OKLCH and display-p3 background conversion",
+      "360px detail drawer"
+    ],
+    "responsive": [
+      {
+        "width": 1224,
+        "outerOverflow": false,
+        "innerOverflow": false,
+        "toolbarTop": 0,
+        "colorScheme": "dark",
+        "errors": 0
+      },
+      {
+        "width": 745,
+        "outerOverflow": false,
+        "innerOverflow": false,
+        "toolbarTop": 0,
+        "colorScheme": "dark",
+        "errors": 0
+      },
+      {
+        "width": 520,
+        "outerOverflow": false,
+        "innerOverflow": false,
+        "toolbarTop": 0,
+        "colorScheme": "dark",
+        "errors": 0
+      },
+      {
+        "width": 360,
+        "outerOverflow": false,
+        "innerOverflow": false,
+        "toolbarTop": 0,
+        "colorScheme": "dark",
+        "errors": 0
+      }
+    ],
+    "spaceId": 56,
+    "spaceFinishedExactlyOnce": true,
+    "keptPages": [],
+    "validationServicePort": 49594,
+    "validationServiceStopped": true,
+    "screenshots": [
+      "reports/screenshots/antigravity-synthetic-dark-360.png",
+      "reports/screenshots/antigravity-synthetic-detail-360.png",
+      "reports/screenshots/antigravity-synthetic-light-1224.png"
+    ],
+    "limitations": [
+      "Copy test captured the browser clipboard callback; it did not validate desktop clipboard permissions.",
+      "Controlled browser checks are not final native desktop acceptance."
+    ]
+  },
+  "native": {
+    "appVersion": "2.32.1",
+    "installedAdapterVersion": "0.2.18",
+    "entrypointObserved": "Extensions > DSH Trace",
+    "initialMountObserved": true,
+    "realConversationRows": 2,
+    "realConversationPlannerSteps": 1,
+    "realConversationTools": 0,
+    "realConversationBodiesCommitted": false,
+    "userConfirmedVisibleTrajectory": true,
+    "installedPayloadBeforeMainSync": {
+      "markerFiles": 10,
+      "markerMatches": 10,
+      "sourceMatches": 10,
+      "readmeNotInstalled": true
+    },
+    "runningServiceCwdWasBackup": true,
+    "cwdAloneDoesNotProveLoadedCodeVersion": true,
+    "finalCandidateInstalled": false,
+    "finalCandidateNativeAcceptance": false,
+    "pending": "Wait for the user reminder, install the 0.2.19 candidate, disable and re-enable this plugin, then verify the running candidate in Antigravity.",
+    "userRequestedWindowPause": true,
+    "desktopOrNativeServiceRestartedByAgent": false
+  },
+  "dataBoundaries": {
+    "source": "Antigravity native client-step transcripts",
+    "preferredLog": "transcript_full.jsonl",
+    "compactFallbackExplicit": true,
+    "rawModelRequestAvailable": false,
+    "completeModelInputAvailable": false,
+    "toolDeclarationsAvailable": false,
+    "durationInferred": false,
+    "unknownDurationsAreNull": true,
+    "inputCacheBucketSemanticsInferred": false
+  },
+  "review": {
+    "independentSourceReviewPassed": true,
+    "repaired": [
+      "cross-conversation trace access",
+      "native cancelled state",
+      "native timestamp/request labels",
+      "unknown request configuration",
+      "OKLCH theme inference",
+      "upstream branding title replacement"
+    ],
+    "unresolvedSourceBugs": []
+  },
+  "tooling": {
+    "egoLiteUpdateAvailable": true,
+    "egoLiteUpgraded": false,
+    "npmDefaultCachePermissionIssueHandledWithTemporaryCache": true
+  }
+}

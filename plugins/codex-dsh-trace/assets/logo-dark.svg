@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">Codex Trace</title>
+  <desc id="desc">Three execution nodes connected by a continuous path, ending in a highlighted node.</desc>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="#F0F5F3"/>
+  <path d="M18 16V26A6 6 0 0 0 24 32H40A6 6 0 0 1 46 38V48" stroke="#18231F" stroke-width="4.5" stroke-linecap="round"/>
+  <circle cx="18" cy="16" r="4.5" fill="#18231F"/>
+  <circle cx="32" cy="32" r="4.5" fill="#18231F"/>
+  <circle cx="46" cy="48" r="5.5" fill="#087C65"/>
+</svg>

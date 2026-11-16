@@ -1,4 +1,4 @@
-# Codex DSH Trace
+# Codex Trace
 
 DSH-style execution traces for Codex: recorded requests, nested tools, compaction
 and timing in the conversation side panel.
@@ -11,7 +11,7 @@ Native Codex sidebar plugin for official rollout-trace, using the approved
 DSH-style interface. It shows complete recorded client context, original
 incremental requests, tool input/output and caller relationships, and timing.
 
-The current implementation is **0.2.18**. It opens directly into the original DSH
+The current implementation is **0.2.19**. It opens directly into the original DSH
 toolbar and timeline, with the current chat and live updates selected automatically.
 There is no extra trajectory header, ellipsis menu or settings panel. Theme and
 language follow Codex. Recording maintenance stays outside the chat viewing surface.
@@ -79,7 +79,7 @@ codex plugin marketplace add "$PWD"
 codex plugin add codex-dsh-trace@rollout-local
 ```
 
-Open **Codex DSH Trace** from the conversation's right-panel tools menu. It reads
+Open **Codex Trace** from the conversation's right-panel tools menu. It reads
 the current chat automatically and waits for records when none are available.
 Newly installed plugins may require reopening the conversation or restarting the
 desktop app before their entrypoints appear.
@@ -88,6 +88,12 @@ The project and plugin ID were renamed in 0.2.18. The internal MCP namespace,
 tool API names, recording configuration and saved display preferences retain
 their earlier identifiers for compatibility. Historical reports and design
 artifacts retain the names used when they were produced.
+
+Version 0.2.19 uses the shorter display name **Codex Trace** and an execution-path
+icon, with light and dark logos. The repository and plugin ID remain
+`codex-dsh-trace`. Version 0.2.19 is installed locally and the legacy plugin entry
+is disabled. Reopening the native panel is pending; its new branding has not yet
+been visually verified. See `reports/branding-install-0219-validation.json`.
 
 Record a new CLI task with `python3 scripts/record.py -- exec --ephemeral "task"`.
 Recording directories can be registered through the backend's `--register PATH`

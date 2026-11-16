@@ -26,7 +26,7 @@ export class McpClient {
     child.on('error', () => {if (this.child === child) this.fail(new Error('Unable to start the trace reader.'));});
     child.on('exit', () => {if (this.child === child) this.fail(new Error('The trace reader stopped. Retry the operation.'));});
     child.stdin.on('error', () => {if (this.child === child) this.fail(new Error('The trace reader connection closed.'));});
-    this.starting = this.send('initialize', {protocolVersion: '2025-06-18', capabilities: {}, clientInfo: {name: 'antigravity-dsh-trace', version: '0.2.18'}}).then(() => {
+    this.starting = this.send('initialize', {protocolVersion: '2025-06-18', capabilities: {}, clientInfo: {name: 'antigravity-dsh-trace', version: '0.2.19'}}).then(() => {
       this.write({jsonrpc: '2.0', method: 'notifications/initialized'});
     }).catch(error => {if (this.child === child) this.fail(error); throw error;});
     return this.starting;

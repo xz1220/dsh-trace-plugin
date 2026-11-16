@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from native_store import NativeStore, TraceError
 
-VERSION = '0.2.18'
+VERSION = '0.2.19'
 STORE = NativeStore()
 STRING = {'type': 'string'}
 TRACE = {'traceId': STRING}
