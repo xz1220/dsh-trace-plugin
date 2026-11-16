@@ -227,3 +227,19 @@ class ThreadIndexTests(unittest.TestCase):
         self.assertEqual(
             {cell["seq"] for cell in fresh["cells"]}, {fresh["requestNumbers"][0]["seq"]}
         )
+
+    def test_mixed_schema_keeps_readable_history_and_reports_missing_source(self):
+        path = self.after.root / "manifest.json"
+        manifest = json.loads(path.read_text())
+        manifest["schema_version"] = 99
+        path.write_text(json.dumps(manifest))
+        opened = self.store.open(thread_id="thread-root")
+        self.assertTrue(opened["trace"]["incomplete"])
+        self.assertEqual(opened["trace"]["issues"][0]["errorCode"], "unsupported_schema")
+        self.assertEqual(opened["requestCount"], 2)
+        revision = opened["revision"]
+        manifest["schema_version"] = 2
+        path.write_text(json.dumps(manifest))
+        self.store.binding("thread-root")
+        self.assertTrue(self.store.index(opened["trace"]["id"]).delta(revision)["resync"])
+        self.assertFalse(self.store.open(thread_id="thread-root")["trace"]["incomplete"])

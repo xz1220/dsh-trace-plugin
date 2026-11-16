@@ -29,6 +29,7 @@ class TraceError(ValueError):
         super().__init__(message)
         self.code = code
         self.params = dict(params or {})
+        self.info: dict[str, Any] = {}
 
 
 class TraceFormatError(TraceError):
@@ -113,7 +114,13 @@ class Catalog:
         if not self.config_file.exists():
             return {"roots": [], "labels": {}}
         data = read_json(self.config_file, 1024 * 1024)
-        if not isinstance(data, dict):
+        if (
+            not isinstance(data, dict)
+            or not isinstance(data.get("roots", []), list)
+            or any(not isinstance(root, str) or not root for root in data.get("roots", []))
+            or not isinstance(data.get("labels", {}), dict)
+            or any(not isinstance(label, str) for label in data.get("labels", {}).values())
+        ):
             raise TraceError("录制目录配置格式错误。", code="invalid_directory_config")
         return data
 
@@ -145,19 +152,39 @@ class Catalog:
 
     def manifest(self, path, labels=None):
         data = read_json(safe_file(path, "manifest.json"), 1024 * 1024)
-        trace_id = identifier(data.get("trace_id"))
-        thread_id = identifier(data.get("root_thread_id"))
+        if not isinstance(data, dict):
+            raise TraceError("录制清单必须是 JSON 对象。", code="invalid_recording_manifest")
         version = data.get("schema_version")
-        if type(version) is not int or version not in SUPPORTED_SCHEMAS:
-            raise TraceFormatError(trace_id, thread_id, version)
-        if data.get("raw_event_log") != "trace.jsonl":
-            raise TraceError(
-                "该录制的事件文件布局尚不受支持。", code="unsupported_recording_layout"
-            )
+        identities = {
+            target: value
+            for source, target in (("trace_id", "traceId"), ("root_thread_id", "threadId"))
+            if isinstance(value := data.get(source), str) and ID_RE.fullmatch(value)
+        }
+        try:
+            trace_id = identifier(data.get("trace_id"))
+            thread_id = identifier(data.get("root_thread_id"))
+            if type(version) is not int or version not in SUPPORTED_SCHEMAS:
+                raise TraceFormatError(trace_id, thread_id, version)
+            if data.get("raw_event_log") != "trace.jsonl":
+                raise TraceError(
+                    "该录制的事件文件布局尚不受支持。", code="unsupported_recording_layout"
+                )
+            started_at = data.get("started_at_unix_ms")
+            if started_at is not None and (type(started_at) is not int or started_at < 0):
+                raise TraceError("录制开始时间无效。", code="invalid_recording_manifest")
+        except TraceError as exc:
+            exc.info = {
+                **identities,
+                "schemaVersion": version if type(version) is int else None,
+                "message": str(exc),
+                "errorCode": exc.code,
+                "errorParams": exc.params,
+            }
+            raise
         return {
             "id": trace_id,
             "threadId": thread_id,
-            "startedAt": data.get("started_at_unix_ms"),
+            "startedAt": started_at,
             "schemaVersion": version,
             "label": (self.config().get("labels", {}) if labels is None else labels).get(
                 trace_id, f"任务 {thread_id[:8]}"
@@ -194,8 +221,6 @@ class Catalog:
                     try:
                         item = self.manifest(path, labels)
                         found[item["id"]] = item
-                    except TraceFormatError as exc:
-                        issues.append(exc.info)
                     except TraceError as exc:
                         issues.append(
                             {
@@ -203,6 +228,7 @@ class Catalog:
                                 "message": str(exc),
                                 "errorCode": exc.code,
                                 "errorParams": exc.params,
+                                **exc.info,
                             }
                         )
                     except OSError:
@@ -264,6 +290,7 @@ class BundleIndex:
         self.signature = None
         self.last_seq = 0
         self.epoch = os.urandom(6).hex()
+        self.projection_revision = 0
         self.rows = OrderedDict()
         self.threads = {}
         self.turns = {}
@@ -316,6 +343,8 @@ class BundleIndex:
                     if not line.strip():
                         continue
                     event = json.loads(line)
+                    if not isinstance(event, dict) or not isinstance(event.get("payload"), dict):
+                        raise TraceError("录制事件结构无效。", code="invalid_recording_events")
                     if (
                         type(event.get("schema_version")) is not int
                         or event.get("schema_version") != self.meta.get("schemaVersion", 1)
@@ -327,7 +356,7 @@ class BundleIndex:
                         )
                     self.apply(event)
                     self.last_seq = event["seq"]
-            except (ValueError, KeyError, TypeError) as exc:
+            except (ValueError, KeyError, TypeError, AttributeError) as exc:
                 self.reset()
                 raise TraceError(
                     "录制事件格式或顺序不一致。", code="invalid_recording_events"
@@ -373,9 +402,18 @@ class BundleIndex:
         self.remember_refs(payload)
         thread = event.get("thread_id") or payload.get("thread_id") or self.meta["threadId"]
         if kind == "thread_started":
+            identity = payload["thread_id"]
+            label = payload.get("agent_path", identity[:8])
+            if self.threads.get(identity) != label and any(
+                row["threadId"] == identity for row in self.rows.values()
+            ):
+                self.projection_revision = event["seq"]
             self.threads[payload["thread_id"]] = payload.get("agent_path", payload["thread_id"][:8])
         elif kind == "codex_turn_started":
-            self.turns[payload["codex_turn_id"]] = {"start": now, "threadId": thread}
+            turn_id = payload["codex_turn_id"]
+            if any(row.get("turnId") == turn_id for row in self.rows.values()):
+                self.projection_revision = event["seq"]
+            self.turns[turn_id] = {"start": now, "threadId": thread}
         elif kind == "inference_started":
             key = "request:" + payload["inference_call_id"]
             self.request_counter += 1
@@ -397,6 +435,15 @@ class BundleIndex:
             self.latest_requests[payload.get("thread_id", thread)] = key
         elif kind in ("inference_completed", "inference_failed", "inference_cancelled"):
             key = "request:" + payload["inference_call_id"]
+            original = self.rows.get(key)
+            if original and any(
+                row.get("type") == "request" and row["seq"] > original["seq"]
+                for row in self.rows.values()
+            ):
+                self.projection_revision = event["seq"]
+            self.context_cache.clear()
+            self.text_cache.clear()
+            self.text_cache_bytes = 0
             self.row(
                 key,
                 event,
@@ -554,6 +601,7 @@ class BundleIndex:
             return {
                 "trace": {k: v for k, v in self.meta.items() if not k.startswith("_")},
                 "revision": f"{self.epoch}:{self.last_seq}",
+                "projectionRevision": self.projection_revision,
                 "status": self.status,
                 "origin": self.meta["startedAt"],
                 "latestTime": self.latest_time,
@@ -575,7 +623,7 @@ class BundleIndex:
                 seq = int(seq)
             except (AttributeError, ValueError):
                 epoch, seq = "", -1
-            if epoch != self.epoch or seq > self.last_seq:
+            if epoch != self.epoch or seq > self.last_seq or seq < self.projection_revision:
                 return {"resync": True}
             if seq == self.last_seq:
                 return {
@@ -835,6 +883,9 @@ def compaction_info(index, row):
 
 class Store:
     def __init__(self, config_file=None):
+        from snapshots import Snapshots
+
+        self.snapshots = Snapshots()
         self.catalog = Catalog(config_file)
         self.indexes = OrderedDict()
         self.thread_indexes = OrderedDict()
@@ -987,6 +1038,7 @@ class Store:
         with projector.index.lock:
             data = dict(projector.detail(row_id, cell_key))
             fields = {}
+            texts = {}
             for key in (
                 "inputDetail",
                 "outputDetail",
@@ -1004,9 +1056,13 @@ class Store:
                     is_json = not isinstance(value, str)
                     text = json.dumps(value, ensure_ascii=False, indent=2) if is_json else value
                     fields[key] = {"totalChars": len(text), "json": is_json}
-            return {"cell": data, "fields": fields}
+                    texts[key] = text
+            snapshot = self.snapshots.create((trace_id, row_id, cell_key), texts)
+            return {"cell": data, "fields": fields, "snapshot": snapshot}
 
-    def cell_text(self, trace_id, row_id, cell_key, field, offset=0, version=None):
+    def cell_text(self, trace_id, row_id, cell_key, field, offset=0, version=None, snapshot=None):
+        if snapshot is not None:
+            return self.snapshots.page(snapshot, (trace_id, row_id, cell_key), field, offset)
         projector = self.projection(trace_id)
         with projector.index.lock:
             if version is not None and projector.index.get_row(row_id).get("_updated") != version:
@@ -1117,7 +1173,10 @@ class Store:
                 return candidate["id"]
         return None
 
-    def text(self, trace_id, row_id, section, item_index=None, offset=0):
+    def text(self, trace_id, row_id, section, item_index=None, offset=0, snapshot=None):
+        identity = (trace_id, row_id, section, item_index)
+        if snapshot is not None:
+            return self.snapshots.page(snapshot, identity, "text", offset)
         value: Any
         index = self.index(trace_id)
         with index.lock:
@@ -1126,7 +1185,8 @@ class Store:
             cached = index.text_cache.get(cache_key)
             if cached is not None:
                 index.text_cache.move_to_end(cache_key)
-                return self.text_page(cached, offset)
+                token = self.snapshots.create(identity, {"text": cached})
+                return self.snapshots.page(token, identity, "text", offset)
             cacheable = True
             if section in ("message", "message_json", "full_context"):
                 context = index.context(row_id)
@@ -1195,7 +1255,8 @@ class Store:
                 while index.text_cache_bytes > 32 * 1024 * 1024 or len(index.text_cache) > 40:
                     _, evicted = index.text_cache.popitem(last=False)
                     index.text_cache_bytes -= len(evicted) * 4
-            return self.text_page(text, offset)
+            token = self.snapshots.create(identity, {"text": text})
+            return self.snapshots.page(token, identity, "text", offset)
 
     @staticmethod
     def text_page(text, offset):

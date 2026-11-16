@@ -27,6 +27,7 @@ FILES = (
     "server/main.py",
     "server/projection.py",
     "server/store.py",
+    "server/snapshots.py",
     "server/thread_index.py",
     "server/trajectory-locales.json",
 )

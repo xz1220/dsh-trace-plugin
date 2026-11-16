@@ -484,7 +484,7 @@ class Projection:
         self.requests()
         ancestor = self.inherited_requests.get(row["id"])
         dependency = (ancestor["id"], ancestor.get("_updated")) if ancestor else None
-        key = (row["id"], row.get("_updated"), dependency)
+        key = (row["id"], row.get("_updated"), dependency, self.index.projection_revision)
         if key in self.cache:
             self.cache.move_to_end(key)
             return self.cache[key]

@@ -43,6 +43,13 @@ class ThreadIndex(BundleIndex):
                 for meta in self.store.catalog.list(force)
                 if meta["threadId"] == self.thread_id
             ]
+            issues = [
+                issue
+                for issue in self.store.catalog.issues
+                if issue.get("threadId") == self.thread_id
+            ]
+            issues_changed = issues != self.meta.get("issues", [])
+            self.meta.update(issues=issues, incomplete=bool(issues))
             metas = []
             signatures = {}
             for meta in candidates:
@@ -58,9 +65,10 @@ class ThreadIndex(BundleIndex):
                     code="recording_index_too_large",
                     params={"limitMiB": MAX_LOG // (1024 * 1024)},
                 )
-            if signatures == self.source_signatures:
+            if signatures == self.source_signatures and not issues_changed:
                 return
             reset = bool(set(self.sources) - set(signatures))
+            projection_changed = False
             for meta in metas:
                 source = meta["id"]
                 before = self.source_signatures.get(source)
@@ -72,6 +80,9 @@ class ThreadIndex(BundleIndex):
                 index = self.store.index(source)
                 index.refresh()
                 with index.lock:
+                    previous = self.sources.get(source)
+                    if previous and previous["projectionRevision"] != index.projection_revision:
+                        projection_changed = True
                     self.sources[source] = {
                         "meta": meta,
                         "rows": [dict(row) for row in index.rows.values()],
@@ -79,6 +90,7 @@ class ThreadIndex(BundleIndex):
                         "threads": dict(index.threads),
                         "status": index.status,
                         "latestTime": index.latest_time,
+                        "projectionRevision": index.projection_revision,
                     }
             self.sources = {key: value for key, value in self.sources.items() if key in signatures}
             ordered = sorted(
@@ -91,6 +103,8 @@ class ThreadIndex(BundleIndex):
                 ),
             )
             keys = [source + ":" + row["id"] for source, row in ordered]
+            old_threads = self.threads
+            old_turns = self.turns
             old_keys = list(self.rows)
             if old_keys != keys[: len(old_keys)]:
                 reset = True
@@ -133,6 +147,21 @@ class ThreadIndex(BundleIndex):
                     if key not in turns or turn["start"] < turns[key]["start"]:
                         turns[key] = turn
             self.turns = dict(sorted(turns.items(), key=lambda pair: pair[1]["start"]))
+            if (
+                issues_changed
+                or projection_changed
+                or any(
+                    old_threads.get(thread) != label
+                    and any(row["threadId"] == thread for row in old_rows.values())
+                    for thread, label in self.threads.items()
+                )
+                or any(
+                    old_turns.get(turn) != value
+                    and any(row.get("turnId") == turn for row in old_rows.values())
+                    for turn, value in self.turns.items()
+                )
+            ):
+                self.projection_revision = revision
             self.request_counter = sum(
                 row.get("type") in ("request", "compaction") for row in self.rows.values()
             )

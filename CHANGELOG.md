@@ -14,6 +14,11 @@ User-visible changes are recorded here. Historical entries describe code changes
 
 ### Fixed
 
+- Keep paged context and cell reads on an immutable content snapshot during live updates.
+- Refresh projections after late agent/turn metadata and report unreadable captures in a chat aggregate.
+- Isolate malformed manifests so one invalid recording does not stop catalog discovery.
+- Build large selected details once for all text pages.
+
 - Isolate authenticated preview cookies by port so concurrent previews do not overwrite each other.
 - Allow protocol and preview tests to inject an isolated store.
 - Preserve request-button activation with Enter and Space, and improve text contrast in both themes.

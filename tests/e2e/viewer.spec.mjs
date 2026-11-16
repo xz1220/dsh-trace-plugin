@@ -121,3 +121,56 @@ test('live append appears automatically without losing recorded history', async 
     page.getByText('Watch the controlled live append.', { exact: false }).first(),
   ).toBeVisible();
 });
+
+test('late agent metadata refreshes inherited history through polling', async ({
+  page,
+  recordingServer,
+}) => {
+  const directory = recordingServer.directory;
+  await execute(process.env.PYTHON || 'python3', [
+    '-c',
+    `
+import json, sys
+from pathlib import Path
+sys.path.insert(0, 'tests')
+from test_store import Fixture
+f = Fixture(Path(sys.argv[1]) / 'recordings/dependency')
+p = f.root / 'manifest.json'
+m = json.loads(p.read_text()); m['trace_id'] = 'dependency'; p.write_text(json.dumps(m))
+parent = {'type':'message','role':'user','id':'parent','content':[{'type':'input_text','text':'PARENT_METADATA_MARKER'}]}
+f.append('thread_started', thread_id='thread-root', agent_path='/root')
+f.append('inference_started', inference_call_id='parent', thread_id='thread-root', request_payload=f.payload({'input':[parent]}, 'inference_request'))
+f.append('thread_started', thread_id='child', agent_path='unknown')
+f.append('inference_started', inference_call_id='child', thread_id='child', request_payload=f.payload({'input':[parent,{'type':'message','role':'user','id':'child','content':[{'type':'input_text','text':'CHILD_METADATA_MARKER'}]}]}, 'inference_request'))
+`,
+    directory,
+  ]);
+  await page.addInitScript(() => {
+    let preview;
+    Object.defineProperty(window, '__ROLLOUT_PREVIEW__', {
+      configurable: true,
+      get: () => preview,
+      set: (value) => {
+        preview = { ...value, traceId: 'dependency' };
+      },
+    });
+  });
+  await page.goto(recordingServer.url);
+  await expect(page.getByText('PARENT_METADATA_MARKER', { exact: true })).toHaveCount(2);
+  await execute(process.env.PYTHON || 'python3', [
+    '-c',
+    `
+import json, sys
+from pathlib import Path
+p = Path(sys.argv[1]) / 'recordings/dependency/trace.jsonl'
+last = json.loads(p.read_text().splitlines()[-1])
+last.update(seq=last['seq']+1, wall_time_unix_ms=last['wall_time_unix_ms']+10, payload={'type':'thread_started','thread_id':'child','agent_path':'/root/child'})
+with p.open('a') as f: f.write(json.dumps(last)+'\\n')
+`,
+    directory,
+  ]);
+  await expect(page.getByText('PARENT_METADATA_MARKER', { exact: true })).toHaveCount(1, {
+    timeout: 10000,
+  });
+  await expect(page.getByText('CHILD_METADATA_MARKER', { exact: true })).toBeVisible();
+});

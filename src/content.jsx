@@ -74,11 +74,13 @@ export function compactionText(info, t) {
 }
 export async function readComplete(api, name, arguments_, isCurrent = () => true) {
   let text = '',
-    offset = 0;
+    offset = 0,
+    snapshot = arguments_.snapshot;
   while (offset !== null) {
     if (!isCurrent()) throw apiError({ errorCode: 'cancelled' });
-    const result = await api(name, { ...arguments_, offset });
+    const result = await api(name, { ...arguments_, offset, ...(snapshot ? { snapshot } : {}) });
     if (result.available === false) return null;
+    snapshot = result.snapshot || snapshot;
     text += result.text;
     if (result.nextOffset !== null && result.nextOffset <= offset)
       throw apiError({ errorCode: 'paging_stalled' });
@@ -119,6 +121,7 @@ export function TextContent({ rowId, section, itemIndex, api, copy, label }) {
           section,
           ...(itemIndex !== undefined ? { itemIndex } : {}),
           offset,
+          ...(offset && dataRef.current?.snapshot ? { snapshot: dataRef.current.snapshot } : {}),
         });
         if (id !== ticket.current) return;
         const next = {
@@ -207,7 +210,12 @@ export function TextContent({ rowId, section, itemIndex, api, copy, label }) {
           </button>
         </div>
       </div>
-      {error && <Failure error={error} retry={() => load(data?.nextOffset || 0)} />}
+      {error && (
+        <Failure
+          error={error}
+          retry={() => load(error.code === 'content_updated' ? 0 : data?.nextOffset || 0)}
+        />
+      )}
       {!data && !error ? (
         <Skeleton />
       ) : data?.available === false ? (

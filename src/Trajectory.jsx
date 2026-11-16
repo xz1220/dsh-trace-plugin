@@ -208,7 +208,13 @@ export default function Trajectory({
               const text = await readComplete(
                 api,
                 'read_rollout_cell_text',
-                { rowId: cell.rowId, cellKey: cell.cellKey, field, version: metadata.cell.version },
+                {
+                  rowId: cell.rowId,
+                  cellKey: cell.cellKey,
+                  field,
+                  version: metadata.cell.version,
+                  snapshot: metadata.snapshot,
+                },
                 () => live.current,
               );
               return [field, info.json && text !== null ? JSON.parse(text) : text];

@@ -308,6 +308,9 @@ function App() {
             }
           />
         )}
+        {data?.trace.issues?.map((issue, index) => (
+          <Failure key={index} error={apiError({ error: issue.message, ...issue })} />
+        ))}
         {loading ? (
           <Skeleton />
         ) : !data ? (
@@ -325,7 +328,7 @@ function App() {
           </section>
         ) : (
           <Trajectory
-            key={`${data.trace.id}:${data.revision.split(':')[0]}`}
+            key={`${data.trace.id}:${data.revision.split(':')[0]}:${data.projectionRevision || 0}`}
             {...{ data, call, earlier, copy, focusCallId }}
             thread="all"
             onFocusApplied={() => setFocusCallId(null)}

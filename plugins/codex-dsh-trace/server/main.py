@@ -137,6 +137,7 @@ TOOLS = [
             "field": STRING,
             "offset": {"type": "integer", "minimum": 0},
             "version": {"type": "integer", "minimum": 0},
+            "snapshot": STRING,
         },
         ["traceId", "rowId", "cellKey", "field"],
         app=True,
@@ -181,6 +182,7 @@ TOOLS = [
                     "runtime",
                 ],
             },
+            "snapshot": STRING,
             "itemIndex": {"type": "integer"},
             "offset": {"type": "integer", "minimum": 0},
         },
@@ -286,6 +288,7 @@ def call(name, args, metadata=None, *, store=None):
             args["field"],
             args.get("offset", 0),
             args.get("version"),
+            args.get("snapshot"),
         )
     if name == "get_rollout_request_info":
         projector = store.projection(args["traceId"])
@@ -307,6 +310,7 @@ def call(name, args, metadata=None, *, store=None):
             args["section"],
             args.get("itemIndex"),
             args.get("offset", 0),
+            args.get("snapshot"),
         )
     if name == "add_rollout_directory":
         return store.catalog.register(args["path"], args.get("label"))

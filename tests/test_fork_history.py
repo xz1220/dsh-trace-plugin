@@ -372,7 +372,9 @@ class ForkHistoryTests(unittest.TestCase):
             ["PARENT_INPUT", "CHILD_TASK"],
         )
         epoch = projector.index.epoch
+        revision = projector.index.overview()["revision"]
         self.thread("child", "/root/review")
+        self.assertTrue(projector.index.delta(revision)["resync"])
         after = projector.page(row_ids=["request:child"])
         self.assertEqual(projector.index.epoch, epoch)
         self.assertEqual(
