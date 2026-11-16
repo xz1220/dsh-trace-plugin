@@ -16,7 +16,14 @@ export default [
     ],
   },
   {
-    files: ['src/**/*.{js,jsx}', 'scripts/**/*.mjs', 'tests/**/*.{js,mjs}', '*.js', '*.mjs'],
+    files: [
+      'src/**/*.{js,jsx}',
+      'scripts/**/*.mjs',
+      'tests/**/*.{js,mjs}',
+      'packages/**/*.mjs',
+      '*.js',
+      '*.mjs',
+    ],
     ...js.configs.recommended,
     languageOptions: {
       ecmaVersion: 'latest',

@@ -1,0 +1,29 @@
+{
+  "name": "dsh-trace-extension",
+  "version": "0.0.0-development",
+  "private": true,
+  "description": "Set up local DSH-style execution traces for coding agents.",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "dsh-trace-extension": "bin/dsh-trace-extension.mjs"
+  },
+  "engines": {
+    "node": ">=20.19"
+  },
+  "files": [
+    "bin/",
+    "payload/",
+    "README.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.txt"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xz1220/dsh-trace-plugin.git"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}

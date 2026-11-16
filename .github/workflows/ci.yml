@@ -84,6 +84,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.node == '22.22.3'
         run: npm run check:generated
       - run: npm run build
+      - run: npm run test:npm
 
   quality:
     runs-on: ubuntu-latest
