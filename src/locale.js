@@ -1,39 +1,59 @@
-import {zh} from '../vendor/dsh/packages/client/locale/src/locales/zh.ts';
-import {en} from '../vendor/dsh/packages/client/locale/src/locales/en.ts';
-import {ja} from '../vendor/dsh/packages/client/locale/src/locales/ja.ts';
-import {es} from '../vendor/dsh/packages/client/locale/src/locales/es.ts';
-import {fr} from '../vendor/dsh/packages/client/locale/src/locales/fr.ts';
-import {de} from '../vendor/dsh/packages/client/locale/src/locales/de.ts';
-import {ru} from '../vendor/dsh/packages/client/locale/src/locales/ru.ts';
-import {pt} from '../vendor/dsh/packages/client/locale/src/locales/pt.ts';
+import { zh } from '../vendor/dsh/packages/client/locale/src/locales/zh.ts';
+import { en } from '../vendor/dsh/packages/client/locale/src/locales/en.ts';
+import { ja } from '../vendor/dsh/packages/client/locale/src/locales/ja.ts';
+import { es } from '../vendor/dsh/packages/client/locale/src/locales/es.ts';
+import { fr } from '../vendor/dsh/packages/client/locale/src/locales/fr.ts';
+import { de } from '../vendor/dsh/packages/client/locale/src/locales/de.ts';
+import { ru } from '../vendor/dsh/packages/client/locale/src/locales/ru.ts';
+import { pt } from '../vendor/dsh/packages/client/locale/src/locales/pt.ts';
 import * as trajectory from '../vendor/dsh/packages/client/ui-trajectory/src/client/locales.ts';
 
-const common={zh,en,ja,es,fr,de,ru,pt};
-const evidence={
-  zh:['完整上下文','原始请求','原始响应'],en:['Complete context','Raw request','Raw response'],
-  ja:['完全なコンテキスト','元のリクエスト','元のレスポンス'],es:['Contexto completo','Solicitud original','Respuesta original'],
-  fr:['Contexte complet','Requête brute','Réponse brute'],de:['Vollständiger Kontext','Rohe Anfrage','Rohe Antwort'],
-  ru:['Полный контекст','Исходный запрос','Исходный ответ'],pt:['Contexto completo','Requisição original','Resposta original'],
+const common = { zh, en, ja, es, fr, de, ru, pt };
+const evidence = {
+  zh: ['完整上下文', '原始请求', '原始响应'],
+  en: ['Complete context', 'Raw request', 'Raw response'],
+  ja: ['完全なコンテキスト', '元のリクエスト', '元のレスポンス'],
+  es: ['Contexto completo', 'Solicitud original', 'Respuesta original'],
+  fr: ['Contexte complet', 'Requête brute', 'Réponse brute'],
+  de: ['Vollständiger Kontext', 'Rohe Anfrage', 'Rohe Antwort'],
+  ru: ['Полный контекст', 'Исходный запрос', 'Исходный ответ'],
+  pt: ['Contexto completo', 'Requisição original', 'Resposta original'],
 };
-export const supportedLocales=Object.keys(common);
-export const normalizeLocale=value=>{
-  const language=typeof value==='string'?value.toLowerCase().split(/[-_]/)[0]:'zh';
-  return supportedLocales.includes(language)?language:'en';
+export const supportedLocales = Object.keys(common);
+export const normalizeLocale = (value) => {
+  const language = typeof value === 'string' ? value.toLowerCase().split(/[-_]/)[0] : 'zh';
+  return supportedLocales.includes(language) ? language : 'en';
 };
-export const dictionaries=Object.fromEntries(supportedLocales.map(locale=>[locale,{
-  ...common[locale],...trajectory[locale],
-  'codex.prompt':evidence[locale][0],'codex.request':evidence[locale][1],'codex.response':evidence[locale][2],
-  'record.rawResultUnavailable':locale==='zh'?'录制中没有原始结果':'No raw result in this recording',
-  'timing.sessionTimestamps':locale==='zh'?'官方录制起止事件':'Recorded start and end events',
-  'timing.sessionTimestampsRunning':locale==='zh'?'官方录制开始事件（运行中）':'Recorded start event (running)',
-}]));
-export function translatorFor(value){
-  const locale=normalizeLocale(value),dictionary=dictionaries[locale];
-  const t=(key,params={})=>String(dictionary[key]??dictionaries.en[key]??key).replace(/\{(\w+)\}/g,(_,name)=>params[name]??'');
-  t.locale=locale;
+export const dictionaries = Object.fromEntries(
+  supportedLocales.map((locale) => [
+    locale,
+    {
+      ...common[locale],
+      ...trajectory[locale],
+      'codex.prompt': evidence[locale][0],
+      'codex.request': evidence[locale][1],
+      'codex.response': evidence[locale][2],
+      'record.rawResultUnavailable':
+        locale === 'zh' ? '录制中没有原始结果' : 'No raw result in this recording',
+      'timing.sessionTimestamps':
+        locale === 'zh' ? '官方录制起止事件' : 'Recorded start and end events',
+      'timing.sessionTimestampsRunning':
+        locale === 'zh' ? '官方录制开始事件（运行中）' : 'Recorded start event (running)',
+    },
+  ]),
+);
+export function translatorFor(value) {
+  const locale = normalizeLocale(value),
+    dictionary = dictionaries[locale];
+  const t = (key, params = {}) =>
+    String(dictionary[key] ?? dictionaries.en[key] ?? key).replace(
+      /\{(\w+)\}/g,
+      (_, name) => params[name] ?? '',
+    );
+  t.locale = locale;
   // Codex-specific extensions use English when no native translation is available.
-  t.text=(chinese,english)=>locale==='zh'?chinese:english;
+  t.text = (chinese, english) => (locale === 'zh' ? chinese : english);
   return t;
 }
-export const dictionary=dictionaries.zh;
-export const t=translatorFor('zh');
+export const dictionary = dictionaries.zh;
+export const t = translatorFor('zh');
