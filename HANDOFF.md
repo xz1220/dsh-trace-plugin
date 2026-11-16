@@ -1,5 +1,12 @@
 # 从这里继续：Codex DSH Trace
 
+## 当前 worktree：Antigravity 插件适配
+
+本分支为 `codex/antigravity-plugin`，持续接收本地 `main` / `origin/main` 的变更，
+暂不合回主分支。先读 [AGENTS.md](AGENTS.md) 和
+[Antigravity 适配记录](docs/ANTIGRAVITY.md)。主分支以下历史实现与验收结论继续有效；
+Antigravity 自定义面板尚未实现或原生验收，不能将 Codex 验收记录视作其通过。
+
 ## 最新：0.2.18 项目改名与私有远端
 
 - 用户选定名称 **Codex DSH Trace**，仓库/插件发行标识为`codex-dsh-trace`。GitHub私有仓库已创建并核实可见性：`https://github.com/xz1220/codex-dsh-trace`，origin为对应HTTPS Git地址；远端主分支约定为`main`，原`codex/design-prototype`开发分支保留在本地。
