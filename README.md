@@ -1,167 +1,106 @@
 # Codex Trace
 
-DSH-style execution traces for Codex: recorded requests, nested tools, compaction
-and timing in the conversation side panel.
+Read recorded Codex requests, nested tool calls, compaction, and execution timing alongside your conversation.
 
-继续本次工作请先读 [HANDOFF.md](HANDOFF.md)。代码、设计稿、真实录制、实验与运行状态均已整理在本目录；归档原始材料位于 `local-context/`。
+[简体中文](README.zh-CN.md) · [Contributing](CONTRIBUTING.md) · [Architecture](docs/ARCHITECTURE.md) · [Security](SECURITY.md)
 
-Local recordings, screenshots and experiments are intentionally excluded from Git.
+![Codex Trace displaying a synthetic execution recording](docs/images/trace-viewer.png)
 
-Native Codex sidebar plugin for official rollout-trace, using the approved
-DSH-style interface. It shows complete recorded client context, original
-incremental requests, tool input/output and caller relationships, and timing.
+_The screenshot uses synthetic data in the local preview. It does not contain a private conversation or demonstrate a native Codex installation._
 
-The current implementation is **0.2.19**. It opens directly into the original DSH
-toolbar and timeline, with the current chat and live updates selected automatically.
-There is no extra trajectory header, ellipsis menu or settings panel. Theme and
-language follow Codex. Recording maintenance stays outside the chat viewing surface.
-It uses the pinned upstream trajectory table, timeline, toolbar,
-inspectors and image gallery. Core component CSS remains unchanged; local
-adapters are documented in `vendor/dsh/PATCHES.md` and verified during builds.
+## Features
 
-The follow-up comparison findings are repaired: timeline-mode changes clear
-selection, cold tool inspection links to its assistant, duration/wrapping
-preferences survive recording switches and reloads, and host focus styles stay
-out of the DSH search field. Call-ID launch requests load the necessary history;
-core controls follow all eight upstream locales. Local Codex extensions use
-Chinese or English fallback.
+- Open the current chat's recording automatically and follow new events.
+- Explore the DSH timeline and execution ledger with folding, search, and a resizable inspector.
+- Compare reconstructed context with the incremental request and original response JSON.
+- Follow nested calls, recorded subtool declarations, and tool results, including recorded images.
+- Keep earlier requests visible across resumed recordings, fork history, and compaction.
+- Read large recordings through incremental indexing, virtualized rows, and on-demand details.
+- Follow the host's theme and language. Upstream controls support eight locales; Codex-specific text currently falls back to Chinese or English.
 
-The sidebar actively reads its current-chat recording when opened, without
-waiting for another model message. The current-chat view joins official
-recordings for the same exact root and keeps earlier requests, tools, timing and
-message order while new recordings appear. Explicit API archive launches remain
-available outside the sidebar's viewing controls.
-The regression evidence is in `reports/startup-live-0211-validation.json`;
-current chronological-history evidence is in `reports/chronology-0214-validation.json`.
+## Requirements
 
-Recorded assistant messages replayed inside a request are now visible alongside
-historical users. Stable message identities prevent duplicate replay rows while
-keeping distinct new messages with identical text. Historical input messages have
-their own group and source; they are not presented as the current inference's
-response or assigned its token usage and timing. The regression evidence is in
-`reports/history-assistant-0212-validation.json`.
+- A Codex client that supports local plugins, MCP Apps, and official `rollout-trace` recording. Compatibility depends on the client and recording schema.
+- Python **3.9+** available as `python3`. No Python packages are required.
+- Node.js **20.19+** and npm to build or develop from source. An already-built plugin does not need Node.js at runtime.
 
-**122 automated checks pass.** Installed 0.2.16 clicks cover direct cold startup,
-duration/turn controls, search, details, automatic live appends, host theme/locale,
-empty-to-live transitions and transient-error recovery. At 1224/745/520/360px,
-the toolbar starts at y=0 with no horizontal overflow. Earlier installed builds
-also cover 301-record call navigation, copying and image export. See
-`reports/direct-view-0216-validation.json`.
+macOS arm64 has been checked locally. The original integration used Codex CLI 0.163.0; that is a historical test baseline, not a minimum-version guarantee. CI checks the reader and build on Ubuntu; Linux and Windows native Codex integrations remain unverified. The reader supports recording schemas **1 and 2**.
 
-Version 0.2.17 restores recorded code-mode subtool declarations, deduplicates fork
-history against confirmed ancestors, and explains applied compaction snapshots
-without changing original request/response data. Installed local clicks and real
-recording checks are in `reports/schema-history-0217-validation.json`. The current
-model connection still reports 0.2.16; native acceptance of 0.2.17 is pending reload.
-[The current acceptance ledger](docs/DSH_PARITY.md) and
-`reports/dsh-alignment-028.json` record the earlier interaction evidence. The native
-panel has been observed live, and after the user's restart the connected backend
-reads schema 1/2 recordings. Version 0.2.9 fixed the schema-2 compatibility bug
-and explicitly reports unreadable formats. The 0.2.10 top-navigation acceptance
-and native verification are recorded separately in `reports/topbar-0210-validation.json`;
-local preview is not evidence of an updated native panel.
-
-## Run and install
+## Install from source
 
 ```sh
 git clone https://github.com/xz1220/codex-dsh-trace.git
 cd codex-dsh-trace
 npm ci
 npm run build
-npm test
 codex plugin marketplace add "$PWD"
 codex plugin add codex-dsh-trace@rollout-local
 ```
 
-Open **Codex Trace** from the conversation's right-panel tools menu. It reads
-the current chat automatically and waits for records when none are available.
-Newly installed plugins may require reopening the conversation or restarting the
-desktop app before their entrypoints appear.
+Open **Codex Trace** from the conversation's right-panel tools menu. Reopen the panel or restart Codex after installation if the entry does not appear. Client menus and plugin commands can differ between Codex versions.
 
-The project and plugin ID were renamed in 0.2.18. The internal MCP namespace,
-tool API names, recording configuration and saved display preferences retain
-their earlier identifiers for compatibility. Historical reports and design
-artifacts retain the names used when they were produced.
+The repository is `codex-dsh-trace`; the displayed product name is **Codex Trace**. Existing `rollout-viewer` MCP identifiers and configuration remain supported for compatibility. See [Architecture](docs/ARCHITECTURE.md#compatibility-identifiers).
 
-Version 0.2.19 uses the shorter display name **Codex Trace** and an execution-path
-icon, with light and dark logos. The repository and plugin ID remain
-`codex-dsh-trace`. Version 0.2.19 is installed locally and the legacy plugin entry
-is disabled. Reopening the native panel is pending; its new branding has not yet
-been visually verified. See `reports/branding-install-0219-validation.json`.
+## Enable recording
 
-Record a new CLI task with `python3 scripts/record.py -- exec --ephemeral "task"`.
-Recording directories can be registered through the backend's `--register PATH`
-command. Recording must be enabled before a task starts; ordinary session logs
-are not silently substituted.
-See [plugin documentation](plugins/codex-dsh-trace/README.md) for runtime and limits.
+Recording must be enabled **before Codex starts**. Existing conversations cannot be captured retroactively.
 
-On macOS, `python3 scripts/record.py --desktop-env` sets the official recording
-environment variable for subsequently launched desktop apps in the current login
-session. Fully quit and reopen Codex afterwards. It does not close the current app
-or make changes to existing recordings. After logging out, run it again if needed.
-Use `launchctl unsetenv CODEX_ROLLOUT_TRACE_ROOT` and restart Codex to turn it off.
+For a new CLI process:
 
-## Validation
+```sh
+CODEX_ROLLOUT_TRACE_ROOT="$HOME/.codex/rollout-traces" codex
+```
 
-- Real OpenAI task: three model requests, two terminal tool calls, two code cells.
-- Base/developer/workspace/user instructions and tool returns recovered completely.
-- Request context item counts agree with the official `codex debug trace-reduce` output.
-- MCP discovery, exact native-thread binding, UI resource, and MCP Apps browser handshake checked.
-- Backend tests cover continuation, partial writes, paging, immutable warm reads,
-  missing context, Unicode chunks, invalid payload paths, 1,100-request chains,
-  namespaced schemas, cancellation prefixes, images, and structured result values.
-- Redacted benchmark results are in `reports/performance.json`; no captured prompts
-  or real trace bundles are committed.
-- Installed-package RPC checks are reproducible with `scripts/verify-install.py`.
-- Current DSH integration checks and backend timings are in
-  `reports/dsh-installed-validation.json` and `reports/dsh-performance.json`.
-  Browser evidence and remaining UI gates are in `reports/dsh-parity-validation.json`.
-- Native mounting and schema-2 reading have been observed. Installed preview
-  checks do not substitute for native acceptance of the current release; the
-  existing model connection still reports 0.2.16.
+Or record one scripted task with the helper:
 
-The optional local preview uses the installed MCP App frontend and backend,
-with a private loopback cookie. It is not a mock data implementation.
+```sh
+python3 scripts/record.py -- exec --ephemeral "your task"
+```
 
-## Earlier interactive mock
+On macOS, configure subsequently launched desktop apps for the current login session:
 
-Open `design/codex-trajectory-dsh.html` for the DSH-style Codex sidebar prototype.
-The three guided paths inspect full prompts, trace tool calls, and select timing
-intervals. Full/incremental context, original request JSON, source filtering,
-tool arguments/results/schema, parent/child navigation, wheel zoom, range
-selection, folding, simulated playback, error states, and narrow/dark views work
-locally. All data is synthetic; no local sessions or model APIs are accessed.
+```sh
+python3 scripts/record.py --desktop-env
+```
 
-Build with `npm run build:mock`. Original DSH CSS is hash-verified by the same
-source cache used for the analysis. The generated HTML is self-contained.
+Fully quit and reopen Codex afterwards. Repeat the command after logging out. To disable desktop recording, run `launchctl unsetenv CODEX_ROLLOUT_TRACE_ROOT` and restart Codex. The helper does not close the application itself.
 
-## Source design-system analysis
+To register another recording directory:
 
-The earlier design-system study is `design/dsh-design-system.html`: a self-contained,
-source-backed decomposition of the DSH trajectory design system. It includes
-original CSS specimens, theme tokens, type/size specifications, conditional detail
-tabs, interactions, responsive behavior, performance mechanisms, and pinned source
-links. Demonstration content is synthetic and clearly distinguished from source
-facts and analysis.
+```sh
+python3 plugins/codex-dsh-trace/server/main.py --register /absolute/path/to/recordings
+```
 
-Build this study with `npm ci && npm run build:analysis`. The build verifies and
-caches upstream sources using Git blob SHA-1 values in `design/dsh-sources.json`.
-Source copies are excluded from Git; the output HTML works without a server or
-network. See `design/DSH-NOTICE.md` and `design/DSH-LICENSE.txt` for attribution.
+## Privacy and data
 
-## Earlier Codex plugin mock
+The plugin reads official local trace bundles from the default recording root, `CODEX_ROLLOUT_TRACE_ROOT`, and directories you register. It does not substitute ordinary session logs. Registration writes a small configuration file under `$CODEX_HOME/rollout-viewer/` (default `~/.codex/rollout-viewer/`); it does not modify recordings.
 
-An interactive design review for a future native Codex sidebar plugin based on official rollout-trace.
+The reader has no upload, analytics, or remote-service integration. Recording data is delivered to the local Codex app for display. The optional preview serves the same data on authenticated loopback HTTP. Follow external links and use copy or export actions with care: recordings can include credentials, private code, prompts, and images. Read [Security](SECURITY.md) before sharing a trace or screenshot.
 
-Open `design/rollout-viewer.html` directly in a browser. It is self-contained, works offline, and contains only synthetic demonstration data.
+## Troubleshooting
 
-The review includes:
-- An interactive event ledger, timeline, and request/tool inspector.
-- Full-context versus incremental-request views.
-- Completed, failed, missing-context, and unrecorded scenarios.
-- User journeys and a visible design system.
-- Light/dark themes, compact/comfortable density, and narrow/expanded previews.
+**The viewer is empty.** Confirm recording was enabled before the Codex process started and that its root matches the current chat. Opening the viewer does not start recording. An empty resumed recording waits for new data automatically.
 
-Build with `npm ci && npm run build:design`.
+**The plugin still looks like an older version.** Installed files and an open Codex connection can differ. Reopen the panel or restart the client. Installing a package alone does not prove that a running panel has reloaded.
 
-This is a frontend prototype. It does not read local sessions, invoke a model, enable recording, or install a plugin.
+**A recording is unsupported or too large.** Schemas 1 and 2 are supported. The current limits are 256 MiB of event logs and 64 MiB per payload. Limits produce an explicit error. A current-chat aggregate over the limit can still be inspected as individual captures through the API.
+
+**Some historical text or timing is missing.** The viewer shows what was recorded. Opaque compaction items, uncaptured images, missing continuation prefixes, and unrecorded generation timings cannot be reconstructed reliably.
+
+## Development
+
+```sh
+npm ci
+npm run build
+npm test
+```
+
+Run `npm run demo` for an isolated synthetic recording without access to personal Codex data.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for formatting, CI checks, synthetic fixtures, the browser preview, packaging, and the DSH update workflow. Product behavior and planned work are documented in [docs/PRODUCT.md](docs/PRODUCT.md) and [docs/ROADMAP.md](docs/ROADMAP.md).
+
+## Attribution and license
+
+Independently maintained; **not an official OpenAI or DeepSeek product**. The interface includes MIT-licensed components from [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness), pinned and documented in [vendor/dsh/PATCHES.md](vendor/dsh/PATCHES.md). DSH refers to that upstream project.
+
+This project's code is MIT licensed; see [LICENSE](LICENSE). Built plugin packages include `LICENSE` and `THIRD_PARTY_NOTICES.txt` with the bundled dependencies' notices. Historical synthetic design studies remain in [design/](design/README.md).

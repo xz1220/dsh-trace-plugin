@@ -1,146 +1,60 @@
 # Codex Trace
 
-Plugin ID: `codex-dsh-trace@rollout-local`.
+A local Codex MCP App for official `rollout-trace` recordings. Plugin ID: `codex-dsh-trace@rollout-local`.
 
-A local Codex sidebar app for official `rollout-trace` recordings. The interface
-uses DSH's theme and trajectory styles, with a paged execution ledger, timing
-overview, reconstructed request context, and tool inspectors.
+## Open and record
 
-Version 0.2.19 uses the upstream DSH runtime: turn/step grouping, request boundaries,
-three levels of folding, full-content search, interactive timing overview,
-virtualized rows, a resizable inspector, Markdown/code/JSON views, prompt/tool
-diffs, and the original image gallery. Complete Codex context and original request
-and response JSON are additional request tabs. Raw result values remain available
-beside rendered content.
+Install through the repository's local plugin marketplace; see the [source installation instructions](https://github.com/xz1220/codex-dsh-trace#install-from-source). Choose **Codex Trace** in the conversation's right-panel tools menu. The panel follows the current chat and new recordings automatically. It has no recording-management settings.
 
-The view starts directly with the original DSH toolbar and timeline. Current-chat
-binding and live updates are automatic; theme and language follow Codex. There
-is no additional navigation row, ellipsis menu, recording selector or settings
-panel. Missing recordings show a brief status and keep checking for available
-records. Recording maintenance remains available through the local backend and
-its command-line interface, outside the chat viewing surface.
-
-The viewer clears ranges on timeline-mode changes, retains shared duration and
-wrapping preferences, and keeps tool-to-assistant links available before loading
-an assistant body. The launcher accepts an optional `callId` and loads the
-required history before selecting it. All eight upstream locales are supported;
-Codex-specific panels use Chinese or English fallback.
-
-The current chat is one chronological view across official recordings with the
-same exact root. Earlier requests, tools, measured durations and stable row IDs
-survive resumed recordings. Historical assistant inputs remain interleaved with
-users and retain request-input provenance without invented generation metrics.
-Stable identities prevent repeated full snapshots from duplicating old messages.
-Source IDs qualify records and call references; raw payloads remain unchanged.
-The 256 MiB combined event-log bound is explicit, and source/index caches are
-bounded. Both schema 1 and 2 recordings are supported. Unsupported formats show
-a reason rather than being silently hidden. Explicit archive inspection remains
-available through the backend; the sidebar has no archive-management controls.
-
-The versioned resource URI and an HTML metadata tag identify the frontend build
-without adding visible version information to the viewer.
-
-The 0.2.18 name change preserves the `rollout-viewer` MCP namespace, tool API
-names, existing recording configuration and saved display preferences. The new
-plugin ID is distinct from earlier cached installations.
-
-Version 0.2.19 displays **Codex Trace** with an execution-path composer icon and
-light/dark plugin logos. Its plugin ID remains `codex-dsh-trace`. Version 0.2.19
-is installed locally and its installed metadata/assets have been checked. The
-native panel must be reopened before the new branding can be visually verified.
-
-Subtool Schema inspection prefers the recorded JSON declaration. For code-mode
-subtools whose declaration exists only inside the parent request's recorded
-`functions.exec` description, it displays that original TypeScript section.
-Missing, truncated, namespace-mismatched or ambiguous declarations remain
-unavailable. Runtime subtool declarations do not inflate the model tool catalog.
-
-Forked agents keep their own new work visible without replaying the ancestor
-conversation into the ledger. Inherited snapshots remain intact in raw request
-inspection. Applied compactions show recorded before/after item and role counts;
-opaque encrypted items are identified without inventing missing historical text.
-
-## Open
-
-In a Codex conversation's right panel, choose **+ → More tools… → Plugins and
-MCPs → Codex Trace**. The native entry joins only official recordings whose
-root thread ID matches the caller. If none exist, it shows a brief
-empty state. It never substitutes the latest task or asks the user to pick a
-recording in the sidebar.
-
-The model-facing `show_rollout_trace` tool can also open an explicit trace ID.
-It returns only launch metadata. Prompt and tool bodies are loaded through
-app-only tools as the user opens them.
-
-## Record
-
-Enable tracing before starting the Codex process:
+Enable recording before starting Codex:
 
 ```sh
 CODEX_ROLLOUT_TRACE_ROOT="$HOME/.codex/rollout-traces" codex
 ```
 
-For a scripted run, the repository includes `scripts/record.py`:
+An already-running desktop process does not inherit shell environment changes. On macOS, the repository's `scripts/record.py --desktop-env` configures subsequently launched apps for the current login session; fully quit and reopen Codex afterwards. Existing history cannot be captured retroactively.
+
+Register another directory with:
 
 ```sh
-python3 scripts/record.py -- exec --ephemeral "your task"
+python3 server/main.py --register /absolute/path/to/recordings
 ```
 
-An already-running desktop process does not inherit a new shell variable.
-Desktop recording requires launching that process with the environment variable;
-reopening the viewer alone does not enable recording. Existing history cannot be
-retroactively captured. The plugin also accepts a recording directory configured
-through the server's `--register PATH` command.
+Run this command from the plugin directory. Maintenance is available through the backend, outside the viewing surface.
 
-## Data and performance
+## Inspect
 
-- Reads only configured trace roots, not the ordinary Codex session archive.
-- Indexes complete JSONL records incrementally. An unchanged poll reads no log bytes.
-- First paint uses metadata; large prompt and tool payloads are read on selection.
-- Restores WebSocket continuation context from `previous_response_id`, prior
-  response output items, and current inputs. Missing prefixes are explicit.
-- Text is paged in 48,000-character chunks, with a complete-copy action.
-- Requests preserve raw input structure separately from reconstructed context.
-- Tool rows link to their code unit and to the first later request containing its
-  structured return item, when that evidence exists.
-- Request durations are recorded wall-clock boundaries. No token-level latency,
-  pure generation time, or readable hidden reasoning is invented.
+The DSH interface provides turn/step grouping, request boundaries, folding, search, a timeline, virtualized rows, and a resizable inspector. Details include Markdown, code, JSON, prompt/tool diffs, and recorded images. Complete Codex context and original request/response JSON remain separate views.
 
-Current bounds: schema versions 1 and 2; 256 MiB event log; 64 MiB individual payload;
-200 execution records per page. Loaded ledger metadata remains resident and only
-visible rows are mounted. Completed detail bodies use a 20-record / 16 MiB cache
-budget apart from active reads and selections. Payload, text, projection and image
-caches are bounded. A limit error is explicit; full content is never silently
-presented as complete after truncation. `state.json` is not rewritten.
+The panel joins recordings only for the same exact root thread. Resumed tasks preserve prior history and stable identities. Inherited fork history is deduplicated against confirmed ancestors. Compaction shows recorded application state, before/after counts, and opaque items without inventing hidden text. Subtool declarations come from the recording, including unambiguous recorded code-mode TypeScript sections when JSON schema is absent.
 
-Tool content blocks preserve text and image order, including code-cell images.
-Business JSON fields named `value` are retained. Image bytes are loaded only from
-the recording, with shared decoding, retry, original-image preview and browser
-file dragging. Unrecorded image bytes stay unavailable.
+The model-facing `show_rollout_trace` tool returns launch metadata. Detailed request and tool bodies are exposed through app-only tools for inspection. These visibility hints depend on the host; they are not an operating-system sandbox.
 
-## Runtime
+Theme and language follow the host. Upstream controls support eight locales; Codex-specific text uses Chinese or English fallback.
 
-Python 3.9+ and Codex are required. No Python packages or network service are
-needed. The frontend is bundled into one MCP App resource. Tested on macOS arm64
-with Codex CLI 0.163.0. Other client versions may require compatibility updates.
+## Runtime and limits
 
-The optional `--preview` server binds only to loopback and requires a random,
-HttpOnly, SameSite cookie. It uses the same frontend and data tools as the native
-app; `/harness` additionally exercises the MCP Apps postMessage handshake.
+Python **3.9+**, available as `python3`, and a compatible Codex client are required. No Python packages or Node.js runtime are needed for this built plugin. macOS arm64 has been checked locally; Linux and Windows native integrations remain best effort. Codex CLI 0.163.0 was the original integration baseline, not a minimum-version guarantee.
 
-Browser reviews cover the image gallery, tool/code/assistant images, actual file
-dragging, copying, navigation and narrow/dark layouts. Version 0.2.9 additionally
-repairs the mode-selection, cold parent-link, shared preference and focus-style
-differences found by direct upstream comparison. Its installed UI has been
-clicked through, including early-call navigation across 301 history records and
-all eight host locale notifications. The native panel and schema-2 desktop
-recordings have since been observed live. The new top-navigation checks and
-native update result are recorded separately in `reports/topbar-0210-validation.json`;
-the local preview and bridge harness remain separate evidence. See the
-repository's `docs/DSH_PARITY.md`.
+- Recording schemas: 1 and 2.
+- Event-log bound: 256 MiB, including a current-chat aggregate.
+- Individual payload bound: 64 MiB.
+- Default overview page: 200 execution records.
+- Long text is read in 48,000-character chunks; complete copy is available.
+- Payload, projection, text, image, and completed-detail caches are bounded. Active reads and selections may consume additional memory.
+
+An exceeded limit is reported explicitly. The reader does not silently present truncated content as complete. Missing continuation prefixes, uncaptured image bytes, opaque compaction text, and unrecorded generation metrics remain unavailable. Original recording files, including `state.json`, are not rewritten.
+
+## Data and privacy
+
+The catalog reads the default `$CODEX_HOME/rollout-traces` directory (default `~/.codex/rollout-traces`), the `CODEX_ROLLOUT_TRACE_ROOT` environment variable, and explicitly registered directories. It does not read the ordinary Codex session archive as a substitute.
+
+Registration writes `$CODEX_HOME/rollout-viewer/config.json`, with a default root under `~/.codex`. The viewer itself does not upload recordings, contact a model, or send telemetry. It provides data to the local host for display; external links and copy/export actions can take content outside that view. Traces may contain credentials and private code. Share only data you have reviewed and redacted.
+
+The optional `python3 server/main.py --preview` server binds to `127.0.0.1` and prints a secret bootstrap URL. It uses a random authenticated cookie and same-origin checks. Treat that URL as a credential. `/harness` tests the MCP Apps bridge locally and does not prove native Codex integration.
+
+The `rollout-viewer` MCP namespace, resource namespace, and configuration keys remain for compatibility with earlier installations.
 
 ## Attribution
 
-Original DSH component styles © 2026 DeepSeek, MIT licensed. See the repository's
-`design/DSH-LICENSE.txt` and the license embedded in the bundled HTML. This project
-is independently maintained and is not an official OpenAI or DeepSeek product.
+This project is independently maintained and is **not an official OpenAI or DeepSeek product**. DSH components are MIT licensed, © 2026 DeepSeek. See the included `LICENSE` and `THIRD_PARTY_NOTICES.txt` for project and bundled dependency notices.

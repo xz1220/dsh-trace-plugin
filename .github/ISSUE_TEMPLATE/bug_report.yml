@@ -1,0 +1,52 @@
+name: Bug report
+description: Report a reproducible problem using synthetic or redacted data.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For vulnerabilities use SECURITY.md. Do not attach live traces, credentials, private prompts, or preview bootstrap URLs.
+  - type: input
+    id: plugin
+    attributes:
+      label: Codex Trace version
+      description: Include the installed version and whether the panel was reopened.
+    validations:
+      required: true
+  - type: input
+    id: client
+    attributes:
+      label: Codex client and version
+      placeholder: Desktop / CLI version, if known
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Operating system and Python version
+      placeholder: macOS arm64, Python 3.9.6
+    validations:
+      required: true
+  - type: input
+    id: schema
+    attributes:
+      label: Recording schema version
+      description: From manifest.json; write unknown if unavailable. Do not paste the recording.
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Prefer synthetic data. Identify whether this is the native panel, local preview, or bridge harness.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Redacted evidence
+      description: Include relevant errors or screenshots after reviewing them for sensitive content.

@@ -1,0 +1,18 @@
+name: Feature request
+description: Describe a user problem and the behavior that would help.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: Describe the task and where the current behavior gets in the way.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Include alternatives or a synthetic example if useful. Do not include private recordings.
+    validations:
+      required: true
