@@ -46,7 +46,7 @@ The frontend is bundled into `plugins/codex-dsh-trace/assets/viewer.html`. The s
 
 `vendor/dsh/upstream.json` pins the upstream commit and original file hashes. `vendor/dsh/patches.json` allows only reviewed adaptations, explained in `vendor/dsh/PATCHES.md`. Core component CSS remains upstream source. Host CSS strengthens the caption color token to meet AA text contrast. Format and lint configuration must exclude vendored source from automatic rewriting.
 
-## Compatibility identifiers
+## Current internal identifiers
 
 The display name is **Codex Trace**. The repository is `dsh-trace-plugin`; the plugin ID remains `codex-dsh-trace`. Earlier `rollout-viewer` identifiers remain in:
 
@@ -55,7 +55,10 @@ The display name is **Codex Trace**. The repository is `dsh-trace-plugin`; the p
 - saved display-preference keys;
 - the legacy `ui://rollout-viewer/viewer.html` resource alias.
 
-Keeping these identifiers avoids breaking installed clients, saved preferences, and existing launches. There is no scheduled removal. A future breaking migration must provide a documented path and explicit compatibility tests; renaming internal identifiers is not required for the current product name.
+These are internal development identifiers, not a public compatibility contract.
+The project has not had its first public release and has no migration users.
+Before that release, simplify or rename these identifiers directly when needed;
+do not build migration paths for internal development installations.
 
 ## Verification scope
 

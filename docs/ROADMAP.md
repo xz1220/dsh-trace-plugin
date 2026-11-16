@@ -1,5 +1,10 @@
 # Roadmap
 
+The project has not had its first public release and has no migration users.
+Pre-public development should favor a clean current implementation over migration
+paths or backward compatibility with internal development versions. Define the
+public compatibility policy when the first public release actually happens.
+
 This is a direction for future work, not a release schedule. Small reproducible issues and focused contributions are welcome.
 
 - **Native compatibility:** document tested Codex client versions and verify Linux/Windows integrations before claiming full platform support.
