@@ -18,7 +18,7 @@ Compaction details identify application state, before/after counts, and opaque i
 
 ## Identity
 
-The panel title is **Codex Trace**; the repository and plugin slug are `codex-dsh-trace`. DSH names the upstream interface source. Compatibility identifiers remain documented in [ARCHITECTURE.md](ARCHITECTURE.md#compatibility-identifiers).
+The panel title is **Codex Trace**; the repository is `dsh-trace-plugin` and the plugin slug is `codex-dsh-trace`. DSH names the upstream interface source. Compatibility identifiers remain documented in [ARCHITECTURE.md](ARCHITECTURE.md#compatibility-identifiers).
 
 The icon is a continuous rounded execution path joining three nodes. The current endpoint uses mint. The primary mark uses graphite `#181C1B`, white `#F4F7F6`, and mint `#64DFC2`. The dark-surface logo uses a light tile `#F0F5F3`, dark path `#18231F`, and teal endpoint `#087C65`.
 

@@ -2,9 +2,27 @@
 
 A local Codex MCP App for official `rollout-trace` recordings. Plugin ID: `codex-dsh-trace@rollout-local`.
 
+## Install and update
+
+```sh
+codex plugin marketplace add xz1220/dsh-trace-plugin
+codex plugin add codex-dsh-trace@rollout-local
+```
+
+The repository ships the built frontend; Node.js and a source build are not required. A private repository requires Git access.
+
+To update:
+
+```sh
+codex plugin marketplace upgrade rollout-local
+codex plugin add codex-dsh-trace@rollout-local
+```
+
+Fully quit and reopen Codex after updating to reload the backend and frontend.
+
 ## Open and record
 
-Install through the repository's local plugin marketplace; see the [source installation instructions](https://github.com/xz1220/codex-dsh-trace#install-from-source). Choose **Codex Trace** in the conversation's right-panel tools menu. The panel follows the current chat and new recordings automatically. It has no recording-management settings.
+See the [installation instructions](https://github.com/xz1220/dsh-trace-plugin#install). Choose **Codex Trace** in the conversation's right-panel tools menu. The panel follows the current chat and new recordings automatically. It has no recording-management settings.
 
 Enable recording before starting Codex:
 
@@ -12,7 +30,14 @@ Enable recording before starting Codex:
 CODEX_ROLLOUT_TRACE_ROOT="$HOME/.codex/rollout-traces" codex
 ```
 
-An already-running desktop process does not inherit shell environment changes. On macOS, the repository's `scripts/record.py --desktop-env` configures subsequently launched apps for the current login session; fully quit and reopen Codex afterwards. Existing history cannot be captured retroactively.
+An already-running desktop process does not inherit shell environment changes. On macOS, configure subsequently launched apps for the current login session:
+
+```sh
+mkdir -p -m 700 "$HOME/.codex/rollout-traces"
+launchctl setenv CODEX_ROLLOUT_TRACE_ROOT "$HOME/.codex/rollout-traces"
+```
+
+Fully quit and reopen Codex afterwards. Existing history cannot be captured retroactively.
 
 Register another directory with:
 

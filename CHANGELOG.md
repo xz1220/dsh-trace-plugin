@@ -6,6 +6,7 @@ User-visible changes are recorded here. Historical entries describe code changes
 
 ### Added
 
+- Direct Git marketplace installation and update commands, with recording setup that works without a source checkout.
 - Public installation, privacy, architecture, contribution, security, and roadmap documentation.
 - CI, formatting, linting, Python type checks, and generated-asset verification.
 - An isolated synthetic demo, browser/accessibility regressions, and protocol tests.
@@ -21,6 +22,7 @@ User-visible changes are recorded here. Historical entries describe code changes
 
 ### Changed
 
+- Rename the repository to `dsh-trace-plugin`, retaining the existing plugin ID and display name.
 - Archived machine-specific handoff notes and one-off validation logs outside the tracked source tree.
 
 ## 0.2.19 — 2026-11-16

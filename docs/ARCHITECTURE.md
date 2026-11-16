@@ -46,7 +46,7 @@ The `design/` directory contains historical studies with synthetic data. Those p
 
 ## Compatibility identifiers
 
-The display name is **Codex Trace**. The repository and plugin ID are `codex-dsh-trace`. Earlier `rollout-viewer` identifiers remain in:
+The display name is **Codex Trace**. The repository is `dsh-trace-plugin`; the plugin ID remains `codex-dsh-trace`. Earlier `rollout-viewer` identifiers remain in:
 
 - the MCP server key and tool/resource namespace;
 - `$CODEX_HOME/rollout-viewer/config.json`;

@@ -26,11 +26,35 @@ _截图来自使用合成数据的本地预览，不含私人聊天，也不代�
 
 已在 macOS arm64 做本地检查。最初集成使用 Codex CLI 0.163.0；这是历史测试基准，不是最低版本保证。CI 在 Ubuntu 检查读取器与构建；Linux 和 Windows 尚未完成原生 Codex 集成验证。目前支持录制格式 **schema 1 和 2**。
 
-## 从源码安装
+## 安装
 
 ```sh
-git clone https://github.com/xz1220/codex-dsh-trace.git
-cd codex-dsh-trace
+codex plugin marketplace add xz1220/dsh-trace-plugin
+codex plugin add codex-dsh-trace@rollout-local
+```
+
+仓库已包含构建好的前端，安装时无需 Node.js、npm 或手动克隆源码。如果仓库仍为私有，你的 Git 凭据需要有仓库访问权限。
+
+在聊天右侧工具菜单中打开 **Codex Trace**。新安装后若入口未出现，打开一个新聊天。
+
+## 更新
+
+```sh
+codex plugin marketplace upgrade rollout-local
+codex plugin add codex-dsh-trace@rollout-local
+```
+
+如果之前登记的是本地源码目录，先重新执行上面的两条安装命令，将 marketplace 切换到 Git 来源。
+
+更新后完全退出并重新打开 Codex，使后端与界面资源重新加载。仅重新打开面板可能仍使用旧版。为兼容已有安装，marketplace 标识保留为 `rollout-local`。
+
+## 从源码构建
+
+用于开发或通过本地 marketplace 安装：
+
+```sh
+git clone https://github.com/xz1220/dsh-trace-plugin.git
+cd dsh-trace-plugin
 npm ci
 npm run build
 codex plugin marketplace add "$PWD"
@@ -39,7 +63,7 @@ codex plugin add codex-dsh-trace@rollout-local
 
 在聊天右侧工具菜单中打开 **Codex Trace**。新安装后若入口未出现，重新打开面板或重启 Codex。不同 Codex 版本的菜单和插件命令可能有所不同。
 
-仓库及插件标识为 `codex-dsh-trace`，展示名称为 **Codex Trace**。原有 `rollout-viewer` MCP 标识与配置保留兼容，见[架构说明](docs/ARCHITECTURE.md#compatibility-identifiers)。
+仓库名为 `dsh-trace-plugin`，插件标识为 `codex-dsh-trace`，展示名称为 **Codex Trace**。原有 `rollout-viewer` MCP 标识与配置保留兼容，见[架构说明](docs/ARCHITECTURE.md#compatibility-identifiers)。
 
 ## 开启录制
 
@@ -51,21 +75,22 @@ codex plugin add codex-dsh-trace@rollout-local
 CODEX_ROLLOUT_TRACE_ROOT="$HOME/.codex/rollout-traces" codex
 ```
 
-也可以用辅助脚本录制一次任务：
+也可以录制一次 CLI 任务：
 
 ```sh
-python3 scripts/record.py -- exec --ephemeral "你的任务"
+CODEX_ROLLOUT_TRACE_ROOT="$HOME/.codex/rollout-traces" codex exec --ephemeral "你的任务"
 ```
 
 macOS 桌面端可为当前登录会话中后续启动的应用设置环境变量：
 
 ```sh
-python3 scripts/record.py --desktop-env
+mkdir -p -m 700 "$HOME/.codex/rollout-traces"
+launchctl setenv CODEX_ROLLOUT_TRACE_ROOT "$HOME/.codex/rollout-traces"
 ```
 
-随后完全退出并重新打开 Codex。注销系统后需要重新执行。关闭桌面录制可运行 `launchctl unsetenv CODEX_ROLLOUT_TRACE_ROOT` 并重启 Codex。脚本本身不会关闭应用。
+随后完全退出并重新打开 Codex。注销系统后需要重新执行。关闭桌面录制可运行 `launchctl unsetenv CODEX_ROLLOUT_TRACE_ROOT` 并重启 Codex。这些命令不会关闭应用。源码仓库也提供 `scripts/record.py` 作为录制辅助脚本。
 
-登记其他录制目录：
+在源码目录中登记其他录制目录：
 
 ```sh
 python3 plugins/codex-dsh-trace/server/main.py --register /absolute/path/to/recordings
@@ -81,7 +106,7 @@ python3 plugins/codex-dsh-trace/server/main.py --register /absolute/path/to/reco
 
 **侧栏没有内容。** 确认 Codex 启动前已经开启录制，且录制属于当前聊天。打开查看器不会自动开启录制。任务恢复后若新录制暂时为空，界面会继续等待。
 
-**安装后仍像旧版。** 安装文件与正在运行的客户端连接可能不同步。重新打开面板或重启 Codex；安装成功不等于旧面板已经重载。
+**安装后仍像旧版。** 安装文件与正在运行的客户端连接可能不同步。更新后完全退出并重新打开 Codex；安装成功不等于旧面板已经重载。
 
 **提示格式不支持或超过大小限制。** 当前支持 schema 1/2，事件日志上限 256 MiB、单个 payload 上限 64 MiB。超过限制会明确报错。聊天合并视图超过上限时，仍可通过 API 分别查看单份录制。
 

@@ -4,7 +4,7 @@ Codex Trace processes local recordings that can contain system instructions, cre
 
 ## Report a vulnerability
 
-Use [GitHub private vulnerability reporting](https://github.com/xz1220/codex-dsh-trace/security/advisories/new) if it is enabled for the repository. If that route is unavailable, open an issue containing only a request for a private contact channel, or use a private contact method listed on [the maintainer's profile](https://github.com/xz1220). Do not publish a live trace, credential, bootstrap URL, or exploit containing another person's data.
+Use [GitHub private vulnerability reporting](https://github.com/xz1220/dsh-trace-plugin/security/advisories/new) if it is enabled for the repository. If that route is unavailable, open an issue containing only a request for a private contact channel, or use a private contact method listed on [the maintainer's profile](https://github.com/xz1220). Do not publish a live trace, credential, bootstrap URL, or exploit containing another person's data.
 
 Include the affected version, operating system, relevant Codex version, impact, and minimal reproduction using synthetic data. Redact paths and secrets. We will coordinate disclosure once the issue and a repair are understood; response times are not guaranteed for this volunteer-maintained project.
 

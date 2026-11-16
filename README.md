@@ -26,11 +26,35 @@ _The screenshot uses synthetic data in the local preview. It does not contain a 
 
 macOS arm64 has been checked locally. The original integration used Codex CLI 0.163.0; that is a historical test baseline, not a minimum-version guarantee. CI checks the reader and build on Ubuntu; Linux and Windows native Codex integrations remain unverified. The reader supports recording schemas **1 and 2**.
 
-## Install from source
+## Install
 
 ```sh
-git clone https://github.com/xz1220/codex-dsh-trace.git
-cd codex-dsh-trace
+codex plugin marketplace add xz1220/dsh-trace-plugin
+codex plugin add codex-dsh-trace@rollout-local
+```
+
+The repository includes the built frontend. You do not need Node.js, npm, or a source checkout to install it. If the repository is private, your Git credentials must have access.
+
+Open **Codex Trace** from the conversation's right-panel tools menu. Open a new chat after installation if the entry does not appear.
+
+## Update
+
+```sh
+codex plugin marketplace upgrade rollout-local
+codex plugin add codex-dsh-trace@rollout-local
+```
+
+If you previously registered a local checkout, run the two Install commands first to switch the marketplace to the Git source.
+
+Fully quit and reopen Codex after updating so the backend and UI resource reload. Reopening only the panel can retain an older build. The marketplace identifier remains `rollout-local` for compatibility.
+
+## Build from source
+
+For development or a local marketplace installation:
+
+```sh
+git clone https://github.com/xz1220/dsh-trace-plugin.git
+cd dsh-trace-plugin
 npm ci
 npm run build
 codex plugin marketplace add "$PWD"
@@ -39,7 +63,7 @@ codex plugin add codex-dsh-trace@rollout-local
 
 Open **Codex Trace** from the conversation's right-panel tools menu. Reopen the panel or restart Codex after installation if the entry does not appear. Client menus and plugin commands can differ between Codex versions.
 
-The repository is `codex-dsh-trace`; the displayed product name is **Codex Trace**. Existing `rollout-viewer` MCP identifiers and configuration remain supported for compatibility. See [Architecture](docs/ARCHITECTURE.md#compatibility-identifiers).
+The repository is `dsh-trace-plugin`; the plugin ID is `codex-dsh-trace` and the displayed product name is **Codex Trace**. Existing `rollout-viewer` MCP identifiers and configuration remain supported for compatibility. See [Architecture](docs/ARCHITECTURE.md#compatibility-identifiers).
 
 ## Enable recording
 
@@ -51,21 +75,22 @@ For a new CLI process:
 CODEX_ROLLOUT_TRACE_ROOT="$HOME/.codex/rollout-traces" codex
 ```
 
-Or record one scripted task with the helper:
+Or record one scripted task:
 
 ```sh
-python3 scripts/record.py -- exec --ephemeral "your task"
+CODEX_ROLLOUT_TRACE_ROOT="$HOME/.codex/rollout-traces" codex exec --ephemeral "your task"
 ```
 
 On macOS, configure subsequently launched desktop apps for the current login session:
 
 ```sh
-python3 scripts/record.py --desktop-env
+mkdir -p -m 700 "$HOME/.codex/rollout-traces"
+launchctl setenv CODEX_ROLLOUT_TRACE_ROOT "$HOME/.codex/rollout-traces"
 ```
 
-Fully quit and reopen Codex afterwards. Repeat the command after logging out. To disable desktop recording, run `launchctl unsetenv CODEX_ROLLOUT_TRACE_ROOT` and restart Codex. The helper does not close the application itself.
+Fully quit and reopen Codex afterwards. Repeat the command after logging out. To disable desktop recording, run `launchctl unsetenv CODEX_ROLLOUT_TRACE_ROOT` and restart Codex. These commands do not close the application. Source checkouts also include `scripts/record.py` as a recording helper.
 
-To register another recording directory:
+From a source checkout, register another recording directory:
 
 ```sh
 python3 plugins/codex-dsh-trace/server/main.py --register /absolute/path/to/recordings
@@ -81,7 +106,7 @@ The reader has no upload, analytics, or remote-service integration. Recording da
 
 **The viewer is empty.** Confirm recording was enabled before the Codex process started and that its root matches the current chat. Opening the viewer does not start recording. An empty resumed recording waits for new data automatically.
 
-**The plugin still looks like an older version.** Installed files and an open Codex connection can differ. Reopen the panel or restart the client. Installing a package alone does not prove that a running panel has reloaded.
+**The plugin still looks like an older version.** Installed files and an open Codex connection can differ. Fully quit and reopen the client after updating. Installing a package alone does not prove that a running panel has reloaded.
 
 **A recording is unsupported or too large.** Schemas 1 and 2 are supported. The current limits are 256 MiB of event logs and 64 MiB per payload. Limits produce an explicit error. A current-chat aggregate over the limit can still be inspected as individual captures through the API.
 
