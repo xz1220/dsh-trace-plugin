@@ -45,8 +45,9 @@ names, existing recording configuration and saved display preferences. The new
 plugin ID is distinct from earlier cached installations.
 
 Version 0.2.19 displays **Codex Trace** with an execution-path composer icon and
-light/dark plugin logos. Its plugin ID remains `codex-dsh-trace`. This branding
-update has not been installed or verified in the native Codex panel yet.
+light/dark plugin logos. Its plugin ID remains `codex-dsh-trace`. Version 0.2.19
+is installed locally and its installed metadata/assets have been checked. The
+native panel must be reopened before the new branding can be visually verified.
 
 Subtool Schema inspection prefers the recorded JSON declaration. For code-mode
 subtools whose declaration exists only inside the parent request's recorded

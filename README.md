@@ -85,8 +85,9 @@ artifacts retain the names used when they were produced.
 
 Version 0.2.19 uses the shorter display name **Codex Trace** and an execution-path
 icon, with light and dark logos. The repository and plugin ID remain
-`codex-dsh-trace`. This branding update has not been installed or verified in the
-native Codex panel yet.
+`codex-dsh-trace`. Version 0.2.19 is installed locally and the legacy plugin entry
+is disabled. Reopening the native panel is pending; its new branding has not yet
+been visually verified. See `reports/branding-install-0219-validation.json`.
 
 Record a new CLI task with `python3 scripts/record.py -- exec --ephemeral "task"`.
 Recording directories can be registered through the backend's `--register PATH`

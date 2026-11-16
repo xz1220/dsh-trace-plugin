@@ -1,0 +1,16 @@
+{
+  "pluginId": "codex-dsh-trace@rollout-local",
+  "version": "0.2.19",
+  "displayName": "Codex Trace",
+  "installedFilesMatchSource": true,
+  "checkedInstalledFiles": 7,
+  "nativePluginListRecognizesBranding": true,
+  "newPluginEnabled": true,
+  "legacyPluginEnabled": false,
+  "legacyCacheRemoved": false,
+  "mcpConfigReloadAcknowledged": true,
+  "installedEntryTitle": "Codex Trace",
+  "installedResourceUri": "ui://rollout-viewer/viewer-0.2.19.html",
+  "nativePanelUpdated": false,
+  "nativePanelStatus": "Awaiting user reopen; computer use is not permitted to control the Codex main window."
+}

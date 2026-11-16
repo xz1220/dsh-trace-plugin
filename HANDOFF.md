@@ -1,5 +1,13 @@
 # 从这里继续：Codex Trace
 
+## 当前：0.2.19 已安装，等待重新打开原生面板
+
+- 用户明确要求更新安装并让当前面板显示新名称/图标。已通过官方 CLI 安装 `codex-dsh-trace@rollout-local` **0.2.19**，缓存目录 `/Users/danielxing/.codex/plugins/cache/rollout-local/codex-dsh-trace/0.2.19`。
+- 官方桌面 app-server 的 `plugin/list` 已返回新名称 **Codex Trace**、版本 0.2.19、installed/enabled=true，以及三个正确的图标路径。七个安装文件与源码 SHA-256 一致，安装包 stdio/RPC 的入口标题、资源 URI 与 HTML 标题通过。
+- 新旧插件 ID 不同。已通过官方 `config/value/write` 将 `rollout-viewer@rollout-local.enabled` 设为 false，新 ID 保持 enabled=true；旧缓存及录制数据未删除。`config/mcpServer/reload` 已确认。
+- **原生新标签未验收**：旧面板停止后，MCP Apps tab 列表为空；本轮模型工具连接仍返回旧名称，不能用它打开新 ID。Computer Use 明确拒绝控制 `com.openai.codex` 主窗口，未绕过限制、未重启桌面或后台。已请用户关闭旧标签，从右侧 `+ → 更多工具 → Plugins and MCPs → Codex Trace` 重新打开，等待用户操作后再核对。
+- 安装证据在 `reports/branding-install-0219-validation.json`；详细本地回执在 `local-context/review/branding-install-0219/`。后续先用 CUA `listTabs` 找新 tab，不复用已失效的旧 tab1。用户重新打开之前，不得声称新图标与标题已显示。
+
 ## 最新：0.2.19 图标与展示名称
 
 - 产品展示名改为 **Codex Trace**；manifest、原生入口工具标题、资源名称、MCP Apps 握手、HTML 标题和无障碍标签同步。插件配置接入执行路径图标与浅色/深色 logo。
