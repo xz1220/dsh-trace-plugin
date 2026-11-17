@@ -18,6 +18,8 @@ The following local additions are deliberate and listed in `patches.json`:
   for lazy local payloads, and three Codex evidence tabs (complete context, raw
   request, raw response). Skip image dimensions absent from the recording and
   render recorded code-cell images through the existing output-block renderer.
+  Show attachment sizes only for verified non-negative safe-integer byte counts,
+  leaving unknown sizes blank to avoid `NaNGB` or a fabricated `0`.
   Request-only anchors use the correct generation/compaction accessibility label.
   Existing DSH tabs and layout are retained.
   Native Enter/Space activation on request buttons stops at the button so the
