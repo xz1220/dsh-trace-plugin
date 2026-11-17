@@ -1,42 +1,45 @@
 # Codex Trace
 
-Read recorded Codex requests, nested tool calls, compaction, and execution timing alongside your conversation.
+Bring the DSH trace-viewing experience into Codex. Inspect agent actions and their recorded evidence to understand and use agents better.
 
-[简体中文](README.zh-CN.md) · [Contributing](.github/CONTRIBUTING.md) · [Architecture](docs/ARCHITECTURE.md) · [Security](.github/SECURITY.md)
+View recorded model requests, tool calls, context changes, and execution timing alongside your conversation. The current integration is **macOS / Codex**.
+
+[简体中文](README.zh-CN.md) · [Installer guide](docs/INSTALLER.md) · [Contributing](.github/CONTRIBUTING.md) · [Security](.github/SECURITY.md)
 
 ![Codex Trace displaying a synthetic execution recording](docs/images/trace-viewer.png)
 
-_The screenshot uses synthetic data in the local preview. It does not contain a private conversation or demonstrate a native Codex installation._
+_The screenshot uses synthetic data in the local preview. It contains no private conversation and does not demonstrate native Codex acceptance._
 
-## Features
+## What you can inspect
 
-- Open the current chat's recording automatically and follow new events.
-- Explore the DSH timeline and execution ledger with folding, search, and a resizable inspector.
-- Compare reconstructed context with the incremental request and original response JSON.
-- Follow nested calls, recorded subtool declarations, and tool results, including recorded images.
-- Keep earlier requests visible across resumed recordings, fork history, and compaction.
-- Read large recordings through incremental indexing, virtualized rows, and on-demand details.
-- Follow the host's theme and language. Upstream controls support eight locales; Codex-specific text currently falls back to Chinese or English.
+- **How execution unfolds:** use the DSH timeline and ledger to inspect requests, nested tool calls, results, and recorded images, with search, folding, and a detail inspector.
+- **What the model receives:** compare reconstructed complete context, the incremental request actually sent, and original response JSON.
+- **Where time goes:** inspect available request and tool timing to locate steps that need closer examination.
+- **How history continues:** keep existing history and its sources visible across resumed tasks, forks, and compaction, while following new events for the current chat.
 
-## Requirements
+The viewer uses official `rollout-trace` recordings. Uncaptured images, opaque compacted text, and missing timing remain unavailable. It cannot recover earlier unrecorded execution or guarantee an explanation of every model decision.
 
-- macOS and a Codex client that supports local plugins, MCP Apps, and official `rollout-trace` recording. Compatibility depends on the client and recording schema.
-- Python **3.9+** available as `python3`. No Python packages are required.
-- Node.js **20.19+** and npm/npx for the setup helper or source development. The installed Python backend does not need Node.js at runtime.
+## Get started
 
-macOS arm64 has been checked locally. The original integration used Codex CLI 0.163.0; that is a historical test baseline, not a minimum-version guarantee. CI checks the reader and build on Ubuntu; Linux and Windows native Codex integrations remain unverified. The reader supports recording schemas **1 and 2**.
+You need macOS and a compatible Codex client with local plugins, MCP Apps, and official recording support. Setup also needs a `codex` CLI on PATH with plugin commands, `python3` (Python 3.9+), and Node.js 20.19+ with npm/npx. The reader supports recording schemas 1 and 2; other systems and hosts are not claimed as supported.
 
-## Install
+**Validation scope:** the first npm release, `0.2.19`, has installation-lifecycle evidence from an isolated environment. Native-sidebar acceptance and recording startup order after login remain unverified. Compatibility depends on the client version and recording format; installation success alone does not establish native readiness.
 
 ```sh
 npx dsh-trace-extension setup
 ```
 
-The package includes the built plugin and setup tools. Setup displays its plan, installs a stable local copy, and configures recording after confirmation. It does not require a GitHub account, a source checkout, or a frontend build.
+1. Review the files and settings in the setup plan, then confirm installation.
+2. Fully quit and reopen Codex so the new process receives the recording settings.
+3. Run a new task, then open **Codex Trace** from the conversation's right-panel tools menu.
 
-Fully quit and reopen Codex after setup, run a new task, then open **Codex Trace** from the conversation's right-panel tools menu.
+The package includes the built plugin: no GitHub login, source checkout, or local build is required. Setup installs a stable local copy and configures recording; clearing the npm cache does not remove that copy. Recording must be enabled before the Codex process starts. Opening the viewer does not start recording.
 
-See the [installer guide](docs/INSTALLER.md) for configuration options and the first release, [`0.2.19`](https://www.npmjs.com/package/dsh-trace-extension/v/0.2.19).
+See the [installer guide](docs/INSTALLER.md) for options and validation limits. To review the plan first:
+
+```sh
+npx dsh-trace-extension setup --dry-run
+```
 
 ## Check and uninstall
 
@@ -45,86 +48,26 @@ npx dsh-trace-extension doctor
 npx dsh-trace-extension uninstall
 ```
 
-Uninstall preserves recordings and unrelated configuration. Repeat setup reuses its own unchanged installation. Future cross-version upgrades will be documented and verified before release.
-
-## Build from source
-
-For development or a local marketplace installation:
-
-```sh
-git clone https://github.com/xz1220/dsh-trace-plugin.git
-cd dsh-trace-plugin
-npm ci
-npm run build
-codex plugin marketplace add "$PWD"
-codex plugin add codex-dsh-trace@rollout-local
-```
-
-Open **Codex Trace** from the conversation's right-panel tools menu. Reopen the panel or restart Codex after installation if the entry does not appear. Client menus and plugin commands can differ between Codex versions.
-
-The npm package is `dsh-trace-extension`; the repository is `dsh-trace-plugin`, the plugin ID is `codex-dsh-trace`, and the native entry is **Codex Trace**. See [Architecture](docs/ARCHITECTURE.md#current-internal-identifiers) for internal namespaces.
-
-## Manual recording (optional)
-
-The setup helper configures desktop recording; these manual commands are for source development or a separately configured CLI. Recording must be enabled **before Codex starts**. Existing conversations cannot be captured retroactively.
-
-For a new CLI process:
-
-```sh
-CODEX_ROLLOUT_TRACE_ROOT="$HOME/.codex/rollout-traces" codex
-```
-
-Or record one scripted task:
-
-```sh
-CODEX_ROLLOUT_TRACE_ROOT="$HOME/.codex/rollout-traces" codex exec --ephemeral "your task"
-```
-
-On macOS, configure subsequently launched desktop apps for the current login session:
-
-```sh
-mkdir -p -m 700 "$HOME/.codex/rollout-traces"
-launchctl setenv CODEX_ROLLOUT_TRACE_ROOT "$HOME/.codex/rollout-traces"
-```
-
-Fully quit and reopen Codex afterwards. Repeat the command after logging out. To disable desktop recording, run `launchctl unsetenv CODEX_ROLLOUT_TRACE_ROOT` and restart Codex. These commands do not close the application. Source checkouts also include `scripts/record.py` as a recording helper.
-
-From a source checkout, register another recording directory:
-
-```sh
-python3 plugins/codex-dsh-trace/server/main.py --register /absolute/path/to/recordings
-```
-
-## Privacy and data
-
-The plugin reads official local trace bundles from the default recording root, `CODEX_ROLLOUT_TRACE_ROOT`, and directories you register. It does not substitute ordinary session logs. Registration writes a small configuration file under `$CODEX_HOME/rollout-viewer/` (default `~/.codex/rollout-viewer/`); it does not modify recordings.
-
-The reader has no upload, analytics, or remote-service integration. Recording data is delivered to the local Codex app for display. The optional preview serves the same data on authenticated loopback HTTP. Follow external links and use copy or export actions with care: recordings can include credentials, private code, prompts, and images. Read [Security](.github/SECURITY.md) before sharing a trace or screenshot.
+doctor checks settings and files. Repeat setup reuses its own unchanged installation; uninstall preserves recordings and unrelated configuration. Cross-version upgrade behavior will be documented and verified before a future release, using `0.2.19` as the compatibility baseline.
 
 ## Troubleshooting
 
-**The viewer is empty.** Confirm recording was enabled before the Codex process started and that its root matches the current chat. Opening the viewer does not start recording. An empty resumed recording waits for new data automatically.
+**The panel is empty.** Check that recording was enabled before Codex started and that the recording belongs to the current chat. Earlier execution cannot be captured retroactively. An empty resumed recording continues waiting for new events.
 
-**The plugin still looks like an older version.** Installed files and an open Codex connection can differ. Fully quit and reopen the client after updating. Installing a package alone does not prove that a running panel has reloaded.
+**Text, images, or timing are missing.** The viewer displays available evidence without inventing uncaptured content. Unsupported formats and exceeded limits produce explicit errors; event logs are limited to 256 MiB and each payload to 64 MiB.
 
-**A recording is unsupported or too large.** Schemas 1 and 2 are supported. The current limits are 256 MiB of event logs and 64 MiB per payload. Limits produce an explicit error. A current-chat aggregate over the limit can still be inspected as individual captures through the API.
+**The panel still looks like an older version.** Installed files and an open panel can differ. Fully quit and reopen the client before checking again. See the [installer guide](docs/INSTALLER.md).
 
-**Some historical text or timing is missing.** The viewer shows what was recorded. Opaque compaction items, uncaptured images, missing continuation prefixes, and unrecorded generation timings cannot be reconstructed reliably.
+## Data handling
 
-## Development
+The plugin reads official recordings locally without modifying them; explicit directory registration writes local configuration. The reader has no active recording upload, analytics, or remote-service integration. Native mode passes content to the local Codex host for display; optional preview uses authenticated loopback HTTP.
 
-```sh
-npm ci
-npm run build
-npm test
-```
+Recordings can contain prompts, credentials, private code, tool output, and images. Local processing does not eliminate every risk or guarantee how the host handles received data. Read [Security](.github/SECURITY.md) before copying, exporting, sharing screenshots, or following external links.
 
-Run `npm run demo` for an isolated synthetic recording without access to personal Codex data.
+## Contribute
 
-Start with this README for installation and use, then follow the [contribution guide](.github/CONTRIBUTING.md) for setup, checks, and the repository map. Read the [architecture](docs/ARCHITECTURE.md) when changing the reader or UI; [product behavior](docs/PRODUCT.md) and the [roadmap](docs/ROADMAP.md) provide the detailed constraints and planned work.
+Use [GitHub Issues and PRs](.github/CONTRIBUTING.md#issues-and-proposals) for feedback and contributions. Discuss larger changes first. The maintainer prioritizes work using evidence and scope, without fixed response or repair deadlines. See [Contributing](.github/CONTRIBUTING.md) for development setup, repository paths, and checks, and [development usage](.github/CONTRIBUTING.md#source-installation-and-manual-recording) for source installation and manual recording. Run `npm run demo` from a source checkout for isolated synthetic recordings without reading personal Codex data. Use synthetic examples in reports.
 
-## Attribution and license
+See [Architecture](docs/ARCHITECTURE.md), [Product behavior](docs/PRODUCT.md), and the [Roadmap](docs/ROADMAP.md) for implementation and behavior boundaries.
 
-Independently maintained; **not an official OpenAI or DeepSeek product**. The interface includes MIT-licensed components from [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness), pinned and documented in [vendor/dsh/PATCHES.md](vendor/dsh/PATCHES.md). DSH refers to that upstream project.
-
-This project's code is MIT licensed; see [LICENSE](LICENSE). Built plugin packages include `LICENSE` and `THIRD_PARTY_NOTICES.txt` with the bundled dependencies' notices.
+Independently maintained; **not an official OpenAI or DeepSeek product**. The interface includes pinned, MIT-licensed components from [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH); see [vendor/dsh/PATCHES.md](vendor/dsh/PATCHES.md) for adaptations. This project is [MIT licensed](LICENSE), and distributions include third-party notices.
