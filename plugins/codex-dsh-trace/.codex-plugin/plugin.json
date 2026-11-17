@@ -1,6 +1,6 @@
 {
   "name": "codex-dsh-trace",
-  "version": "0.2.19",
+  "version": "0.2.20",
   "description": "Inspect official Codex rollout-trace requests, tool calls, and execution timing.",
   "license": "MIT",
   "mcpServers": "./.mcp.json",

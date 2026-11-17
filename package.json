@@ -1,7 +1,7 @@
 {
   "name": "codex-dsh-trace",
   "private": true,
-  "version": "0.2.19",
+  "version": "0.2.20",
   "scripts": {
     "build": "node scripts/build-plugin.mjs",
     "test": "npm run test:python && npm run test:node",
