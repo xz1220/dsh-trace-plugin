@@ -251,28 +251,29 @@ class BundleTests(unittest.TestCase):
             manager.apply(Transaction().write, Transaction().ensure)
         self.assertEqual(catalog.read_text(), "a concurrent edit")
 
-    def test_different_development_bundle_requires_rebuilding_the_environment(self):
+    def test_same_version_changed_contents_are_preserved(self):
         original, _ = self.install()
         before = {p: p.read_bytes() for p in original.source_path.rglob("*") if p.is_file()}
-        candidates = [
-            self.create_payload(self.root / "other-version", "0.3.0"),
-            self.create_payload(self.root / "other-content", extra=b"changed candidate"),
-        ]
+        candidates = [self.create_payload(self.root / "other-content", extra=b"changed candidate")]
         for payload in candidates:
             candidate = self.manager(payload)
-            with self.assertRaisesRegex(bundle.BundleError, "different development bundle"):
+            with self.assertRaisesRegex(bundle.BundleError, "different package contents"):
                 candidate.plan()
-            self.assertEqual(candidate.verify()["status"], "different-development-bundle")
+            self.assertTrue(candidate.verify()["valid"])
+            self.assertFalse(candidate.verify()["currentCandidate"])
             self.assertEqual({p: p.read_bytes() for p in before}, before)
 
-    def test_different_python_pin_is_a_different_development_candidate(self):
+    def test_verified_release_can_repin_python_and_retains_old_bundle(self):
         self.install()
         python = self.root / "other-python"
         python.write_text("#!/bin/sh\nexit 0\n")
         python.chmod(0o700)
         candidate = self.manager(python=str(python))
-        with self.assertRaisesRegex(bundle.BundleError, "rebuild the isolated"):
-            candidate.plan()
+        original = self.manager().active_receipt()
+        candidate.plan()
+        candidate.apply(Transaction().write, Transaction().ensure)
+        self.assertEqual(candidate.verify()["pythonExecutable"], str(python))
+        self.assertTrue((candidate.source_path / original["activeBundle"]).is_dir())
 
     def test_unlisted_cache_files_are_not_copied(self):
         (self.payload / "private-recording.json").write_text("not distributed")

@@ -13,7 +13,7 @@ function help() {
 
 Usage: npx dsh-trace-extension [setup|doctor|uninstall] [options]
 
-  setup          Install the bundled plugin and configure recording (default)
+  setup          Install, update or repair the owned plugin (default)
   doctor         Check the installation without changing settings
   uninstall      Remove only unchanged, helper-owned settings and files
 
