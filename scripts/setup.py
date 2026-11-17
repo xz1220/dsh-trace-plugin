@@ -864,9 +864,8 @@ class Installer:
                 raise SetupError(f"Expected a directory; preserving existing path: {path}")
         self.check_owned_agent()
         marketplace_exists = self.inspect_marketplace()
-        bundle_plan = self.bundled("plan")
         plugin = self.installed_plugin(marketplace_exists)
-        receipt = self.bundle.previous_receipt
+        receipt = self.bundled("active_receipt", allow_missing=True)
         if self.state and (
             receipt is None or self.state["bundle"]["version"] != receipt["version"]
         ):
@@ -913,6 +912,32 @@ class Installer:
                 raise SetupError(
                     f"Preserving an edited or unowned target cache at {target_cache.get('path', 'unknown')}. Review those paths before installing this release."
                 )
+        recovery_files = {}
+        source_recovery_cache = None
+        if receipt and self.bundle.missing_files and plugin_owned:
+            old_plugin = plugin
+            if plugin and plugin.get("version") != receipt["version"] and self.pending:
+                old_plugin = self.pending["origin"]["plugin"]
+            if old_plugin and old_plugin.get("version") == receipt["version"]:
+                old_cache = self.cache_report(old_plugin, self.bundled("cache_files", receipt))
+                if old_cache["verified"] and not old_cache["extra"]:
+                    source_recovery_cache = (
+                        old_plugin,
+                        self.bundled("cache_files", receipt),
+                        old_cache,
+                    )
+                    prefix = receipt["activeBundle"] + "/plugins/codex-dsh-trace/"
+                    for name in self.bundle.missing_files:
+                        if not name.startswith(prefix):
+                            continue
+                        cached = Path(old_cache["path"]) / name[len(prefix) :]
+                        data = self.bytes_at(cached)
+                        if data is None or digest(data) != receipt["files"][name]:
+                            raise SetupError(
+                                f"Old cache changed while preparing source recovery: {cached}. Preserve it before retrying."
+                            )
+                        recovery_files[name] = data
+        bundle_plan = self.bundled("plan", recovery_files=recovery_files)
         current_env = self.environment()
         old_owned = bool(
             self.state
@@ -991,6 +1016,7 @@ class Installer:
             "_observed_source": self.observed_source,
             "_cache": cache,
             "_cache_expected": expected_cache,
+            "_source_recovery_cache": source_recovery_cache,
         }
 
     def revalidate(self, plan):
@@ -1015,6 +1041,12 @@ class Installer:
             raise SetupError(
                 "Installed files changed since inspection; preserve them and rerun setup."
             )
+        if plan["_source_recovery_cache"]:
+            old_plugin, expected, observed = plan["_source_recovery_cache"]
+            if self.cache_report(old_plugin, expected) != observed:
+                raise SetupError(
+                    "Old cache changed since source recovery was inspected; preserve it before retrying."
+                )
 
     def ensure_directory(self, path):
         safe_path(path)

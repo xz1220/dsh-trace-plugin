@@ -154,6 +154,99 @@ class RecoveryTests(unittest.TestCase):
         self.install()
         self.assertEqual(server.read_bytes(), expected)
 
+    def test_missing_old_source_uses_verified_old_cache_before_updating(self):
+        old, _ = self.install()
+        receipt = old.bundle.active_receipt()
+        source = (
+            old.bundle.source_path
+            / receipt["activeBundle"]
+            / "plugins/codex-dsh-trace/server/store.py"
+        )
+        original = source.read_bytes()
+        source.unlink()
+        cache_before = fixtures.tree_snapshot(self.cache(old))
+        payload = self.newer()
+        new_file = payload / "plugins/codex-dsh-trace/server/store.py"
+        new_file.write_bytes(b"# different new implementation\n")
+        manifest_path = payload / "bundle-manifest.json"
+        manifest = json.loads(manifest_path.read_text())
+        manifest["files"]["plugins/codex-dsh-trace/server/store.py"] = fixtures.setup.digest(
+            new_file.read_bytes()
+        )
+        manifest_path.write_text(json.dumps(manifest))
+        updated, result = self.install(payload)
+        self.assertEqual(result["pluginVersion"], "0.2.20")
+        self.assertEqual(source.read_bytes(), original)
+        self.assertNotEqual(source.read_bytes(), new_file.read_bytes())
+        self.assertEqual(fixtures.tree_snapshot(self.cache(old)), cache_before)
+        self.assertFalse(updated.pending_path.exists())
+
+    def test_missing_old_source_without_original_cache_bytes_stops_honestly(self):
+        old, _ = self.install()
+        receipt = old.bundle.active_receipt()
+        (
+            old.bundle.source_path
+            / receipt["activeBundle"]
+            / "plugins/codex-dsh-trace/server/store.py"
+        ).unlink()
+        (self.cache(old) / "server/store.py").unlink()
+        before = fixtures.tree_snapshot(self.home)
+        with self.assertRaises(fixtures.setup.SetupError) as raised:
+            self.install(self.newer())
+        self.assertNotIn("npx dsh-trace-extension@0.2.19 setup", str(raised.exception))
+        self.assertIn("original", str(raised.exception))
+        self.assertEqual(fixtures.tree_snapshot(self.home), before)
+
+    def test_legacy_source_recovery_preserves_modified_cache_and_confirmation_edits(self):
+        old, _ = self.install()
+        receipt = old.bundle.active_receipt()
+        source = (
+            old.bundle.source_path
+            / receipt["activeBundle"]
+            / "plugins/codex-dsh-trace/server/store.py"
+        )
+        source.unlink()
+        cached = self.cache(old) / "server/store.py"
+        original = cached.read_bytes()
+        cached.write_bytes(b"# user edit\n")
+        before = fixtures.tree_snapshot(self.home)
+        payload = self.newer()
+        with self.assertRaisesRegex(fixtures.setup.SetupError, "edited"):
+            self.install(payload)
+        self.assertEqual(fixtures.tree_snapshot(self.home), before)
+        cached.write_bytes(original)
+        updated = self.installer(payload)
+        with patch.object(
+            updated, "confirm", side_effect=lambda _: cached.write_bytes(b"# concurrent edit\n")
+        ):
+            with self.assertRaisesRegex(fixtures.setup.SetupError, "Installed files changed"):
+                updated.setup()
+        self.assertFalse(source.exists())
+        self.assertEqual(cached.read_bytes(), b"# concurrent edit\n")
+
+    def test_failed_update_after_old_source_restoration_can_retry(self):
+        old, _ = self.install()
+        receipt = old.bundle.active_receipt()
+        source = (
+            old.bundle.source_path
+            / receipt["activeBundle"]
+            / "plugins/codex-dsh-trace/server/store.py"
+        )
+        original = source.read_bytes()
+        source.unlink()
+        before = fixtures.tree_snapshot(self.cache(old))
+        payload = self.newer()
+        self.system.failure = "plugin add codex-dsh-trace"
+        with self.assertRaisesRegex(fixtures.setup.SetupError, "Retry: npx"):
+            self.install(payload)
+        self.assertEqual(source.read_bytes(), original)
+        self.assertEqual(fixtures.tree_snapshot(self.cache(old)), before)
+        self.system.failure = None
+        updated, result = self.install(payload)
+        self.assertEqual(result["pluginVersion"], "0.2.20")
+        self.assertEqual(source.read_bytes(), original)
+        self.assertFalse(updated.pending_path.exists())
+
     def test_user_cache_edit_blocks_setup_uninstall_and_backend_probe(self):
         instance, _ = self.install()
         (self.cache(instance) / "server/main.py").write_text("# user change")

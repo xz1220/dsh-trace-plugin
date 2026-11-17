@@ -428,13 +428,26 @@ class BundledMarketplace:
     def _different_candidate_message(self):
         return (
             f"The same version has different package contents at {self.source_path}. "
-            "Use its original published package to repair it, or a newer release to update. "
+            "Keep the installed release and select a newer stable package; do not replace a published version's contents. "
             "Historical development sources and user changes are preserved."
         )
 
-    def plan(self):
+    def plan(self, recovery_files=None):
         receipt, receipt_raw = self._load_owned(allow_missing=True)
         self.previous_receipt = receipt
+        repairs = {}
+        for name, data in (recovery_files or {}).items():
+            if (
+                not receipt
+                or name not in self.missing_files
+                or not name.startswith(receipt["activeBundle"] + "/" + PREFIX)
+                or not isinstance(data, bytes)
+                or digest(data) != receipt["files"].get(name)
+            ):
+                raise BundleError(
+                    "Recovery bytes do not match a missing file owned by the old receipt."
+                )
+            repairs[name] = data
         if receipt:
             old = tuple(int(x) for x in receipt["version"].split("-")[0].split("."))
             new = tuple(int(x) for x in self.version.split("-")[0].split("."))
@@ -444,9 +457,18 @@ class BundledMarketplace:
                 )
             if new == old and receipt["packageDigest"] != self.package_digest:
                 raise BundleError(self._different_candidate_message())
-            if self.missing_files and receipt["packageDigest"] != self.package_digest:
+            unresolved = sorted(set(self.missing_files) - set(repairs))
+            if unresolved and receipt["packageDigest"] != self.package_digest:
                 raise BundleError(
-                    f"Repair the installed source first: npx dsh-trace-extension@{receipt['version']} setup. Missing files were preserved for review."
+                    f"Automatic recovery requires original bytes from a complete verified old cache. Missing {receipt['version']} source files: "
+                    + ", ".join(unresolved[:5])
+                    + ". Preserve the installed backend, recordings and receipt. Restore only these absent paths "
+                    "from an independently verified original archive or backup, then retry this current helper. "
+                    + (
+                        "The published 0.2.19 setup cannot repair this state."
+                        if receipt["version"] == "0.2.19"
+                        else "No original bytes will be guessed or downloaded automatically."
+                    )
                 )
         desired = {}
         for name, data in self.payload.items():
@@ -471,6 +493,9 @@ class BundledMarketplace:
             },
         }
         desired[RECEIPT] = encoded(desired_receipt)
+        # Retain only exact old bytes, outside the new receipt's active-file map.
+        # They go through the caller's normal confirmation, CAS and durable journal.
+        desired = {**repairs, **desired}
         snapshot = {}
         for name, data in desired.items():
             current = read_bytes(self.source_path / name)
@@ -487,7 +512,18 @@ class BundledMarketplace:
             "source": str(self.source_path),
             "version": self.version,
             "changed": changed,
-            "changes": [
+            "changes": (
+                [
+                    {
+                        "action": "restore-missing-owned-source",
+                        "path": str(self.source_path),
+                        "files": sorted(repairs),
+                    }
+                ]
+                if repairs
+                else []
+            )
+            + [
                 {
                     "action": "persist-bundled-plugin",
                     "path": str(self.source_path),
