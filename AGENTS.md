@@ -32,6 +32,8 @@ Follow Conventional Commits, e.g. `fix: preserve resumed request order`. Use `.g
 
 ## Development Boundaries & Data Safety
 
-Source is public; npm remains unpublished. Prioritize self-contained `npx dsh-trace-extension setup` without GitHub authentication, cloning, or local builds. Skip migrations for historical development installations; establish compatibility with the first npm release. Only macOS/Codex integration is supported.
+The GitHub source became public on 2026-11-16. The first npm release, [`dsh-trace-extension@0.2.19`](https://www.npmjs.com/package/dsh-trace-extension/v/0.2.19), was published on 2026-11-17. Prioritize self-contained `npx dsh-trace-extension setup` without GitHub authentication, cloning, or local builds. Only macOS/Codex integration is supported; Antigravity remains a future candidate.
+
+Skip migrations for historical development installations. Development version numbers, internal installations, and commits do not create a release contract. Use `0.2.19` as the baseline for future compatibility decisions; define and verify upgrade behavior before the next release rather than claiming cross-version upgrades are supported.
 
 Isolate tests using temporary `HOME`/`CODEX_HOME`; preserve existing configuration, installations, recordings, and unrelated files. Never commit private traces, credentials, or bootstrap URLs. Prepare and verify publication contents before requesting explicit authorization to publish npm packages or expose private repositories.

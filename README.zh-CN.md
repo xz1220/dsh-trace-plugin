@@ -20,35 +20,32 @@ _截图来自使用合成数据的本地预览，不含私人聊天，也不代�
 
 ## 运行要求
 
-- 支持本地插件、MCP Apps 和官方 `rollout-trace` 录制的 Codex 客户端。兼容性取决于客户端和录制格式。
+- macOS，以及支持本地插件、MCP Apps 和官方 `rollout-trace` 录制的 Codex 客户端。兼容性取决于客户端和录制格式。
 - 可通过 `python3` 启动的 **Python 3.9+**，无需安装 Python 依赖。
-- 从源码构建或开发需要 **Node.js 20.19+** 和 npm。已构建的插件运行时不需要 Node.js。
+- 安装助手或源码开发需要 **Node.js 20.19+** 和 npm/npx。安装好的 Python 后端运行时不需要 Node.js。
 
 已在 macOS arm64 做本地检查。最初集成使用 Codex CLI 0.163.0；这是历史测试基准，不是最低版本保证。CI 在 Ubuntu 检查读取器与构建；Linux 和 Windows 尚未完成原生 Codex 集成验证。目前支持录制格式 **schema 1 和 2**。
 
 ## 安装
 
 ```sh
-codex plugin marketplace add xz1220/dsh-trace-plugin
-codex plugin add codex-dsh-trace@rollout-local
+npx dsh-trace-extension setup
 ```
 
-仓库已包含构建好的前端，安装时无需 Node.js、npm 或手动克隆源码。如果仓库仍为私有，你的 Git 凭据需要有仓库访问权限。
+包内包含已构建插件和安装工具。安装助手展示操作计划，确认后准备稳定的本地副本并配置录制，无需 GitHub 账号、源码克隆或前端构建。
 
-在聊天右侧工具菜单中打开 **Codex Trace**。新安装后若入口未出现，打开一个新聊天。
+安装后完全退出并重新打开 Codex，运行一个新任务，再从聊天右侧工具菜单打开 **Codex Trace**。
 
-macOS 的单命令安装、配置检查与卸载方式见[安装助手说明](docs/INSTALLER.md)。
+配置选项和首个发行版 [`0.2.19`](https://www.npmjs.com/package/dsh-trace-extension/v/0.2.19) 说明见[安装助手说明](docs/INSTALLER.md)。
 
-## 更新
+## 检查与卸载
 
 ```sh
-codex plugin marketplace upgrade rollout-local
-codex plugin add codex-dsh-trace@rollout-local
+npx dsh-trace-extension doctor
+npx dsh-trace-extension uninstall
 ```
 
-如果之前登记的是本地源码目录，先重新执行上面的两条安装命令，将 marketplace 切换到 Git 来源。
-
-更新后完全退出并重新打开 Codex，使后端与界面资源重新加载。仅重新打开面板可能仍使用旧版。为兼容已有安装，marketplace 标识保留为 `rollout-local`。
+卸载保留录制和无关配置。重复安装会复用自身未被修改的安装。后续跨版本升级方式将在发行前明确说明并验证。
 
 ## 从源码构建
 
@@ -65,11 +62,11 @@ codex plugin add codex-dsh-trace@rollout-local
 
 在聊天右侧工具菜单中打开 **Codex Trace**。新安装后若入口未出现，重新打开面板或重启 Codex。不同 Codex 版本的菜单和插件命令可能有所不同。
 
-仓库名为 `dsh-trace-plugin`，插件标识为 `codex-dsh-trace`，展示名称为 **Codex Trace**。原有 `rollout-viewer` MCP 标识与配置保留兼容，见[架构说明](docs/ARCHITECTURE.md#compatibility-identifiers)。
+npm 包名为 `dsh-trace-extension`，仓库名为 `dsh-trace-plugin`，插件标识为 `codex-dsh-trace`，原生入口为 **Codex Trace**。内部命名空间见[架构说明](docs/ARCHITECTURE.md#current-internal-identifiers)。
 
-## 开启录制
+## 手动录制（可选）
 
-必须在 **Codex 进程启动前**开启录制，无法补录已经发生的聊天。
+安装助手已配置桌面录制；以下手动命令用于源码开发或单独配置的 CLI。必须在 **Codex 进程启动前**开启录制，无法补录已经发生的聊天。
 
 启动新的 CLI 进程：
 

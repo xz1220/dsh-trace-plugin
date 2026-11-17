@@ -55,10 +55,12 @@ The display name is **Codex Trace**. The repository is `dsh-trace-plugin`; the p
 - saved display-preference keys;
 - the legacy `ui://rollout-viewer/viewer.html` resource alias.
 
-These are internal development identifiers, not a public compatibility contract.
-The GitHub source is now public, but no npm version has been formally distributed
-and there are no existing release users. Do not build migration paths for internal
-development installations; establish the release contract with the first npm version.
+These identifiers are included in the first npm release,
+[`dsh-trace-extension@0.2.19`](https://www.npmjs.com/package/dsh-trace-extension/v/0.2.19),
+published on 2026-11-17 after the GitHub source became public on 2026-11-16.
+Earlier internal development installations do not create a migration contract.
+Use `0.2.19` as the baseline for future compatibility decisions; define and verify
+upgrade behavior before the next release rather than assuming it is supported.
 
 ## Verification scope
 

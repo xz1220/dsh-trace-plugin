@@ -1,9 +1,10 @@
 # Roadmap
 
-The GitHub repository became public on 2026-11-16. The npm package has not been
-published and there are no existing release users to migrate. Do not add migration
-paths for internal development versions; define the ongoing compatibility policy
-with the first formally distributed npm version.
+The GitHub repository became public on 2026-11-16. The first npm release,
+[`dsh-trace-extension@0.2.19`](https://www.npmjs.com/package/dsh-trace-extension/v/0.2.19),
+was published on 2026-11-17. Do not add migration paths for earlier internal
+development versions. Use `0.2.19` as the baseline for future compatibility
+decisions, and define and verify upgrade behavior before the next release.
 
 This is a direction for future work, not a release schedule. Small reproducible issues and focused contributions are welcome.
 

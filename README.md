@@ -20,35 +20,32 @@ _The screenshot uses synthetic data in the local preview. It does not contain a 
 
 ## Requirements
 
-- A Codex client that supports local plugins, MCP Apps, and official `rollout-trace` recording. Compatibility depends on the client and recording schema.
+- macOS and a Codex client that supports local plugins, MCP Apps, and official `rollout-trace` recording. Compatibility depends on the client and recording schema.
 - Python **3.9+** available as `python3`. No Python packages are required.
-- Node.js **20.19+** and npm to build or develop from source. An already-built plugin does not need Node.js at runtime.
+- Node.js **20.19+** and npm/npx for the setup helper or source development. The installed Python backend does not need Node.js at runtime.
 
 macOS arm64 has been checked locally. The original integration used Codex CLI 0.163.0; that is a historical test baseline, not a minimum-version guarantee. CI checks the reader and build on Ubuntu; Linux and Windows native Codex integrations remain unverified. The reader supports recording schemas **1 and 2**.
 
 ## Install
 
 ```sh
-codex plugin marketplace add xz1220/dsh-trace-plugin
-codex plugin add codex-dsh-trace@rollout-local
+npx dsh-trace-extension setup
 ```
 
-The repository includes the built frontend. You do not need Node.js, npm, or a source checkout to install it. If the repository is private, your Git credentials must have access.
+The package includes the built plugin and setup tools. Setup displays its plan, installs a stable local copy, and configures recording after confirmation. It does not require a GitHub account, a source checkout, or a frontend build.
 
-Open **Codex Trace** from the conversation's right-panel tools menu. Open a new chat after installation if the entry does not appear.
+Fully quit and reopen Codex after setup, run a new task, then open **Codex Trace** from the conversation's right-panel tools menu.
 
-For the macOS setup helper, including configuration checks and uninstall, see the [installer guide](docs/INSTALLER.md).
+See the [installer guide](docs/INSTALLER.md) for configuration options and the first release, [`0.2.19`](https://www.npmjs.com/package/dsh-trace-extension/v/0.2.19).
 
-## Update
+## Check and uninstall
 
 ```sh
-codex plugin marketplace upgrade rollout-local
-codex plugin add codex-dsh-trace@rollout-local
+npx dsh-trace-extension doctor
+npx dsh-trace-extension uninstall
 ```
 
-If you previously registered a local checkout, run the two Install commands first to switch the marketplace to the Git source.
-
-Fully quit and reopen Codex after updating so the backend and UI resource reload. Reopening only the panel can retain an older build. The marketplace identifier remains `rollout-local` for compatibility.
+Uninstall preserves recordings and unrelated configuration. Repeat setup reuses its own unchanged installation. Future cross-version upgrades will be documented and verified before release.
 
 ## Build from source
 
@@ -65,11 +62,11 @@ codex plugin add codex-dsh-trace@rollout-local
 
 Open **Codex Trace** from the conversation's right-panel tools menu. Reopen the panel or restart Codex after installation if the entry does not appear. Client menus and plugin commands can differ between Codex versions.
 
-The repository is `dsh-trace-plugin`; the plugin ID is `codex-dsh-trace` and the displayed product name is **Codex Trace**. Existing `rollout-viewer` MCP identifiers and configuration remain supported for compatibility. See [Architecture](docs/ARCHITECTURE.md#compatibility-identifiers).
+The npm package is `dsh-trace-extension`; the repository is `dsh-trace-plugin`, the plugin ID is `codex-dsh-trace`, and the native entry is **Codex Trace**. See [Architecture](docs/ARCHITECTURE.md#current-internal-identifiers) for internal namespaces.
 
-## Enable recording
+## Manual recording (optional)
 
-Recording must be enabled **before Codex starts**. Existing conversations cannot be captured retroactively.
+The setup helper configures desktop recording; these manual commands are for source development or a separately configured CLI. Recording must be enabled **before Codex starts**. Existing conversations cannot be captured retroactively.
 
 For a new CLI process:
 
