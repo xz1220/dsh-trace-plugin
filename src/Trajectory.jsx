@@ -8,7 +8,7 @@ import { renderImageSlot as renderSlot, loadImage } from './images.jsx';
 import { Failure, Skeleton, RequestContent, compactionText } from './content.jsx';
 import view from '../vendor/dsh/packages/client/ui-trajectory/src/client/views.module.css';
 import { durationPreference, wrappingPreference } from './preferences.js';
-import { trajectoryTurns } from './trajectory-order.js';
+import { trajectoryTurns, trajectoryTiming } from './trajectory-order.js';
 import { useTrajectoryData } from './use-trajectory.js';
 
 const toggle = (set, key) =>
@@ -24,7 +24,15 @@ const toggleAll = (set, ids, collapsed) =>
     return next;
   });
 
-export default function Trajectory({ data, call, earlier, copy, focusCallId, onFocusApplied }) {
+export default function Trajectory({
+  data,
+  call,
+  earlier,
+  copy,
+  focusCallId,
+  onFocusApplied,
+  reloadTrace,
+}) {
   const t = useTranslation();
   const groupOf = useCallback(
     (cell) =>
@@ -83,7 +91,7 @@ export default function Trajectory({ data, call, earlier, copy, focusCallId, onF
     matches,
     searchBusy,
     watchToolResult,
-  } = useTrajectoryData({ data, call, query, locale: t.locale });
+  } = useTrajectoryData({ data, call, query, locale: t.locale, reloadTrace });
   const [range, setRange] = useState(null),
     [selectedIndex, setSelectedIndex] = useState(null);
   useEffect(() => {
@@ -100,7 +108,7 @@ export default function Trajectory({ data, call, earlier, copy, focusCallId, onF
       [...cells.values()]
         .sort((a, b) => a.seq - b.seq || a.slot - b.slot)
         .map((cell, index) => ({
-          ...cell,
+          ...trajectoryTiming(cell),
           ...(cell.compactionInfo ? { outputDetail: compactionText(cell.compactionInfo, t) } : {}),
           index: index + 1,
           group: groupOf(cell),
@@ -114,7 +122,7 @@ export default function Trajectory({ data, call, earlier, copy, focusCallId, onF
     return [...requests.values()]
       .filter((request) => visible.has(request.rowId))
       .sort((a, b) => a.seq - b.seq)
-      .map((request) => ({ ...request, group: groupOf(request) }));
+      .map((request) => ({ ...trajectoryTiming(request), group: groupOf(request) }));
   }, [requests, visibleCells, groupOf]);
 
   const selectIndex = useCallback(

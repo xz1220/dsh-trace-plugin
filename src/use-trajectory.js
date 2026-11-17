@@ -3,7 +3,7 @@ import { readComplete } from './content.jsx';
 
 // The keyed Trajectory view owns selection and folding. This hook owns the
 // loaded records, their versions, and bounded detail reads for that view.
-export function useTrajectoryData({ data, call, query, locale }) {
+export function useTrajectoryData({ data, call, query, locale, reloadTrace }) {
   const traceId = data.trace.id;
   const [cells, setCells] = useState(new Map()),
     [requests, setRequests] = useState(new Map());
@@ -46,6 +46,10 @@ export function useTrajectoryData({ data, call, query, locale }) {
             rowIds: changed.slice(offset, offset + 200),
           });
           if (!active) return;
+          if (page.resync) {
+            await reloadTrace(traceId, null, { quiet: true, preserve: true });
+            return;
+          }
           const replaced = new Set(page.rowIds);
           setCells((current) => {
             const next = new Map([...current].filter(([, cell]) => !replaced.has(cell.rowId)));
@@ -79,7 +83,7 @@ export function useTrajectoryData({ data, call, query, locale }) {
     return () => {
       active = false;
     };
-  }, [api, data.rows, retryCount]);
+  }, [api, data.rows, retryCount, reloadTrace, traceId]);
 
   const hydrate = useCallback(
     async (selected, force = false) => {

@@ -162,6 +162,7 @@ function App() {
           <Trajectory
             key={`${data.trace.id}:${data.revision.split(':')[0]}:${data.projectionRevision || 0}`}
             {...{ data, call, earlier, copy, focusCallId }}
+            reloadTrace={loadTrace}
             onFocusApplied={() => setFocusCallId(null)}
           />
         )}

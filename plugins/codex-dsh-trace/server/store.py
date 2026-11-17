@@ -226,6 +226,7 @@ class Store:
     def details(self, trace_id, row_id):
         index = self.index(trace_id)
         with index.lock:
+            index.prepare([index.get_row(row_id)])
             row = index.get_row(row_id)
             data = {"row": index.public_row(row), "sections": []}
             if row.get("type") == "request":

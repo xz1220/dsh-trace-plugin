@@ -26,6 +26,11 @@ def preview(value, size=120):
     return " ".join(source[: max(2048, size * 8)].split())[:size]
 
 
+def recorded_duration(row):
+    end = row.get("end")
+    return end - row["start"] if end is not None and end >= row["start"] else None
+
+
 class BundleIndex:
     def __init__(self, meta):
         self.meta = meta
@@ -320,9 +325,7 @@ class BundleIndex:
         data = {k: v for k, v in row.items() if not k.startswith("_")}
         data["version"] = row["_updated"]
         data["threadLabel"] = self.threads.get(row["threadId"], row["threadId"][:8])
-        data["durationMs"] = (
-            max(0, row["end"] - row["start"]) if row.get("end") is not None else None
-        )
+        data["durationMs"] = recorded_duration(row)
         data["error"] = row.get("status") == "error"
         snippet = row.get("_preview")
         if isinstance(snippet, str):
@@ -430,6 +433,9 @@ class BundleIndex:
 
     def call_identity(self, row, call_id):
         return call_id
+
+    def prepare(self, rows, *, ancestors=False):
+        return False
 
     def context(self, row_id):
         # Iterative reconstruction avoids recursion and intermediate full copies.

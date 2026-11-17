@@ -11,7 +11,7 @@ from itertools import islice
 from pathlib import Path
 from typing import Any, Optional
 
-from bundle_index import preview
+from bundle_index import preview, recorded_duration
 from recorded_content import compaction_info, item_text, unpack
 from recording import TraceError
 
@@ -179,6 +179,7 @@ def source_blocks(item, owner, label, metadata_only=False):
                     attachment[key] = block[key]
             if not metadata_only and isinstance(url, str) and url.startswith("data:image/"):
                 attachment["recordedUrl"] = url
+                attachment["attachmentId"] = hashlib.sha256(url.encode()).hexdigest()
                 header, _, encoded = url.partition(",")
                 attachment["mediaType"] = header[5:].split(";")[0]
                 if ";base64" in header:
@@ -422,6 +423,11 @@ class Projection:
             "completedAt": row.get("end"),
             "model": row.get("model", request.get("model")),
             "requestConfig": options,
+            **(
+                {"timingAnomaly": True}
+                if row.get("end") is not None and row["end"] < row["start"]
+                else {}
+            ),
         }
         if row.get("provider"):
             data["provider"] = row["provider"]
@@ -491,7 +497,9 @@ class Projection:
             self.cache.move_to_end(key)
             return self.cache[key]
         turn, step, group, parent = self.location(row)
-        duration = max(0, row["end"] - row["start"]) / 1000 if row.get("end") is not None else None
+        elapsed = recorded_duration(row)
+        duration = elapsed / 1000 if elapsed is not None else None
+        timing_anomaly = row.get("end") is not None and row["end"] < row["start"]
         base = {
             "rowId": row["id"],
             "seq": row["seq"],
@@ -503,6 +511,7 @@ class Projection:
             "sourceSeq": row["seq"],
             "startedAt": row["start"],
             "timeSeconds": duration,
+            **({"timingAnomaly": True} if timing_anomaly else {}),
             "isError": row["status"] in ("error", "cancelled"),
             "detailsPending": True,
         }
@@ -712,8 +721,11 @@ class Projection:
             publicly_returned = "\n\n".join(public_reasoning(item) for item in reasoning)
             attachments = [
                 block
-                for item in messages
-                for block in source_blocks(item, row["id"], "output", metadata_only=True)
+                for position, item in enumerate(outputs)
+                if isinstance(item, dict) and item.get("type") == "message"
+                for block in source_blocks(
+                    item, row["id"], f"output-{position}", metadata_only=True
+                )
                 if "attachment" in block or "file" in block
             ]
             # Parent navigation must work before this assistant's body is hydrated.
@@ -765,7 +777,7 @@ class Projection:
                     "outputDetail": " " if messages else "",
                     "thinkingDetail": " " if publicly_returned else "",
                     "assistantMetrics": {
-                        "timingRecorded": True,
+                        "timingRecorded": not timing_anomaly,
                         "stepStartTime": row["start"],
                         "firstTokenTime": None,
                         "completedTime": row.get("end"),
@@ -882,8 +894,13 @@ class Projection:
                 if after is None
                 else eligible[:limit]
             )
+            epoch = self.index.epoch
+            self.index.prepare(rows)
+            rows = [self.index.get_row(row["id"]) for row in rows]
+            cells = [cell for row in rows for cell in self.cells(row)]
             return {
-                "cells": [cell for row in rows for cell in self.cells(row)],
+                "resync": epoch != self.index.epoch,
+                "cells": cells,
                 "requestNumbers": [
                     self.request_info(row)
                     for row in rows
@@ -896,6 +913,7 @@ class Projection:
             }
 
     def detail(self, row_id, cell_key):
+        self.index.prepare([self.index.get_row(row_id)])
         row = self.index.get_row(row_id)
         self.requests()
         key = (
@@ -948,9 +966,9 @@ class Projection:
             response = self.index.payload(row.get("_response")) or {}
             blocks = []
             thinking = []
-            for item in response.get("output_items", []):
+            for position, item in enumerate(response.get("output_items", [])):
                 if item.get("type") == "message":
-                    blocks.extend(source_blocks(item, row["id"], "output"))
+                    blocks.extend(source_blocks(item, row["id"], f"output-{position}"))
                 elif item.get("type") == "reasoning":
                     thinking.append(public_reasoning(item))
                 elif item.get("type") in ("function_call", "custom_tool_call"):

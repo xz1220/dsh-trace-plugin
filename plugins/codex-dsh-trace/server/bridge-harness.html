@@ -21,12 +21,17 @@
           body: JSON.stringify({ name, arguments: args, _meta: { threadId: config.threadId } }),
         });
         const result = await response.json();
+        const details = result && typeof result === 'object' ? result : {};
         return response.ok
           ? result
           : {
               isError: true,
-              content: [{ type: 'text', text: result.error || 'Local preview request failed' }],
-              structuredContent: { error: result.error || 'Local preview request failed' },
+              content: [{ type: 'text', text: details.error || 'Local preview request failed' }],
+              structuredContent: {
+                error: details.error || 'Local preview request failed',
+                errorCode: details.errorCode,
+                errorParams: details.errorParams,
+              },
             };
       }
       addEventListener('message', async (event) => {

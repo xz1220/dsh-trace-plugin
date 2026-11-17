@@ -289,6 +289,7 @@ def call(name, args, metadata=None, *, store=None):
     if name == "get_rollout_request_info":
         projector = store.projection(args["traceId"])
         with projector.index.lock:
+            projector.index.prepare([projector.index.get_row(args["rowId"])])
             row = projector.index.get_row(args["rowId"])
             if row.get("type") not in ("request", "compaction"):
                 raise TraceError("这条记录不是模型请求。", code="not_model_request")

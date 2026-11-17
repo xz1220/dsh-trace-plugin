@@ -17,3 +17,14 @@ export function trajectoryTurns(cells) {
   }
   return sections.map(({ turn, groups }) => ({ turn, groups }));
 }
+
+// DSH uses null for a running compaction/request. NaN is UI-only unknown
+// elapsed time: keep a completed record complete without displaying a fake zero.
+export function trajectoryTiming(record) {
+  if (!record.timingAnomaly) return record;
+  return {
+    ...record,
+    ...(Object.hasOwn(record, 'timeSeconds') ? { timeSeconds: Number.NaN } : {}),
+    ...(Object.hasOwn(record, 'completedAt') ? { completedAt: Number.NaN } : {}),
+  };
+}
