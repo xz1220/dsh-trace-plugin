@@ -80,3 +80,31 @@ class ImageIdentityTests(ProjectionFixture, unittest.TestCase):
             "output",
         )
         self.assertNotIn("recordedUrl", remote[0]["attachment"])
+
+    def test_inline_image_size_is_decoded_bytes_and_unknown_is_not_zero(self):
+        payload = '<svg xmlns="http://www.w3.org/2000/svg"><text>鸟+%</text></svg>'
+        raw = payload.encode("utf-8")
+        encoded = quote(payload)
+        self.assertNotEqual(len(raw), len(payload))
+        self.assertNotEqual(len(raw), len(encoded))
+        urls = [
+            "data:image/svg+xml," + encoded,
+            "data:image/svg+xml;base64," + base64.b64encode(raw).decode(),
+        ]
+        for url in urls:
+            with self.subTest(url=url):
+                attachment = source_blocks(
+                    {"content": [{"type": "image", "image_url": url}]}, "row", "output"
+                )[0]["attachment"]
+                self.assertEqual(attachment["bytes"], len(raw))
+                self.assertEqual(attachment["recordedUrl"], url)
+        for url in (
+            "data:image/png;base64,not!base64",
+            "data:image/png",
+            "https://example.invalid/image",
+        ):
+            with self.subTest(unknown=url):
+                attachment = source_blocks(
+                    {"content": [{"type": "image", "image_url": url}]}, "row", "output"
+                )[0]["attachment"]
+                self.assertNotIn("bytes", attachment)

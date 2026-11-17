@@ -1258,7 +1258,7 @@ function recordAttachments(
       name: ref.name ?? t('attachment.imageName', { index: imageIndex }),
       metadata: [
         block.attachment?.mediaType ?? fileExtension(ref.name ?? '').toUpperCase(),
-        fileSizeText(ref.bytes),
+        Number.isSafeInteger(ref.bytes) && ref.bytes >= 0 ? fileSizeText(ref.bytes) : '',
         ...(typeof block.attachment?.width === 'number' && typeof block.attachment?.height === 'number'
           ? [`${block.attachment.width} × ${block.attachment.height}`] : []),
       ].filter(Boolean).join(' · '),

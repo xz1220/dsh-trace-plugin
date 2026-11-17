@@ -10,6 +10,7 @@ from collections import OrderedDict
 from itertools import islice
 from pathlib import Path
 from typing import Any, Optional
+from urllib.parse import unquote_to_bytes
 
 from bundle_index import preview, recorded_duration
 from recorded_content import compaction_info, item_text, unpack
@@ -180,9 +181,9 @@ def source_blocks(item, owner, label, metadata_only=False):
             if not metadata_only and isinstance(url, str) and url.startswith("data:image/"):
                 attachment["recordedUrl"] = url
                 attachment["attachmentId"] = hashlib.sha256(url.encode()).hexdigest()
-                header, _, encoded = url.partition(",")
+                header, separator, encoded = url.partition(",")
                 attachment["mediaType"] = header[5:].split(";")[0]
-                if ";base64" in header:
+                if separator and ";base64" in header:
                     try:
                         data = base64.b64decode(encoded, validate=True)
                         attachment["bytes"] = len(data)
@@ -190,6 +191,16 @@ def source_blocks(item, owner, label, metadata_only=False):
                         if data.startswith(b"\x89PNG\r\n\x1a\n") and len(data) >= 24:
                             attachment.setdefault("width", int.from_bytes(data[16:20], "big"))
                             attachment.setdefault("height", int.from_bytes(data[20:24], "big"))
+                    except ValueError:
+                        pass
+                elif separator:
+                    try:
+                        data = (
+                            base64.b64decode(encoded, validate=True)
+                            if header.lower().endswith(";base64")
+                            else unquote_to_bytes(encoded)
+                        )
+                        attachment["bytes"] = len(data)
                     except ValueError:
                         pass
             # Never make a network request or read an arbitrary local path from a trace.
