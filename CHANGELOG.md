@@ -7,6 +7,8 @@ User-visible changes are recorded here. Historical entries describe code changes
 ### Fixed
 
 - Align animation, completed steps, confirmation, results, and next actions to the same text column using one fixed-width marker field.
+- Keep the current chat's trace scoped to its own thread, excluding subagent requests and tool rows while retaining the parent thread's delegation calls and results.
+- Keep child-only appends from advancing the parent timeline or introducing extra request numbers.
 
 ## 0.2.21 — 2026-11-18
 
