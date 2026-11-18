@@ -23,8 +23,10 @@ _合成数据的本地预览，不含私人聊天。_
 ### 运行要求
 
 - **macOS / Codex**：客户端支持本地插件、MCP Apps 和官方 `rollout-trace` 录制。
-- **Node.js 20.19+** 与 npm/npx，用于运行安装助手。
-- 可用的 **Python 3.9+**（`python3`）及 PATH 中支持插件命令的 **Codex CLI**。Python 读取器无需额外 Python 包。
+- **Node.js** 与 npm/npx，用于运行安装助手。
+- 可用的 **Python**（`python3`）及 PATH 中支持插件命令的 **Codex CLI**。Python 读取器无需额外 Python 包。
+
+详细环境要求见[安装说明](docs/INSTALLER.md#用户入口)。
 
 ### 1. 安装
 
@@ -54,7 +56,7 @@ npx dsh-trace-extension setup
 Codex 官方录制 → 本地 Python 读取器 → Codex 侧栏中的 DSH 界面
 ```
 
-Codex 负责录制，查看器读取官方录制包，目前支持 **schema 1 和 2**。它不会修改录制；安装与显式登记录制目录会写入本地配置。
+Codex 负责录制，查看器读取官方录制包。支持的录制格式见[产品说明](docs/PRODUCT.md#compatibility)。查看器不会修改录制；安装与显式登记录制目录会写入本地配置。
 
 读取器没有主动上传轨迹、统计埋点或远程服务集成。原生模式把内容交给本地 Codex 宿主展示；可选预览通过带认证的本机回环 HTTP 提供数据。宿主如何处理收到的数据仍由宿主决定。
 

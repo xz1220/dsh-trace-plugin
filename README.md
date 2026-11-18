@@ -23,8 +23,10 @@ _Synthetic data in the local preview. It contains no private conversation._
 ### Requirements
 
 - **macOS / Codex**: a client with local plugins, MCP Apps, and official `rollout-trace` recording support.
-- **Node.js 20.19+** and npm/npx to run the setup helper.
-- **Python 3.9+** available as `python3`, and a **Codex CLI** on PATH with plugin commands. The Python reader needs no additional Python packages.
+- **Node.js** and npm/npx to run the setup helper.
+- **Python** available as `python3`, and a **Codex CLI** on PATH with plugin commands. The Python reader needs no additional Python packages.
+
+See the [installer guide](docs/INSTALLER.md#用户入口) for detailed environment requirements.
 
 ### 1. Install
 
@@ -54,7 +56,7 @@ See the [installer guide](docs/INSTALLER.md) for settings and troubleshooting.
 Official Codex recordings → local Python reader → DSH view in the Codex sidebar
 ```
 
-Codex records execution; the viewer reads official trace bundles, currently schemas **1 and 2**. It does not modify recordings. Installation and explicit recording-directory registration write local configuration.
+Codex records execution; the viewer reads official trace bundles. See the [product guide](docs/PRODUCT.md#compatibility) for supported recording formats. The viewer does not modify recordings. Installation and explicit recording-directory registration write local configuration.
 
 The reader has no active trace upload, analytics, or remote-service integration. Native mode passes content to the local Codex host for display; optional preview uses authenticated loopback HTTP. The host controls its own handling of received data.
 
