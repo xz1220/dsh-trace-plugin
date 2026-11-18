@@ -11,7 +11,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "plugins/codex-dsh-trace/server"))
 
 from fixtures import Fixture
-from store import Store
+from store import Store, TraceError
 
 
 class ForkHistoryTests(unittest.TestCase):
@@ -268,11 +268,17 @@ class ForkHistoryTests(unittest.TestCase):
         self.store.catalog.register(str(fixture.root))
         return fixture
 
-    def test_fork_inherits_recorded_parent_history_across_recordings(self):
+    def test_root_aggregate_preserves_cross_recording_history_without_child_rows(self):
         parent = self.message("user", "parent-user", "PARENT_BEFORE_RESUME", "main-turn")
         self.request("parent", [parent])
         resumed = self.resumed_bundle()
         self.thread("thread-root", "/root", fixture=resumed)
+        self.request(
+            "root-resumed",
+            [self.message("user", "root-follow-up", "ROOT_AFTER_RESUME", "resumed-root-turn")],
+            turn="resumed-root-turn",
+            fixture=resumed,
+        )
         self.thread("child", "/root/review", fixture=resumed)
         self.request(
             "child",
@@ -282,17 +288,31 @@ class ForkHistoryTests(unittest.TestCase):
             fixture=resumed,
         )
         projector = self.store.projection("thread@thread-root")
-        child = self.input_cells(projector, "resumed:request:child")
-        self.assertEqual([cell["previewMarkdown"] for cell in child], ["RESUMED_CHILD_TASK"])
+        page = projector.page()
         self.assertEqual(
-            sum(
-                cell.get("previewMarkdown") == "PARENT_BEFORE_RESUME"
-                for cell in projector.page()["cells"]
-            ),
-            1,
+            page["rowIds"], ["trace-test:request:parent", "resumed:request:root-resumed"]
+        )
+        self.assertEqual(
+            {row["threadId"] for row in projector.index.rows.values()}, {"thread-root"}
+        )
+        self.assertEqual(set(projector.index.turns), {"main-turn", "resumed-root-turn"})
+        self.assertEqual(projector.index.threads, {"thread-root": "/root"})
+        texts = [cell.get("previewMarkdown") for cell in page["cells"]]
+        self.assertEqual(texts.count("PARENT_BEFORE_RESUME"), 1)
+        self.assertEqual(texts.count("ROOT_AFTER_RESUME"), 1)
+        self.assertNotIn("RESUMED_CHILD_TASK", texts)
+        with self.assertRaises(TraceError) as missing:
+            self.input_cells(projector, "resumed:request:child")
+        self.assertEqual(missing.exception.code, "record_not_found")
+        # The explicit capture remains a mixed-thread diagnostic entry point.
+        capture = self.store.projection("resumed")
+        self.assertEqual(
+            [cell["previewMarkdown"] for cell in self.input_cells(capture, "request:child")],
+            ["PARENT_BEFORE_RESUME", "RESUMED_CHILD_TASK"],
         )
 
-    def test_another_chat_with_the_same_agent_path_is_not_an_ancestor(self):
+    def test_other_root_is_excluded_and_capture_does_not_inherit_its_agent_history(self):
+        self.request("root", [self.message("user", "root-input", "ROOT_CHAT_INPUT", "main-turn")])
         inherited = self.message("user", "matching-id", "MESSAGE_FROM_OTHER_CHAT", "main-turn")
         other = self.resumed_bundle("other-chat", started_at=100)
         path = other.root / "manifest.json"
@@ -304,18 +324,42 @@ class ForkHistoryTests(unittest.TestCase):
         self.thread("child", "/root/review")
         self.request("child", [inherited], thread="child", turn="child-turn")
         projector = self.store.projection("thread@thread-root")
-        child = self.input_cells(projector, "trace-test:request:child")
-        self.assertEqual([cell["previewMarkdown"] for cell in child], ["MESSAGE_FROM_OTHER_CHAT"])
+        page = projector.page()
+        self.assertEqual(page["rowIds"], ["trace-test:request:root"])
+        self.assertEqual(
+            {row["threadId"] for row in projector.index.rows.values()}, {"thread-root"}
+        )
+        self.assertEqual(set(projector.index.turns), {"main-turn"})
+        self.assertEqual(projector.index.threads, {"thread-root": "/root"})
         self.assertFalse(
             any(row.get("sourceTraceId") == "other-chat" for row in projector.index.rows.values())
         )
+        self.assertNotIn(
+            "MESSAGE_FROM_OTHER_CHAT", [cell.get("previewMarkdown") for cell in page["cells"]]
+        )
+        with self.assertRaises(TraceError) as missing:
+            self.input_cells(projector, "trace-test:request:child")
+        self.assertEqual(missing.exception.code, "record_not_found")
+        # Matching agent paths in another root do not justify dropping recorded
+        # input from the explicit capture's diagnostic child view.
+        capture = self.projection()
+        self.assertEqual(
+            [cell["previewMarkdown"] for cell in self.input_cells(capture, "request:child")],
+            ["MESSAGE_FROM_OTHER_CHAT"],
+        )
 
-    def test_late_older_parent_recording_rebuilds_inheritance_and_cached_cells(self):
+    def test_late_older_root_rebuilds_cached_positions_without_restoring_child_rows(self):
         inherited = self.message(
             "user", "parent-user", "OLDER_PARENT_DISCOVERED_LATER", "main-turn"
         )
         resumed = self.resumed_bundle()
         self.thread("thread-root", "/root", fixture=resumed)
+        self.request(
+            "root-resumed",
+            [self.message("user", "root-follow-up", "ROOT_AFTER_RESUME", "resumed-root-turn")],
+            turn="resumed-root-turn",
+            fixture=resumed,
+        )
         self.thread("child", "/root/review", fixture=resumed)
         self.request(
             "child",
@@ -325,16 +369,33 @@ class ForkHistoryTests(unittest.TestCase):
             fixture=resumed,
         )
         projector = self.store.projection("thread@thread-root")
-        self.assertEqual(len(self.input_cells(projector, "resumed:request:child")), 2)
+        root_row = "resumed:request:root-resumed"
+        before = projector.page()
+        self.assertEqual(before["rowIds"], [root_row])
+        cached = projector.detail(root_row, "input:0")
+        self.assertEqual(cached["inputDetail"], "ROOT_AFTER_RESUME")
         self.request("parent", [inherited])
-        projector.page()
+        after = projector.page()
+        self.assertEqual(after["rowIds"], ["trace-test:request:parent", root_row])
+        fresh = projector.detail(root_row, "input:0")
+        self.assertEqual(fresh["recordId"], cached["recordId"])
+        self.assertEqual(fresh["inputDetail"], cached["inputDetail"])
+        self.assertGreater(fresh["seq"], cached["seq"])
+        self.assertGreater(fresh["turn"], cached["turn"])
+        root_number = next(item for item in after["requestNumbers"] if item["rowId"] == root_row)
+        self.assertEqual(fresh["seq"], root_number["seq"])
         self.assertEqual(
-            [
-                cell["previewMarkdown"]
-                for cell in self.input_cells(projector, "resumed:request:child")
-            ],
-            ["CHILD_TASK"],
+            {row["threadId"] for row in projector.index.rows.values()}, {"thread-root"}
         )
+        self.assertEqual(set(projector.index.turns), {"main-turn", "resumed-root-turn"})
+        self.assertEqual(projector.index.threads, {"thread-root": "/root"})
+        texts = [cell.get("previewMarkdown") for cell in after["cells"]]
+        self.assertEqual(texts.count("OLDER_PARENT_DISCOVERED_LATER"), 1)
+        self.assertEqual(texts.count("ROOT_AFTER_RESUME"), 1)
+        self.assertNotIn("CHILD_TASK", texts)
+        with self.assertRaises(TraceError) as missing:
+            self.input_cells(projector, "resumed:request:child")
+        self.assertEqual(missing.exception.code, "record_not_found")
 
     def test_warm_metadata_append_does_not_reread_old_request_bodies(self):
         inherited = self.message("user", "parent-user", "PARENT_INPUT", "main-turn")

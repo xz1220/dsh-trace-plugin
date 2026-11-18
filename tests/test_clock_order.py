@@ -76,7 +76,7 @@ class ClockOrderTests(unittest.TestCase):
             response_payload=ref,
         )
 
-    def test_same_capture_keeps_parent_and_parallel_events_in_recorded_order(self):
+    def test_thread_scope_keeps_main_order_and_capture_keeps_parallel_events(self):
         f = self.bundle("one", 1000)
         self.request(f, "root", 2000)
         self.append(f, 1500, "tool_call_started", tool_call_id="tool")
@@ -85,10 +85,16 @@ class ClockOrderTests(unittest.TestCase):
         rows = self.store.index("thread@thread-root").overview()["rows"]
         self.assertEqual(
             [r["sourceRowId"] for r in rows],
+            ["request:root", "tool:tool", "request:root-next"],
+        )
+        self.assertEqual([r["start"] for r in rows], [2000, 1500, 1800])
+        self.assertEqual(rows[1]["parentId"], rows[0]["id"])
+        capture = self.store.index("one").overview()["rows"]
+        self.assertEqual(
+            [row["id"] for row in capture],
             ["request:root", "tool:tool", "request:parallel", "request:root-next"],
         )
-        self.assertEqual([r["start"] for r in rows], [2000, 1500, 1400, 1800])
-        self.assertEqual(rows[1]["parentId"], rows[0]["id"])
+        self.assertEqual([row["start"] for row in capture], [2000, 1500, 1400, 1800])
 
     def test_sources_still_interleave_by_time_instead_of_concatenating_bundles(self):
         a, b = self.bundle("a", 1000), self.bundle("b", 1100)

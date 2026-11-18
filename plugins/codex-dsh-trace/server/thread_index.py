@@ -1,4 +1,4 @@
-"""A stable chronological view of official recordings for one exact chat root."""
+"""A chronological view of one exact thread across its official recording bundles."""
 
 from collections import OrderedDict
 from heapq import heappop, heappush
@@ -135,6 +135,7 @@ class ThreadIndex(BundleIndex):
                 return
             reset = bool(set(self.sources) - set(signatures))
             projection_changed = False
+            source_changed = False
             for meta in metas:
                 source = meta["id"]
                 before = self.source_signatures.get(source)
@@ -151,10 +152,22 @@ class ThreadIndex(BundleIndex):
                 index = self.store.index(source)
                 index.refresh()
                 with index.lock:
-                    previous = self.sources.get(source)
-                    if previous and previous["projectionRevision"] != index.projection_revision:
-                        projection_changed = True
-                    for original in index.rows.values():
+                    # A root capture may also record independent subagent threads.
+                    # Scope the data before ordering, context links, search, or projection.
+                    rows = [
+                        dict(row)
+                        for row in index.rows.values()
+                        if row["threadId"] == self.thread_id
+                    ]
+                    source_turns = {
+                        key: turn
+                        for key, turn in index.turns.items()
+                        if turn["threadId"] == self.thread_id
+                    }
+                    threads = {
+                        key: label for key, label in index.threads.items() if key == self.thread_id
+                    }
+                    for original in rows:
                         old = self.rows.get(source + ":" + original["id"])
                         if (
                             old
@@ -163,15 +176,29 @@ class ThreadIndex(BundleIndex):
                             and old["seq"] < self.latest_request_seq
                         ):
                             projection_changed = True
-                    self.sources[source] = {
+                    scoped = {
                         "meta": meta,
-                        "rows": [dict(row) for row in index.rows.values()],
-                        "turns": dict(index.turns),
-                        "threads": dict(index.threads),
+                        "rows": rows,
+                        "turns": source_turns,
+                        "threads": threads,
                         "status": index.status,
-                        "latestTime": index.latest_time,
-                        "projectionRevision": index.projection_revision,
+                        "latestTime": max(
+                            [meta["startedAt"] or 0]
+                            + [
+                                time
+                                for row in rows
+                                for time in (row["start"], row.get("end"))
+                                if time is not None
+                            ]
+                            + [turn["start"] for turn in source_turns.values()]
+                        ),
                     }
+                    source_changed |= self.sources.get(source) != scoped
+                    self.sources[source] = scoped
+            if not source_changed and not reset and not issues_changed and not self.order_dirty:
+                # Child-only appends and late agent labels cannot change the main ledger.
+                self.source_signatures = signatures
+                return
             self.sources = {key: value for key, value in self.sources.items() if key in signatures}
             known_rows = {
                 source + ":" + row["id"]
@@ -200,6 +227,7 @@ class ThreadIndex(BundleIndex):
             new_rows = OrderedDict()
             self.local_responses = {}
             self.shared_responses = {}
+            request_number = 0
             for seq, (source, original) in enumerate(ordered, 1):
                 key = source + ":" + original["id"]
                 old = old_rows.get(key)
@@ -218,6 +246,10 @@ class ThreadIndex(BundleIndex):
                     )
                     if original.get("parentId"):
                         row["parentId"] = source + ":" + original["parentId"]
+                if row.get("type") in ("request", "compaction"):
+                    request_number += 1
+                    if row["type"] == "request":
+                        row["name"] = f"请求 #{request_number}"
                 new_rows[key] = row
                 if row.get("responseId"):
                     self.local_responses[(source, row["responseId"])] = key
