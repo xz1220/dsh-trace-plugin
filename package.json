@@ -25,7 +25,7 @@
     "reconcile": "python3 scripts/reconcile.py"
   },
   "dependencies": {
-    "@shikijs/langs": "4.4.3",
+    "@shikijs/langs": "4.6.0",
     "@tanstack/react-virtual": "3.14.10",
     "clsx": "2.1.1",
     "diff": "9.0.0",
