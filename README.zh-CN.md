@@ -14,11 +14,9 @@
 npx dsh-trace-extension setup
 ```
 
-_npm 正式版当前为 **0.2.19**；本分支的 **0.2.20 尚未发布**。另见[试用本地候选包](docs/INSTALLER.md#试用本地候选包)。_
-
 ![Codex Trace 的时间轴、执行列表与详情面板](docs/images/trace-viewer.png)
 
-_合成数据的本地预览，不含私人聊天，也不代表原生 Codex 安装验收。_
+_合成数据的本地预览，不含私人聊天。_
 
 ## 快速开始
 
@@ -28,20 +26,19 @@ _合成数据的本地预览，不含私人聊天，也不代表原生 Codex 安
 - **Node.js 20.19+** 与 npm/npx，用于运行安装助手。
 - 可用的 **Python 3.9+**（`python3`）及 PATH 中支持插件命令的 **Codex CLI**。Python 读取器无需额外 Python 包。
 
-正式版 `0.2.19` 已有隔离环境下真实 CLI 的安装、重复安装、doctor、卸载，以及清 npm 缓存后后端启动证据。**正式原生侧栏、重新登录后的录制和 Finder 拖出仍未验。** 客户端兼容性取决于版本与录制格式。
+### 1. 安装
 
-### 1. 安装正式版
-
-在自己信任的仓库外目录打开终端，先查看计划，再确认安装：
+在自己信任的仓库外目录打开终端，运行：
 
 ```sh
-npx dsh-trace-extension setup --dry-run
 npx dsh-trace-extension setup
 ```
 
 包内包含已构建插件，无需 GitHub 登录、克隆源码或本地构建。助手展示文件与配置变更，确认后准备稳定的本地副本并配置录制。
 
-### 2. 启动新的录制
+如需先查看操作计划，可选运行 `npx dsh-trace-extension setup --dry-run`。
+
+### 2. 重开 Codex 并运行新任务
 
 完全退出并重新打开 Codex，再运行一个新任务。录制配置必须在 **Codex 新进程启动前**生效；打开查看器不会开启录制，过去的执行不能补录。
 
@@ -49,7 +46,7 @@ npx dsh-trace-extension setup
 
 从聊天右侧工具菜单选择 **Codex Trace**。面板会查找当前聊天的录制，并持续读取新事件。时间轴定位步骤，执行列表追踪调用，详情面板展开内容。
 
-安装选项见[安装说明](docs/INSTALLER.md)。想测试本分支时，请按[试用本地候选包](docs/INSTALLER.md#试用本地候选包)操作；上面的 npm 命令不会安装尚未发布的 `0.2.20`。
+设置与排障帮助见[安装说明](docs/INSTALLER.md)。
 
 ## 如何工作
 
@@ -80,14 +77,7 @@ Codex 负责录制，查看器读取官方录制包，目前支持 **schema 1 �
 ## FAQ
 
 <details>
-<summary><strong>为什么运行 npm 命令还是 0.2.19？</strong></summary>
-
-`npx dsh-trace-extension setup` 下载 npm 正式版，目前为 `0.2.19`。本分支的 `0.2.20` 尚未发布；在 checkout 内运行也不会让 npm 自动采用本地源码。候选试用是独立路径，见[试用本地候选包](docs/INSTALLER.md#试用本地候选包)。
-
-</details>
-
-<details>
-<summary><strong>rollout-local 指向旧源码，换目录就能安装吗？</strong></summary>
+<summary><strong>rollout-local 来源冲突怎么办？</strong></summary>
 
 先只读查看当前来源：
 
@@ -95,9 +85,7 @@ Codex 负责录制，查看器读取官方录制包，目前支持 **schema 1 �
 codex plugin marketplace list --json
 ```
 
-只有仓库内的临时项目发现导致冲突时，切到仓库外才可能解决。如果在仓库外（例如 `/private/tmp`）仍显示旧源码 checkout，换目录不会移除持久登记；安装器会保留原来源并停下。这与 npm 下载哪个版本是两件事。
-
-持久冲突请使用干净的测试身份，保留原注册、配置和录制，不要强删或覆盖。按[rollout-local 来源冲突](docs/INSTALLER.md#rollout-local-来源冲突)诊断和选择测试路径。
+如果冲突来自临时项目发现，在信任的仓库外目录重试可能解决；切换目录不会移除持久登记。安装器会保留已有来源并停下，请保留原注册、配置和录制，按[来源冲突排障](docs/INSTALLER.md#rollout-local-来源冲突)处理，不要强删或覆盖。
 
 </details>
 
@@ -116,15 +104,16 @@ npx dsh-trace-extension doctor
 npx dsh-trace-extension uninstall
 ```
 
-doctor 只读检查配置和文件，不代替原生面板验收。卸载保留录制和无关配置。已安装文件与运行中的面板可能不同步，重开客户端后再核对界面。更新与恢复的版本边界见[安装说明](docs/INSTALLER.md)。
+doctor 只读检查配置和文件。卸载保留录制和无关配置。已安装文件与运行中的面板可能不同步，重开客户端后再核对界面。更多帮助见[安装说明](docs/INSTALLER.md)。
 
 </details>
 
 ## 文档
 
-- [安装说明](docs/INSTALLER.md)：正式版安装、候选试用、来源冲突与验证范围。
-- [产品行为](docs/PRODUCT.md) · [架构](docs/ARCHITECTURE.md)：录制证据、数据流与实现边界。
-- [安全与隐私](.github/SECURITY.md) · [路线图](docs/ROADMAP.md)：数据处理与后续方向。
+- [安装与排障](docs/INSTALLER.md)
+- [使用说明](docs/PRODUCT.md) · [工作原理](docs/ARCHITECTURE.md)
+- [数据使用与分享](.github/SECURITY.md)
+- [项目路线图](docs/ROADMAP.md)
 
 ## 参与贡献
 
@@ -134,6 +123,6 @@ doctor 只读检查配置和文件，不代替原生面板验收。卸载保留�
 
 ## 来源与许可
 
-本项目独立维护，**不是 OpenAI 或 DeepSeek 官方产品**。界面使用固定版本的 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）MIT 组件，适配记录见 [vendor/dsh/PATCHES.md](vendor/dsh/PATCHES.md)。
+本项目独立维护，**不是 OpenAI 或 DeepSeek 官方产品**。界面使用 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）MIT 组件，适配记录见 [vendor/dsh/PATCHES.md](vendor/dsh/PATCHES.md)。
 
 本项目使用 [MIT 许可](LICENSE)，发行包附带 `LICENSE` 与第三方许可说明。

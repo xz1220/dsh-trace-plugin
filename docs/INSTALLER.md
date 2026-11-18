@@ -23,29 +23,6 @@ npx dsh-trace-extension setup
 
 安装助手展示具体操作计划，确认后准备持久插件副本、登记本地来源、安装插件并配置录制。安装后手动完全退出并重新打开 Codex，再运行一个新任务并打开 **Codex Trace**。
 
-## 试用本地候选包
-
-`npx dsh-trace-extension setup` 使用 npm 发布包，切换工作树分支不会让它运行本地源码。目前正式版本为 `0.2.19`，本地 `0.2.20` 候选尚未发布；请取得已核对的 `.tgz`，或按[维护者打包和验收](#维护者打包和验收)生成，再显式指定绝对路径。在自己信任的仓库外目录试跑；下面创建当前用户独占的临时 cwd，只生成计划：
-
-```sh
-# 替换为已取得或打包的候选文件绝对路径
-dsh_candidate_tgz="/absolute/path/to/dsh-trace-extension-0.2.20.tgz"
-(
-  dsh_trial_root="$(mktemp -d)" || exit 1
-  [ -n "$dsh_trial_root" ] || exit 1
-  cd "$dsh_trial_root" || exit 1
-  dsh_trial_root="$(pwd -P)" || exit 1
-  [ -n "$dsh_trial_root" ] || exit 1
-  mkdir -m 700 "$dsh_trial_root/home" || exit 1
-  HOME="$dsh_trial_root/home" CODEX_HOME="$dsh_trial_root/codex" \
-    npx --yes --offline --ignore-scripts --cache "$dsh_trial_root/npm-cache" \
-    --package "$dsh_candidate_tgz" -- dsh-trace-extension setup --dry-run \
-    --codex-home "$dsh_trial_root/codex" --trace-root "$dsh_trial_root/recordings"
-)
-```
-
-这里 npx 可写临时缓存，安装助手只读检查计划；真实登录域若已有不同录制配置，仍会保留并拒绝。`--codex-home` 和临时 HOME 只分开 CLI 文件，不能替代原生 GUI／登录域隔离；不要直接去掉 `--dry-run` 当作隔离安装，`--no-persist` 也仍可能设置当前登录环境。候选的更新基线是可核验的 npm `0.2.19` 受管安装，原生侧栏与重新登录仍未验收。
-
 ## rollout-local 来源冲突
 
 `Marketplace 'rollout-local' uses a different or unknown source` 表示所选 Codex 配置中这个名字已经指向另一来源，例如源码 checkout。`0.2.19` 和 `0.2.20` 候选都保留此保护：只接续可核验的受管来源与 receipt，不自动把开发登记改成 npm 安装。移到中性 cwd 可避开项目级发现，但不会移除已有持久登记，`--yes` 也不绕过归属检查。
@@ -56,7 +33,7 @@ dsh_candidate_tgz="/absolute/path/to/dsh-trace-extension-0.2.20.tgz"
 codex plugin marketplace list --json
 ```
 
-已有个人源码注册时先保留它；只试候选可用上节的新测试身份和 dry-run。若以后选择切换个人开发注册，需要先明确要保留的来源、插件、录制和配置，以及重启与登录环境影响，再由用户授权处理该项登记；不要为解决冲突删除整个 CODEX_HOME、录制或无关配置。正式入口仍使用已发布的 npm 包。
+已有个人源码注册时先保留它；普通 npm 安装与用户验收另用没有这项开发登记的干净普通用户配置。临时 CLI 配置不能替代独立 GUI／登录环境，本地候选包也不是个人来源冲突的自动解决办法。若以后选择切换个人开发注册，需要先明确要保留的来源、插件、录制和配置，以及重启与登录环境影响，再由用户授权处理该项登记；不要为解决冲突删除整个 CODEX_HOME、录制或无关配置。正式入口仍使用已发布的 npm 包。
 
 ## 检查与卸载
 
@@ -116,17 +93,44 @@ Codex 登记的来源位于 `$CODEX_HOME/dsh-trace-extension/marketplace`，而�
 ```sh
 npm ci
 npm run build
-npm run package:npm
 npm run test:npm
 ```
 
-候选目录为 `dist/npm/dsh-trace-extension`。`test:npm` 从真实 tarball 走 npm 本地安装路径；macOS 验收使用临时 HOME 与 fake Codex/launchctl，不触碰真实安装。它会删除临时 npx 缓存，再启动持久副本中的实际 Python 服务，并检查重复安装、doctor 和卸载。
+这些检查属于维护者内部校验。`test:npm` 使用本地 tarball、临时 HOME 与 fake Codex/launchctl，检查缓存独立、重复安装、doctor 和卸载，不替代真实 npm 获取、原生侧栏或用户原样验收。核对并冻结源码、版本和生成物后，再生成一个实际发行归档：
 
 ```sh
+npm run package:npm
 npm pack ./dist/npm/dsh-trace-extension --ignore-scripts --pack-destination dist/npm --json
 ```
 
+记录该归档的提交、版本、SHA-256/integrity、文件表和许可，排除私有工作资料。后续预发、验收和正式推广使用同一份归档；内容改变须重新冻结与核对，已公开的版本不能替换字节。
+
 包无依赖、无 install/postinstall 脚本，不包含测试、用户配置、录制、日志或整个源仓库。安装仅在用户显式执行 `setup` 时进行。
+
+### 试用本地候选包
+
+本节仅供维护者内部 CLI 校验；本地 tgz 不替代发布流程、真实 npm 验证或交给用户的原样验收。
+
+`npx dsh-trace-extension setup` 使用 npm 发布包，切换工作树分支不会让它运行本地源码。目前正式版本为 `0.2.19`，本地 `0.2.20` 候选尚未发布；请取得已核对的 `.tgz`，或按[维护者打包和验收](#维护者打包和验收)生成，再显式指定绝对路径。在自己信任的仓库外目录试跑；下面创建当前用户独占的临时 cwd，只生成计划：
+
+```sh
+# 替换为已取得或打包的候选文件绝对路径
+dsh_candidate_tgz="/absolute/path/to/dsh-trace-extension-0.2.20.tgz"
+(
+  dsh_trial_root="$(mktemp -d)" || exit 1
+  [ -n "$dsh_trial_root" ] || exit 1
+  cd "$dsh_trial_root" || exit 1
+  dsh_trial_root="$(pwd -P)" || exit 1
+  [ -n "$dsh_trial_root" ] || exit 1
+  mkdir -m 700 "$dsh_trial_root/home" || exit 1
+  HOME="$dsh_trial_root/home" CODEX_HOME="$dsh_trial_root/codex" \
+    npx --yes --offline --ignore-scripts --cache "$dsh_trial_root/npm-cache" \
+    --package "$dsh_candidate_tgz" -- dsh-trace-extension setup --dry-run \
+    --codex-home "$dsh_trial_root/codex" --trace-root "$dsh_trial_root/recordings"
+)
+```
+
+这里 npx 可写临时缓存，安装助手只读检查计划；真实登录域若已有不同录制配置，仍会保留并拒绝。`--codex-home` 和临时 HOME 只分开 CLI 文件，不能替代原生 GUI／登录域隔离；不要直接去掉 `--dry-run` 当作隔离安装，`--no-persist` 也仍可能设置当前登录环境。候选的更新基线是可核验的 npm `0.2.19` 受管安装，原生侧栏与重新登录仍未验收。
 
 ## 发行记录与后续发布
 
@@ -134,7 +138,18 @@ npm pack ./dist/npm/dsh-trace-extension --ignore-scripts --pack-destination dist
 
 该版本已从公共 npm 仓库下载，在 macOS 的隔离 HOME / CODEX_HOME 中用真实 Codex CLI 验证全新安装、重复安装、doctor 和卸载。清空 npm 缓存后，已安装后端仍能提供工具和完整前端资源。测试后个人 Codex 配置与登录环境保持原状；重启 Codex 后的原生侧栏及再次登录时的启动顺序仍需验收。
 
-维护者发布前检查真实 tarball 文件清单与完整性，完成安装验收并取得发布授权。直接发布已审阅的 `.tgz`，不要发布根开发包；发布账号须具备 npm 权限和有效认证。
+公开预发前核对真实 tarball 内容、完整性和已有内部验证，并确认预发已获明确授权；推广到默认入口前核对真实 npm 获取、原生验收结果和推广授权。直接发布已审阅的 `.tgz`，不要发布根开发包；发布账号须具备 npm 权限和有效认证。
+
+### 预发、推广与用户原样验收
+
+可选的正式发版前验证按以下顺序进行。每个 npx 入口都从自己信任的仓库外目录运行；内部本地包测试不能跳过后面的真实 npm 和用户验收。
+
+1. **内部校验**：维护者复核同一归档；临时 CLI 配置和私有 launchctl shim 的结果只覆盖其声明范围。
+2. **单独授权公开预发**：取得明确授权后，可执行 `npm publish /absolute/path/to/dsh-trace-extension-0.2.20.tgz --tag next --access public --ignore-scripts`。`next` 的包可被任何人下载，版本内容随即公开且不可替换；默认 `latest` 保持原版。发布到 `next` 不是私有预览，也不是用户原样验收。
+3. **真实 npm 与原生验证**：交付／验收会话通过 `npx dsh-trace-extension@next setup` 从真实 npm 安装，在独立 macOS／Codex 测试身份核对下载归档、真实侧栏、完全重开和重新登录后的录制。新任务应对应当前聊天并持续显示步骤；不能用本地 tgz、仅改 CODEX_HOME 或模拟登录域证明这些结论。
+4. **推广，再交用户**：上述检查通过且正式推广也已获明确授权后，才执行 `npm dist-tag add dsh-trace-extension@0.2.20 latest`，推广同一已验版本，不重新打包。随后在干净普通用户配置中按 README 原样执行 `npx dsh-trace-extension setup`，实际安装、重开、跑新任务、打开侧栏，核对当前聊天与持续步骤。`@next` 的预发验证不能代替这一步。
+
+发布前重新只读核对版本和标签，等待实际归档可从 npm 下载并比对完整性。发 `next` 与切 `latest` 都须处于明确授权范围内；授权可以预先覆盖不同阶段，但不能从预发自动延伸到正式推广，当前说明也不构成执行授权。预发和公开发布都不会消除个人已有的源码 `rollout-local` 冲突，源码开发身份不作为新用户验收起点。
 
 ## REA 参考
 

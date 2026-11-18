@@ -14,11 +14,9 @@ Bring the DeepSeek Harness (DSH) timeline, execution ledger, and detail inspecto
 npx dsh-trace-extension setup
 ```
 
-_The npm release is **0.2.19**; **0.2.20 on this branch is unpublished**. See [Try the local candidate package](docs/INSTALLER.md#试用本地候选包)._
-
 ![Codex Trace timeline, execution ledger, and detail inspector](docs/images/trace-viewer.png)
 
-_Synthetic data in the local preview. It contains no private conversation and does not demonstrate native Codex acceptance._
+_Synthetic data in the local preview. It contains no private conversation._
 
 ## Quick start
 
@@ -28,20 +26,19 @@ _Synthetic data in the local preview. It contains no private conversation and do
 - **Node.js 20.19+** and npm/npx to run the setup helper.
 - **Python 3.9+** available as `python3`, and a **Codex CLI** on PATH with plugin commands. The Python reader needs no additional Python packages.
 
-Release `0.2.19` has isolated, real-CLI evidence for installation, repeat setup, doctor, uninstall, and backend startup after clearing the npm cache. **Native-sidebar acceptance, recording after a real login, and Finder drag-out remain unverified.** Client compatibility depends on its version and recording format.
+### 1. Install
 
-### 1. Install the release
-
-Open a terminal in a trusted directory outside the checkout. Review the plan, then confirm installation:
+Open a terminal in a trusted directory outside the checkout and run:
 
 ```sh
-npx dsh-trace-extension setup --dry-run
 npx dsh-trace-extension setup
 ```
 
 The package includes the built plugin: no GitHub login, source checkout, or local build is required. Setup shows the files and settings it will change, then installs a stable local copy and configures recording after confirmation.
 
-### 2. Start a new recording
+Optionally, preview the plan first with `npx dsh-trace-extension setup --dry-run`.
+
+### 2. Reopen Codex and run a new task
 
 Fully quit and reopen Codex, then run a new task. Recording settings must take effect **before the new Codex process starts**. Opening the viewer does not enable recording or capture earlier execution retroactively.
 
@@ -49,7 +46,7 @@ Fully quit and reopen Codex, then run a new task. Recording settings must take e
 
 Choose **Codex Trace** from the conversation's right-panel tools menu. The panel finds recordings for the current chat and follows new events. Use the timeline to locate steps, the ledger to follow calls, and the inspector to expand content.
 
-See the [installer guide](docs/INSTALLER.md) for options. To test this branch, follow [Try the local candidate package](docs/INSTALLER.md#试用本地候选包); the npm commands above do not install the unpublished `0.2.20`.
+See the [installer guide](docs/INSTALLER.md) for settings and troubleshooting.
 
 ## How it works
 
@@ -80,14 +77,7 @@ Complete context is reconstructed from available recordings. Uncaptured text or 
 ## FAQ
 
 <details>
-<summary><strong>Why does the npm command still install 0.2.19?</strong></summary>
-
-`npx dsh-trace-extension setup` downloads the npm release, currently `0.2.19`. This branch's `0.2.20` is unpublished; running inside a checkout does not make npm use local source automatically. Candidate testing is a separate path: [Try the local candidate package](docs/INSTALLER.md#试用本地候选包).
-
-</details>
-
-<details>
-<summary><strong>rollout-local points to an earlier checkout. Will changing directories fix it?</strong></summary>
+<summary><strong>What if rollout-local has a source conflict?</strong></summary>
 
 Inspect the current source without changing it:
 
@@ -95,9 +85,7 @@ Inspect the current source without changing it:
 codex plugin marketplace list --json
 ```
 
-Moving outside the repository may help only when temporary project discovery causes the conflict. If an earlier source checkout still appears outside the repository, for example in `/private/tmp`, changing directories does not remove the persistent registration. Setup preserves that source and stops. This is separate from which npm version is downloaded.
-
-For a persistent conflict, use a clean test identity and preserve the original registration, settings, and recordings. Do not force-delete or overwrite them. Follow [rollout-local source conflicts](docs/INSTALLER.md#rollout-local-来源冲突) for diagnosis and test options.
+If temporary project discovery causes the conflict, retrying from a trusted directory outside the repository may help. Changing directories does not remove persistent registrations. Setup preserves the existing source and stops; keep its registration, settings, and recordings, and follow [source-conflict troubleshooting](docs/INSTALLER.md#rollout-local-来源冲突) instead of force-deleting or overwriting them.
 
 </details>
 
@@ -116,15 +104,16 @@ npx dsh-trace-extension doctor
 npx dsh-trace-extension uninstall
 ```
 
-doctor checks settings and files without changing them; it does not establish native-panel readiness. Uninstall preserves recordings and unrelated configuration. Installed files and an open panel can differ, so reopen the client before checking the interface. See the [installer guide](docs/INSTALLER.md) for version-specific update and recovery boundaries.
+doctor checks settings and files without changing them. Uninstall preserves recordings and unrelated configuration. Installed files and an open panel can differ, so reopen the client before checking the interface. See the [installer guide](docs/INSTALLER.md) for help.
 
 </details>
 
 ## Documentation
 
-- [Installer guide](docs/INSTALLER.md): release installation, candidate testing, source conflicts, and validation scope.
-- [Product behavior](docs/PRODUCT.md) · [Architecture](docs/ARCHITECTURE.md): recorded evidence, data flow, and implementation boundaries.
-- [Security and privacy](.github/SECURITY.md) · [Roadmap](docs/ROADMAP.md): data handling and future directions.
+- [Installation and troubleshooting](docs/INSTALLER.md)
+- [Usage](docs/PRODUCT.md) · [How it works](docs/ARCHITECTURE.md)
+- [Data handling and sharing](.github/SECURITY.md)
+- [Project roadmap](docs/ROADMAP.md)
 
 ## Contributing
 
@@ -134,6 +123,6 @@ See [Contributing](.github/CONTRIBUTING.md) for development setup and checks, an
 
 ## Attribution and license
 
-Independently maintained; **not an official OpenAI or DeepSeek product**. The interface includes pinned, MIT-licensed components from [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH); see [vendor/dsh/PATCHES.md](vendor/dsh/PATCHES.md) for adaptations.
+Independently maintained; **not an official OpenAI or DeepSeek product**. The interface includes MIT-licensed components from [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH); see [vendor/dsh/PATCHES.md](vendor/dsh/PATCHES.md) for adaptations.
 
 This project is [MIT licensed](LICENSE). Distributions include `LICENSE` and third-party notices.
