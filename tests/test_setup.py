@@ -562,7 +562,41 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(repeated.trace_root, custom)
         self.assertEqual(result["status"], "unchanged")
         self.assertEqual(self.system.environment, str(custom))
+        self.assertTrue(result["plan"]["customTraceRoot"])
+        self.assertFalse(result["plan"]["recordingDirectoryChanged"])
         self.assertEqual(json.loads(installer.state_path.read_text())["traceRoot"], str(custom))
+
+    def test_switch_from_custom_to_default_root_is_visible_without_deleting_recordings(self):
+        custom = self.home / "custom recordings"
+        self.run_setup("--trace-root", str(custom))
+        recording = custom / "preserve.jsonl"
+        recording.write_text("synthetic recording")
+        default = self.home / ".codex/rollout-traces"
+        _, result = self.run_setup("--trace-root", str(default))
+        self.assertFalse(result["plan"]["customTraceRoot"])
+        self.assertTrue(result["plan"]["recordingDirectoryChanged"])
+        self.assertEqual(result["plan"]["traceRoot"], str(default))
+        self.assertEqual(recording.read_text(), "synthetic recording")
+
+    def test_unchanged_setup_needs_no_terminal_or_install_confirmation(self):
+        first, _ = self.run_setup()
+        before = tree_snapshot(self.home)
+        self.system.calls.clear()
+        repeated = self.installer()
+        repeated.args.yes = False
+        with patch.object(
+            setup, "open", side_effect=AssertionError("No terminal needed"), create=True
+        ):
+            result = repeated.setup()
+        self.assertEqual(result["status"], "unchanged")
+        self.assertEqual(tree_snapshot(self.home), before)
+        self.assertFalse(
+            any(
+                command[1:] == ["plugin", "add", setup.PLUGIN, "--json"]
+                for command in self.system.calls
+            )
+        )
+        self.assertEqual(first.state_path.read_bytes(), repeated.state_path.read_bytes())
 
     def test_confirmation_time_launch_agent_edit_is_preserved(self):
         installer, _ = self.run_setup()

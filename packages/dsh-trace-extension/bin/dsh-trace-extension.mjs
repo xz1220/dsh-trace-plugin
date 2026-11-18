@@ -24,11 +24,14 @@ Usage: npx dsh-trace-extension [setup|doctor|uninstall] [options]
   --trace-root PATH
   --codex-home PATH
   --no-persist   Configure this login only
+  --no-animation Use static terminal progress
+  --verbose      Show full installation details
 
 Python 3.9+ and a compatible Codex CLI are required. The package includes the
 built plugin: no GitHub login, repository clone, or frontend build is needed.
 First setup still requires you to fully quit and reopen Codex.
 DSH_TRACE_PYTHON may select an existing Python executable.
+DSH_TRACE_NO_ANIMATION=1 disables motion; NO_COLOR disables color.
 `);
 }
 

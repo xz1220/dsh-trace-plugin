@@ -1,7 +1,7 @@
 {
   "name": "codex-dsh-trace",
   "private": true,
-  "version": "0.2.20",
+  "version": "0.2.22",
   "scripts": {
     "build": "node scripts/build-plugin.mjs",
     "test": "npm run test:python && npm run test:node",
@@ -17,6 +17,7 @@
     "package": "node scripts/package-plugin.mjs",
     "package:npm": "node scripts/build-npm-package.mjs",
     "demo": "python3 scripts/demo.py",
+    "demo:installer": "python3 scripts/preview-installer.py",
     "benchmark": "python3 scripts/benchmark.py",
     "check": "npm run lint && npm run format:check && npm run typecheck && npm test && npm run check:generated",
     "clean": "python3 scripts/clean.py",
