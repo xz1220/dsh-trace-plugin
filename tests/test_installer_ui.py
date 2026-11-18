@@ -245,6 +245,13 @@ class InstallerUITests(unittest.TestCase):
         for change in changes:
             self.assertIn(change["path"], output)
 
+    def test_unchanged_still_guides_a_user_who_has_not_reopened_codex(self):
+        interface, stream = self.interface(no_animation=True)
+        interface.result({"status": "unchanged", "plan": self.plan(), "pluginVersion": "0.2.20"})
+        output = plain(stream.getvalue()).lower()
+        self.assertIn("if you haven't reopened", output)
+        self.assertIn("fully quit and reopen", output)
+
     def test_repair_summary_distinguishes_python_change_and_missing_files(self):
         outputs = {}
         for reason in ("python-changed", "missing-files"):

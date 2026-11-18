@@ -198,6 +198,9 @@ class InstallerUI:
         self.line("  Recordings  " + safe_text(result["plan"]["traceRoot"]))
         if unchanged:
             self.line("  No installation changes were needed.")
+            self.line(
+                "  If you haven't reopened Codex since setup, fully quit and reopen it first."
+            )
         else:
             self.line("  Fully quit and reopen Codex to load this setup.")
         self.line("  Run a new task, then open Codex Trace in the conversation sidebar.")
