@@ -20,7 +20,8 @@
     "benchmark": "python3 scripts/benchmark.py",
     "check": "npm run lint && npm run format:check && npm run typecheck && npm test && npm run check:generated",
     "clean": "python3 scripts/clean.py",
-    "test:npm": "node --test tests/npm/*.mjs"
+    "test:npm": "node --test tests/npm/*.mjs",
+    "reconcile": "python3 scripts/reconcile.py"
   },
   "dependencies": {
     "@shikijs/langs": "4.4.3",
