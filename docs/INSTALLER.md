@@ -2,7 +2,7 @@
 
 GitHub 仓库已于 2026-11-16 公开；首个 npm 发行版 [`dsh-trace-extension@0.2.19`](https://www.npmjs.com/package/dsh-trace-extension/v/0.2.19) 于 2026-11-17 发布。安装设计面向全新安装，不为此前的内部开发版补做迁移路径。
 
-> `0.2.20` 已发布并设为 npm 默认版本，实际下载包已完成哈希核验，用户已确认可以打开侧栏。`0.2.21` 正在准备发布，将交付下文的紧凑机器人终端交互。侧栏打开不单独证明新录制生成、实时事件更新或重新登录后的启动顺序；各项验证仍按对应版本和证据判断。
+> [`0.2.21`](https://www.npmjs.com/package/dsh-trace-extension/v/0.2.21) 已发布并设为 npm 默认版本，公共归档已完成哈希核验，包含下文的紧凑机器人终端交互。全新安装及 `0.2.19`、`0.2.20` 到本版的更新已通过真实 CLI 与私有登录 shim 验证；这不等于原生 GUI 或真实重新登录验收。此前用户确认的是 `0.2.20` 侧栏可以打开，各项结论仍按对应版本和证据判断。
 
 ## 用户入口
 
@@ -25,7 +25,7 @@ npx dsh-trace-extension setup
 
 ## rollout-local 来源冲突
 
-`Marketplace 'rollout-local' uses a different or unknown source` 表示所选 Codex 配置中这个名字已经指向另一来源，例如源码 checkout。已发布的 `0.2.19`、`0.2.20` 及准备中的 `0.2.21` 都保留此保护：只接续可核验的受管来源与 receipt，不自动把开发登记改成 npm 安装。移到中性 cwd 可避开项目级发现，但不会移除已有持久登记，`--yes` 也不绕过归属检查。
+`Marketplace 'rollout-local' uses a different or unknown source` 表示所选 Codex 配置中这个名字已经指向另一来源，例如源码 checkout。已发布的 `0.2.19`、`0.2.20` 和 `0.2.21` 都保留此保护：只接续可核验的受管来源与 receipt，不自动把开发登记改成 npm 安装。移到中性 cwd 可避开项目级发现，但不会移除已有持久登记，`--yes` 也不绕过归属检查。
 
 在自己信任的仓库外目录，可只读查看登记；输出中的本机路径或来源信息不要原样公开：
 
@@ -47,15 +47,15 @@ npx dsh-trace-extension uninstall
 
 `--codex-home`、`--trace-root` 可指定目录。默认创建供后续登录使用的录制 LaunchAgent；`--no-persist` 只配置当前登录会话。首次仍需重启 Codex，登录时与自动启动 Codex 的先后关系也需要实际验证。
 
-## 终端动效（0.2.21 准备发布）
+## 终端动效（0.2.21 起）
 
-以下交互将随 `0.2.21` 的实际安装器交付；当前 npm 默认版本 `0.2.20` 尚不包含这版界面。
+以下交互已随 `0.2.21` 的实际安装器交付，运行默认 npm 安装入口即可使用。
 
 交互终端默认只展示实际发生的检查、安装、校验步骤及下一步，每个输出段落都以小表情开头，减少空行。已知修复原因、登录设置和内部路径收进详情；仅实际启用录制或改变登录设置时，在确认前保留一行影响提示。自定义录制目录、改变后的目标目录、未知操作和错误始终可见。确认时输入 `d` 展开完整计划，仍需明确输入 `y` 才会安装；`--verbose` 直接展示详情，`--dry-run` 保留完整计划。无需修改时不再询问是否应用。
 
 `--no-animation` 或 `DSH_TRACE_NO_ANIMATION=1` 关闭动态刷新，`NO_COLOR` 单独关闭颜色。重定向输出、`TERM=dumb`、CI 和 `--json` 使用原有静态输出，不写动效控制码。
 
-发布前可在源码工作区试看合成片段：
+也可在源码工作区试看合成片段：
 
 ```sh
 npm run demo:installer
@@ -127,15 +127,15 @@ npm pack ./dist/npm/dsh-trace-extension --ignore-scripts --pack-destination dist
 
 包无依赖、无 install/postinstall 脚本，不包含测试、用户配置、录制、日志或整个源仓库。安装仅在用户显式执行 `setup` 时进行。
 
-### 试用本地候选包
+### 校验本地发行归档
 
-本节仅供维护者内部 CLI 校验；本地 tgz 不替代发布流程、真实 npm 验证或交给用户的原样验收。
+本节仅供维护者内部 CLI 校验，可用于复核已发布归档或检查下一版候选；本地 tgz 不替代真实 npm 验证或交给用户的原样验收。
 
-`npx dsh-trace-extension setup` 使用 npm 发布包，切换工作树分支不会让它运行本地源码。目前 npm 默认版本为 `0.2.20`，本地正在准备发布 `0.2.21`；试用后者需取得已核对的 `.tgz`，或按[维护者打包和验收](#维护者打包和验收)生成，再显式指定绝对路径。在自己信任的仓库外目录试跑；下面创建当前用户独占的临时 cwd，只生成计划：
+`npx dsh-trace-extension setup` 使用 npm 发布包，切换工作树分支不会让它运行本地源码。要复核某份发行归档，请取得已核对的 `.tgz`，或按[维护者打包和验收](#维护者打包和验收)生成，再显式指定绝对路径。在自己信任的仓库外目录试跑；下面以 `0.2.21` 为例，创建当前用户独占的临时 cwd，只生成计划：
 
 ```sh
-# 替换为已取得或打包的候选文件绝对路径
-dsh_candidate_tgz="/absolute/path/to/dsh-trace-extension-0.2.21.tgz"
+# 替换为已核对的发行归档绝对路径
+dsh_archive_tgz="/absolute/path/to/dsh-trace-extension-0.2.21.tgz"
 (
   dsh_trial_root="$(mktemp -d)" || exit 1
   [ -n "$dsh_trial_root" ] || exit 1
@@ -145,12 +145,12 @@ dsh_candidate_tgz="/absolute/path/to/dsh-trace-extension-0.2.21.tgz"
   mkdir -m 700 "$dsh_trial_root/home" || exit 1
   HOME="$dsh_trial_root/home" CODEX_HOME="$dsh_trial_root/codex" \
     npx --yes --offline --ignore-scripts --cache "$dsh_trial_root/npm-cache" \
-    --package "$dsh_candidate_tgz" -- dsh-trace-extension setup --dry-run \
+    --package "$dsh_archive_tgz" -- dsh-trace-extension setup --dry-run \
     --codex-home "$dsh_trial_root/codex" --trace-root "$dsh_trial_root/recordings"
 )
 ```
 
-这里 npx 可写临时缓存，安装助手只读检查计划；真实登录域若已有不同录制配置，仍会保留并拒绝。`--codex-home` 和临时 HOME 只分开 CLI 文件，不能替代原生 GUI／登录域隔离；不要直接去掉 `--dry-run` 当作隔离安装，`--no-persist` 也仍可能设置当前登录环境。已知发行版的更新归属从可核验的 npm `0.2.19` 受管安装开始；`0.2.21` 仍需记录本版实际覆盖的升级和验收范围，不能用本地候选的 CLI 结果证明原生侧栏或重新登录通过。
+这里 npx 可写临时缓存，安装助手只读检查计划；真实登录域若已有不同录制配置，仍会保留并拒绝。`--codex-home` 和临时 HOME 只分开 CLI 文件，不能替代原生 GUI／登录域隔离；不要直接去掉 `--dry-run` 当作隔离安装，`--no-persist` 也仍可能设置当前登录环境。已知发行版的更新归属从可核验的 npm `0.2.19` 受管安装开始；每版都应单独记录实际覆盖的升级和验收范围，不能用本地归档的 CLI 结果证明原生侧栏或重新登录通过。
 
 ## 发行记录与后续发布
 
@@ -158,20 +158,24 @@ dsh_candidate_tgz="/absolute/path/to/dsh-trace-extension-0.2.21.tgz"
 
 `0.2.19` 已从公共 npm 仓库下载，在 macOS 的隔离 HOME / CODEX_HOME 中用真实 Codex CLI 验证全新安装、重复安装、doctor 和卸载。清空 npm 缓存后，已安装后端仍能提供工具和完整前端资源。这一轮隔离测试未修改个人 Codex 配置与登录环境；该轮证据不包含重启后的原生侧栏或再次登录时的启动顺序。
 
-`0.2.20` 已于 2026-11-18 发布并设为默认 `latest`，从真实 npm 下载的归档与修复包哈希一致。经用户授权，个人配置已备份并切换至 npm 管理，README 原命令的交互安装和后端自检通过，原源码与录制保留。用户随后确认侧栏可正常打开，因此侧栏打开检查已验收；这项反馈不单独证明新录制生成、实时事件更新或重新登录后的行为。
+`0.2.20` 于 2026-11-18 发布，当时设为默认 `latest`，从真实 npm 下载的归档与修复包哈希一致。经用户授权，个人配置已备份并切换至 npm 管理，README 原命令的交互安装和后端自检通过，原源码与录制保留。用户随后确认侧栏可正常打开，因此侧栏打开检查已验收；这项反馈不单独证明新录制生成、实时事件更新或重新登录后的行为。
 
-`0.2.21` 正在准备发布，交付本次紧凑机器人终端交互、详情展开和动效开关；合成预览脚本仍仅为源码开发工具。本版需单独核对发行归档和实际测试范围，不能把 `0.2.20` 的侧栏反馈直接登记为 `0.2.21` 的全部原生验收。
+`0.2.21` 已于 2026-11-18 发布并设为默认 `latest`，公共 npm 归档与冻结的发行归档哈希一致。本版交付紧凑机器人终端交互、详情展开和动效开关；合成预览脚本仍仅为源码开发工具。
+
+本版全新安装、`0.2.19` 到 `0.2.21` 和 `0.2.20` 到 `0.2.21` 的更新已通过真实 Codex CLI 与私有登录 shim 验证。这些检查覆盖声明的 CLI 安装与更新路径，shim 模拟的登录域不能证明原生 GUI 进程继承环境、重开或真实重新登录后的录制行为。`0.2.20` 的侧栏反馈也不作为 `0.2.21` 的原生验收记录。
+
+发布后，README 字面命令 `npx dsh-trace-extension setup` 已在全新私有配置、npm 缓存和登录 shim 中实际下载并安装 `0.2.21`；展开的 35 个包文件与冻结归档逐字节一致。公共入口 doctor 核验后端版本为 `0.2.21`，重复安装无需交互即返回 unchanged。
 
 公开预发前核对真实 tarball 内容、完整性和已有内部验证，并确认预发已获明确授权；推广到默认入口前核对真实 npm 获取、原生验收结果和推广授权。直接发布已审阅的 `.tgz`，不要发布根开发包；发布账号须具备 npm 权限和有效认证。
 
 ### 预发、推广与用户原样验收
 
-可选的正式发版前验证按以下顺序进行。每个 npx 入口都从自己信任的仓库外目录运行；内部本地包测试不能跳过后面的真实 npm 和用户验收。
+以下是后续版本可选的预发与验收流程，不是对 `0.2.21` 已有测试范围的追加声明。命令中的 `NEW_VERSION` 必须替换为准备发布的新版本；`0.2.21` 已发布，不能重新上传或替换其内容。每个 npx 入口都从自己信任的仓库外目录运行；内部本地包测试不能跳过后面的真实 npm 和用户验收。
 
 1. **内部校验**：维护者复核同一归档；临时 CLI 配置和私有 launchctl shim 的结果只覆盖其声明范围。
-2. **单独授权公开预发**：取得明确授权后，可执行 `npm publish /absolute/path/to/dsh-trace-extension-0.2.21.tgz --tag next --access public --ignore-scripts`。`next` 的包可被任何人下载，版本内容随即公开且不可替换；默认 `latest` 保持原版。发布到 `next` 不是私有预览，也不是用户原样验收。
+2. **单独授权公开预发**：取得明确授权后，可执行 `npm publish "/absolute/path/to/dsh-trace-extension-NEW_VERSION.tgz" --tag next --access public --ignore-scripts`。`next` 的包可被任何人下载，版本内容随即公开且不可替换；默认 `latest` 保持原版。发布到 `next` 不是私有预览，也不是用户原样验收。
 3. **真实 npm 与原生验证**：交付／验收会话通过 `npx dsh-trace-extension@next setup` 从真实 npm 安装，在独立 macOS／Codex 测试身份核对下载归档、真实侧栏、完全重开和重新登录后的录制。新任务应对应当前聊天并持续显示步骤；不能用本地 tgz、仅改 CODEX_HOME 或模拟登录域证明这些结论。
-4. **推广，再交用户**：上述检查通过且正式推广也已获明确授权后，才执行 `npm dist-tag add dsh-trace-extension@0.2.21 latest`，推广同一已验版本，不重新打包。随后在干净普通用户配置中按 README 原样执行 `npx dsh-trace-extension setup`，实际安装、重开、跑新任务、打开侧栏，核对当前聊天与持续步骤。`@next` 的预发验证不能代替这一步。
+4. **推广，再交用户**：上述检查通过且正式推广也已获明确授权后，才执行 `npm dist-tag add "dsh-trace-extension@NEW_VERSION" latest`，推广同一已验版本，不重新打包。随后在干净普通用户配置中按 README 原样执行 `npx dsh-trace-extension setup`，实际安装、重开、跑新任务、打开侧栏，核对当前聊天与持续步骤。`@next` 的预发验证不能代替这一步。
 
 发布前重新只读核对版本和标签，等待实际归档可从 npm 下载并比对完整性。发 `next` 与切 `latest` 都须处于明确授权范围内；授权可以预先覆盖不同阶段，但不能从预发自动延伸到正式推广，当前说明也不构成执行授权。预发和公开发布都不会消除个人已有的源码 `rollout-local` 冲突，源码开发身份不作为新用户验收起点。
 
