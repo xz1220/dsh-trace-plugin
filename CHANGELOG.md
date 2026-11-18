@@ -2,7 +2,40 @@
 
 User-visible changes are recorded here. Historical entries describe code changes, not whether a particular local Codex panel reloaded successfully.
 
-## Unreleased
+## 0.2.21 — 2026-11-18
+
+### Added
+
+- A small trace bot follows real installation steps in interactive terminals, with static progress available through `--no-animation`.
+- Enter `d` before confirmation or use `--verbose` to review paths, commands, and repair details.
+
+### Changed
+
+- Keep the default installation view to checking, setup, verification, and the next action. Show recording notices only when recording settings change, while keeping custom destinations, errors, and unknown operations visible.
+- Skip the confirmation when an owned installation needs no changes, retaining ownership checks and the operation lock.
+- Keep JSON, redirected output, CI, and `TERM=dumb` free of animation control codes. Respect `NO_COLOR` independently of motion.
+
+### Fixed
+
+- Stop animation before confirmation and on errors or interruption. Keep narrow-terminal progress on one line, including wide characters.
+- Explain Python changes and missing-file repairs in details without repeating technical paragraphs during routine setup.
+
+## 0.2.20 — 2026-11-18
+
+### Added
+
+- Verify installed plugin files and probe the local backend with empty recording data.
+- Update and recover known npm-managed installations while preserving recordings, unrelated settings, and edited files.
+
+### Fixed
+
+- Read interactive confirmation through separate terminal input and output streams on macOS Python.
+- Restore verifiable missing managed source files from the original installed cache before upgrading.
+- Preserve trace ordering and recorded evidence across resumed execution, and display verified attachment dimensions.
+
+## Earlier development
+
+The following changes and version entries predate the first npm release and do not define an upgrade contract.
 
 ### Added
 
