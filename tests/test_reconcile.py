@@ -324,7 +324,7 @@ Store.cell_text = _injected_reconciliation_cell_text
         )
         self.assertEqual(report["counts"]["source_missing"], 0)
         self.assertEqual(report["counts"]["source_unreadable"], 0)
-        self.assertEqual(report["provenance"]["reader"]["readerDir"], str(copied_reader))
+        self.assertEqual(report["provenance"]["reader"]["readerDir"], str(copied_reader.resolve()))
 
     def test_cli_entry_point_and_owned_output_guard(self):
         result = subprocess.run(
