@@ -14,6 +14,7 @@ def safe_text(value):
 
 
 class InstallerUI:
+    marker_width = 9
     frames = (
         "[o_o] ●··",
         "[o_o] ·●·",
@@ -62,15 +63,18 @@ class InstallerUI:
     def line(self, value=""):
         self.write(value + "\n")
 
+    def prefix(self, marker):
+        return "  " + safe_text(marker).ljust(self.marker_width) + "  "
+
     def notice(self, value, face="[o_o]", code=None):
         if not self.enhanced:
             return
         text = self.ink(value, code) if code else safe_text(value)
-        self.line("  " + self.ink(face) + "  " + text)
+        self.line(self.ink(self.prefix(face)) + text)
 
     def progress_line(self, marker, label):
         width = max(1, shutil.get_terminal_size((80, 24)).columns - 1)
-        text = f"  {marker}  {safe_text(label)}"
+        text = self.prefix(marker) + safe_text(label)
         used = 0
         clipped = []
         for char in text:

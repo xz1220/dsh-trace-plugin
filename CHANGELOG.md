@@ -2,6 +2,12 @@
 
 User-visible changes are recorded here. Historical entries describe code changes, not whether a particular local Codex panel reloaded successfully.
 
+## 0.2.22 — 2026-11-18
+
+### Fixed
+
+- Align animation, completed steps, confirmation, results, and next actions to the same text column using one fixed-width marker field.
+
 ## 0.2.21 — 2026-11-18
 
 ### Added

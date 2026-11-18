@@ -1350,7 +1350,7 @@ class Installer:
                 open("/dev/tty", "w", encoding="utf-8") as terminal_out,
             ):
                 prompt = (
-                    "  [?_?]  Apply setup? [y/N/d=details] "
+                    ui.prefix("[?_?]") + "Apply setup? [y/N/d=details] "
                     if compact
                     else "Apply this dsh-trace-extension setup? [y/N] "
                 )

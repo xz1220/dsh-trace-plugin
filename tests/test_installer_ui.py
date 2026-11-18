@@ -165,6 +165,20 @@ class InstallerUITests(unittest.TestCase):
                 self.assertIn("Inspect synthetic files", stream.getvalue())
                 self.assertIsNone(SGR.search(stream.getvalue()))
 
+    def test_animation_status_and_message_bodies_share_a_terminal_column(self):
+        for no_color in (False, True):
+            environment = {**self.environment, **({"NO_COLOR": "1"} if no_color else {})}
+            interface, stream = self.interface(environ=environment)
+            label = "Aligned body"
+            markers = [*interface.frames, "[o_o] ✓", "[!_!] ×", "[o_o]"]
+            rows = [plain(interface.progress_line(marker, label)) for marker in markers]
+            for face in ("[o_o]", "[?_?]", "[^_^]", "[>_>]", "[!_!]"):
+                interface.notice(label, face=face)
+            rows.extend(plain(stream.getvalue()).splitlines())
+            positions = {columns(row[: row.index(label)]) for row in rows}
+            self.assertEqual(len(positions), 1, rows)
+            self.assertNotIn("\x1b", interface.prefix("[?_?]"))
+
     def test_motion_switches_keep_static_feedback_without_line_control(self):
         cases = [
             {"no_animation": True},

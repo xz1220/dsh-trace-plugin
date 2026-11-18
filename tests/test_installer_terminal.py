@@ -2,8 +2,10 @@
 
 import errno
 import os
+import re
 import select
 import signal
+import struct
 import subprocess
 import sys
 import tempfile
@@ -12,7 +14,9 @@ import unittest
 from pathlib import Path
 
 if os.name == "posix":
+    import fcntl
     import pty
+    import termios
 
 
 CHILD = r"""
@@ -40,6 +44,9 @@ if "guard-open" in flags:
         raise AssertionError("confirmation unexpectedly opened a terminal")
     builtins.open = unexpected_open
 print("TTY_STATE:" + json.dumps({"stdin": os.isatty(0), "stdout": os.isatty(1)}), flush=True)
+if "alignment" in flags:
+    print(installer.ui.progress_line("[o_o] ✓", "STEP_TEXT"), file=sys.stderr, flush=True)
+    installer.ui.notice("NOTICE_TEXT")
 try:
     installer.confirm({
         "notes": ["SYNTHETIC_TERMINAL_TEST_ONLY"],
@@ -60,6 +67,11 @@ except module.SetupError as exc:
         print("UNCONSUMED:" + sys.stdin.read(), flush=True)
     raise SystemExit(3)
 print("CONFIRMED", flush=True)
+if "alignment" in flags:
+    installer.ui.result({
+        "status": "configured", "plan": {"traceRoot": "/synthetic/recordings"},
+        "pluginVersion": "fixture",
+    })
 """
 
 
@@ -84,6 +96,7 @@ class InstallerTerminalTests(unittest.TestCase):
         answers = [answer] if isinstance(answer, str) else list(answer)
         pid, master = pty.fork()
         if pid == 0:
+            fcntl.ioctl(0, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 80, 0, 0))
             os.chdir(self.root)
             os.execve(
                 sys.executable,
@@ -144,6 +157,24 @@ class InstallerTerminalTests(unittest.TestCase):
         self.assertNotIn("Local recording", output)
         self.assertNotIn("/synthetic/plugin", output)
         self.assertRegex(output, r"\[\?_\?\]\s+Apply setup\? \[y/N/d=details\] ")
+
+    def test_real_terminal_aligns_steps_prompt_completion_and_next_action(self):
+        code, output, _ = self.controlling_terminal("yes\n", flags=("alignment",))
+        self.assertEqual(code, 0, output)
+        text = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", output)
+        positions = []
+        for label in (
+            "STEP_TEXT",
+            "NOTICE_TEXT",
+            "Apply setup?",
+            "Local setup complete",
+            "Fully quit",
+        ):
+            matches = [line for line in text.splitlines() if label in line]
+            self.assertEqual(len(matches), 1, text)
+            line = matches[0]
+            positions.append(line.index(label))
+        self.assertEqual(len(set(positions)), 1, text)
 
     def test_controlling_terminal_default_and_explicit_no_cancel(self):
         for answer in ("\n", "no\n"):
