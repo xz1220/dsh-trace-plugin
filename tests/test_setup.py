@@ -563,7 +563,20 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(result["status"], "unchanged")
         self.assertEqual(self.system.environment, str(custom))
         self.assertTrue(result["plan"]["customTraceRoot"])
+        self.assertFalse(result["plan"]["recordingDirectoryChanged"])
         self.assertEqual(json.loads(installer.state_path.read_text())["traceRoot"], str(custom))
+
+    def test_switch_from_custom_to_default_root_is_visible_without_deleting_recordings(self):
+        custom = self.home / "custom recordings"
+        self.run_setup("--trace-root", str(custom))
+        recording = custom / "preserve.jsonl"
+        recording.write_text("synthetic recording")
+        default = self.home / ".codex/rollout-traces"
+        _, result = self.run_setup("--trace-root", str(default))
+        self.assertFalse(result["plan"]["customTraceRoot"])
+        self.assertTrue(result["plan"]["recordingDirectoryChanged"])
+        self.assertEqual(result["plan"]["traceRoot"], str(default))
+        self.assertEqual(recording.read_text(), "synthetic recording")
 
     def test_unchanged_setup_needs_no_terminal_or_install_confirmation(self):
         first, _ = self.run_setup()

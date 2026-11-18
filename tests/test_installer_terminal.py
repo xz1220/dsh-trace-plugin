@@ -140,9 +140,10 @@ class InstallerTerminalTests(unittest.TestCase):
         self.assertTrue(prompted)
         self.assertIn('"stdin": true', output)
         self.assertIn("CONFIRMED", output)
-        self.assertIn("Codex Trace", output)
+        self.assertNotIn("Refresh Codex Trace", output)
+        self.assertNotIn("Local recording", output)
         self.assertNotIn("/synthetic/plugin", output)
-        self.assertIn("Apply setup? [y/N/d=details] ", output)
+        self.assertRegex(output, r"\[\?_\?\]\s+Apply setup\? \[y/N/d=details\] ")
 
     def test_controlling_terminal_default_and_explicit_no_cancel(self):
         for answer in ("\n", "no\n"):

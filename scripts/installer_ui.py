@@ -62,6 +62,12 @@ class InstallerUI:
     def line(self, value=""):
         self.write(value + "\n")
 
+    def notice(self, value, face="[o_o]", code=None):
+        if not self.enhanced:
+            return
+        text = self.ink(value, code) if code else safe_text(value)
+        self.line("  " + self.ink(face) + "  " + text)
+
     def progress_line(self, marker, label):
         width = max(1, shutil.get_terminal_size((80, 24)).columns - 1)
         text = f"  {marker}  {safe_text(label)}"
@@ -100,7 +106,8 @@ class InstallerUI:
                 )
                 index += 1
 
-        self.write(self.progress_line(self.frames[0], label) + ("" if self.animated else "\n"))
+        marker = self.frames[0] if self.animated else "[o_o]"
+        self.write(self.progress_line(marker, label) + ("" if self.animated else "\n"))
         if self.animated:
             worker = threading.Thread(target=draw, name="dsh-installer-progress", daemon=True)
             try:
@@ -119,16 +126,15 @@ class InstallerUI:
                 worker.join()
             if self.animated:
                 self.write("\r\033[2K")
-            marker = "[o_o] ✓" if completed else "[!_!] ×"
-            self.line(self.progress_line(marker, label if completed else f"Stopped: {label}"))
+            if self.animated or not completed:
+                marker = "[o_o] ✓" if completed else "[!_!] ×"
+                self.line(self.progress_line(marker, label if completed else f"Stopped: {label}"))
 
     def header(self, version=None):
-        if not self.enhanced:
+        if not self.enhanced or not self.verbose:
             return
-        self.line()
         suffix = " · " + safe_text(version) if version else ""
-        self.line("  " + self.ink("[o_o]") + "  " + self.ink("dsh-trace-extension" + suffix, "1"))
-        self.line()
+        self.notice("dsh-trace-extension" + suffix, code="1")
 
     @staticmethod
     def known_command(command, source=None):
@@ -168,38 +174,24 @@ class InstallerUI:
             "write-login-launch-agent",
             "remove-owned-launch-agent",
         }
-        repairs = [
-            change for change in changes if change["action"] == "repair-owned-installed-files"
-        ]
-        self.line()
-        if repairs:
-            self.line(self.ink("  Refresh Codex Trace", "1"))
-            if any(change.get("reason") == "python-changed" for change in repairs):
-                self.line("  Python runtime changed since your last setup.")
-            if any(change.get("missing") for change in repairs):
-                self.line("  Restore missing plugin files.")
-        elif actions & known or any(
-            self.known_command(command, plan.get("source")) for command in commands
+        if actions & {"set-login-environment", "create-recording-directory"}:
+            scope = "across logins" if plan.get("persistentLoginSetup") else "for this login"
+            self.notice(f"Enable recording {scope} (may include private data).", "[!_!]")
+        elif "write-login-launch-agent" in actions:
+            self.notice("Prepare recording at login (may include private data).", "[!_!]")
+        elif "remove-owned-launch-agent" in actions:
+            self.notice("Keep recording for this login only.", "[!_!]")
+        if plan.get("traceRoot") and (
+            plan.get("customTraceRoot") or plan.get("recordingDirectoryChanged")
         ):
-            self.line(self.ink("  Set up Codex Trace", "1"))
-        else:
-            self.line(self.ink("  Installation changes", "1"))
-        if plan.get("traceRoot"):
-            self.line(
-                "  Local recording · "
-                + ("prepare at login" if plan.get("persistentLoginSetup") else "this login only")
-            )
-            if plan.get("customTraceRoot"):
-                self.line("  Record to " + safe_text(plan["traceRoot"]))
-            self.line("  Recordings may include prompts, code, credentials, and tool output.")
+            self.notice("Record to " + safe_text(plan["traceRoot"]))
         for change in changes:
             if change["action"] not in known:
                 target = change.get("path") or change.get("value") or change.get("name", "")
-                self.line("  " + safe_text(change["action"]) + ": " + safe_text(target))
+                self.notice(safe_text(change["action"]) + ": " + safe_text(target), "[!_!]")
         for command in commands:
             if not self.known_command(command, plan.get("source")):
-                self.line("  Run: " + safe_text(shlex.join(str(part) for part in command)))
-        self.line()
+                self.notice("Run: " + safe_text(shlex.join(str(part) for part in command)), "[!_!]")
 
     def show_details(self, plan):
         if not self.enhanced:
@@ -207,8 +199,7 @@ class InstallerUI:
         self.details_shown = True
         changes = plan.get("changes", [])
         commands = plan.get("commands", [])
-        self.line()
-        self.line(self.ink("  Installation details", "1"))
+        self.notice("Installation details", "[?_?]", "1")
         labels = {
             "persist-bundled-plugin": "Keep a stable local copy of the plugin",
             "repair-owned-installed-files": "Refresh the installed plugin",
@@ -221,62 +212,60 @@ class InstallerUI:
         }
         for change in changes:
             action = change["action"]
-            self.line("  + " + safe_text(labels.get(action, action.replace("-", " "))))
+            label = safe_text(labels.get(action, action.replace("-", " ")))
             target = change.get("path") or change.get("value") or change.get("name")
-            if target:
-                self.line("    " + safe_text(target))
+            self.notice(label + (": " + safe_text(target) if target else ""))
             if change.get("reason") == "python-changed":
-                self.line("    Python runtime changed since your last setup.")
-                self.line("    " + safe_text(change["previousPython"]))
-                self.line("    → " + safe_text(change["pythonExecutable"]))
+                self.notice(
+                    "Python runtime changed: "
+                    + safe_text(change["previousPython"])
+                    + " → "
+                    + safe_text(change["pythonExecutable"])
+                )
             if change.get("missing"):
-                self.line(f"    Restore {len(change['missing'])} missing plugin file(s).")
+                self.notice(f"Restore {len(change['missing'])} missing plugin file(s).")
         for command in commands:
-            self.line("  Run: " + safe_text(shlex.join(str(part) for part in command)))
+            self.notice("Run: " + safe_text(shlex.join(str(part) for part in command)))
         if plan.get("stateFile"):
-            self.line("  Settings  " + safe_text(plan["stateFile"]))
+            self.notice("Settings: " + safe_text(plan["stateFile"]))
         if plan.get("traceRoot"):
-            self.line("  Record to " + safe_text(plan["traceRoot"]))
+            self.notice("Record to " + safe_text(plan["traceRoot"]))
         if "persistentLoginSetup" in plan:
-            self.line(
-                "  Login setup: "
-                + ("enabled" if plan["persistentLoginSetup"] else "this login only")
+            self.notice(
+                "Login setup: " + ("enabled" if plan["persistentLoginSetup"] else "this login only")
             )
-        self.line()
-        self.line("  Recordings may include prompts, code, credentials, and tool output.")
-        self.line("  Codex must be reopened before new tasks can use these settings.")
+        self.notice("Recordings may include prompts, code, credentials, and tool output.", "[!_!]")
+        self.notice("Codex must be reopened before new tasks can use these settings.", "[>_>]")
         if plan.get("persistentLoginSetup"):
-            self.line(
-                "  Login setup prepares future sessions; Codex auto-start ordering is unverified."
+            self.notice(
+                "Login setup prepares future sessions; Codex auto-start ordering is unverified."
             )
-        self.line()
 
     def result(self, result):
         if not self.enhanced or result["status"] not in ("configured", "unchanged"):
             return False
-        self.line()
         unchanged = result["status"] == "unchanged"
         version = result.get("pluginVersion")
         title = "Already up to date" if unchanged else "Local setup complete"
         if version:
             title += " · " + safe_text(version)
-        self.line("  " + self.ink("[^_^]") + "  " + self.ink(title, "1"))
-        self.line()
+        self.notice(title, "[^_^]", "1")
         expanded = self.verbose or self.details_shown
-        if expanded or result["plan"].get("customTraceRoot"):
-            self.line("  Recordings  " + safe_text(result["plan"]["traceRoot"]))
+        if (
+            expanded
+            or result["plan"].get("customTraceRoot")
+            or result["plan"].get("recordingDirectoryChanged")
+        ):
+            self.notice("Recordings: " + safe_text(result["plan"]["traceRoot"]))
         if unchanged:
-            self.line(
-                "  If you haven't reopened Codex since setup, fully quit and reopen it first."
-            )
+            self.notice("If you haven't reopened Codex, fully quit and reopen it first.", "[>_>]")
+            self.notice("Run a new task → open Codex Trace in the sidebar.", "[>_>]")
         else:
-            self.line("  Fully quit and reopen Codex to load this setup.")
-        self.line("  Run a new task, then open Codex Trace in the conversation sidebar.")
+            self.notice("Fully quit and reopen Codex → run a new task → open Codex Trace.", "[>_>]")
         if expanded:
-            self.line(
-                "  Opening the panel alone does not verify that new recordings are being created."
+            self.notice(
+                "Opening the panel alone does not verify that new recordings are being created."
             )
         for warning in result.get("warnings", []):
-            self.line("  Warning: " + safe_text(warning))
-        self.line()
+            self.notice("Warning: " + safe_text(warning), "[!_!]")
         return True

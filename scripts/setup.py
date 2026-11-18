@@ -1020,6 +1020,9 @@ class Installer:
             "traceRoot": str(self.trace_root),
             "stateFile": str(self.state_path),
             "customTraceRoot": self.trace_root != self.codex_home / "rollout-traces",
+            "recordingDirectoryChanged": bool(
+                self.state and self.state["traceRoot"] != str(self.trace_root)
+            ),
             "persistentLoginSetup": not self.args.no_persist,
             "commands": commands,
             "changes": changes,
@@ -1347,7 +1350,7 @@ class Installer:
                 open("/dev/tty", "w", encoding="utf-8") as terminal_out,
             ):
                 prompt = (
-                    "Apply setup? [y/N/d=details] "
+                    "  [?_?]  Apply setup? [y/N/d=details] "
                     if compact
                     else "Apply this dsh-trace-extension setup? [y/N] "
                 )
@@ -1746,6 +1749,11 @@ def main(argv=None, **dependencies):
         result = {"status": "error", "error": str(exc), "warnings": installer.warnings}
         if args.json:
             print(json.dumps(result, ensure_ascii=False))
+        elif installer.ui.enhanced:
+            for line in str(exc).splitlines():
+                installer.ui.notice("Error: " + line, "[!_!]")
+            for warning in installer.warnings:
+                installer.ui.notice("Warning: " + warning, "[!_!]")
         else:
             print(f"Error: {exc}", file=sys.stderr)
             for warning in installer.warnings:
@@ -1755,6 +1763,8 @@ def main(argv=None, **dependencies):
         message = "Interrupted. Rerun setup to check or recover any installation changes."
         if args.json:
             print(json.dumps({"status": "error", "error": message, "warnings": installer.warnings}))
+        elif installer.ui.enhanced:
+            installer.ui.notice(message, "[!_!]")
         else:
             print(f"\n{message}", file=sys.stderr)
         return 130

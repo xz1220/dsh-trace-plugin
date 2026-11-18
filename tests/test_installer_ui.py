@@ -99,6 +99,7 @@ class InstallerUITests(unittest.TestCase):
             "stateFile": str(self.home / "setup.json"),
             "traceRoot": str(self.home / "rollout-traces"),
             "customTraceRoot": False,
+            "recordingDirectoryChanged": False,
             "persistentLoginSetup": True,
             "commands": [],
             "changes": [] if changes is None else changes,
@@ -116,10 +117,12 @@ class InstallerUITests(unittest.TestCase):
         interface, stream = self.interface(json_mode=True, verbose=True)
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
+            interface.header("0.2.20")
             with interface.stage("Checking synthetic profile"):
                 pass
             interface.summary(self.plan())
             interface.result({"status": "configured", "plan": self.plan()})
+            interface.notice("Synthetic warning")
         self.assertFalse(interface.enhanced)
         self.assertFalse(interface.animated)
         self.assertEqual(stream.getvalue(), "")
@@ -176,9 +179,22 @@ class InstallerUITests(unittest.TestCase):
                     pass
                 output = stream.getvalue()
                 self.assertIn("Check synthetic cache", plain(output))
+                self.assertEqual(len(plain(output).splitlines()), 1)
                 self.assertNotIn("\r", output)
                 self.assertNotIn("\x1b[2K", output)
                 self.assert_no_background_refresh(stream)
+
+    def test_static_stage_still_reports_failure_and_preserves_the_exception(self):
+        interface, stream = self.interface(no_animation=True)
+        failure = RuntimeError("synthetic failure")
+        with self.assertRaises(RuntimeError) as caught:
+            with interface.stage("Inspect synthetic cache"):
+                raise failure
+        self.assertIs(caught.exception, failure)
+        output = plain(stream.getvalue())
+        self.assertEqual(len(output.splitlines()), 2)
+        self.assertIn("stopped", output.splitlines()[-1].lower())
+        self.assertNotIn("\r", output)
 
     def test_animated_success_stops_refreshing_before_return(self):
         interface, stream = self.interface()
@@ -255,7 +271,7 @@ class InstallerUITests(unittest.TestCase):
         self.assertIn("if you haven't reopened", output)
         self.assertIn("fully quit and reopen", output)
 
-    def test_repair_summary_distinguishes_python_change_and_missing_files(self):
+    def test_details_preserve_python_change_and_missing_file_repair_reasons(self):
         outputs = {}
         for reason in ("python-changed", "missing-files"):
             interface, stream = self.interface(no_animation=True)
@@ -267,15 +283,17 @@ class InstallerUITests(unittest.TestCase):
                 "previousPython": "/synthetic/old-python",
                 "pythonExecutable": "/synthetic/new-python",
             }
-            interface.summary(self.plan([change]))
+            interface.summary(self.plan([change]), details=True)
             outputs[reason] = plain(stream.getvalue())
-            for hidden in (change["path"], change["previousPython"], change["pythonExecutable"]):
-                self.assertNotIn(hidden, outputs[reason])
+            self.assertIn(change["path"], outputs[reason])
+            if reason == "python-changed":
+                self.assertIn(change["previousPython"], outputs[reason])
+                self.assertIn(change["pythonExecutable"], outputs[reason])
         self.assertIn("python", outputs["python-changed"].lower())
-        self.assertRegex(outputs["missing-files"].lower(), r"missing.*files")
+        self.assertRegex(outputs["missing-files"].lower(), r"\b2\b.*missing|missing.*\b2\b")
         self.assertNotEqual(outputs["python-changed"], outputs["missing-files"])
 
-    def test_compact_plan_keeps_effects_but_hides_technical_paths(self):
+    def test_compact_recording_change_hides_technical_paths(self):
         changes = [
             {"action": "persist-bundled-plugin", "path": str(self.home / "source")},
             {"action": "write-login-launch-agent", "path": str(self.home / "agent.plist")},
@@ -297,10 +315,97 @@ class InstallerUITests(unittest.TestCase):
             "/synthetic/codex",
         ):
             self.assertNotIn(hidden, output)
-        self.assertIn("codex trace", output.lower())
         self.assertIn("record", output.lower())
         self.assertIn("login", output.lower())
         self.assertRegex(output.lower(), r"private|credentials|prompts|sensitive")
+
+    def test_pure_persist_or_repair_has_no_standing_summary(self):
+        for reason in (None, "python-changed", "missing-files"):
+            with self.subTest(reason=reason):
+                changes = [{"action": "persist-bundled-plugin", "path": "/synthetic/source"}]
+                if reason:
+                    changes.append(
+                        {
+                            "action": "repair-owned-installed-files",
+                            "path": "/synthetic/cache",
+                            "reason": reason,
+                            "missing": ["server/main.py"],
+                            "previousPython": "/synthetic/old-python",
+                            "pythonExecutable": "/synthetic/new-python",
+                        }
+                    )
+                interface, stream = self.interface(no_animation=True)
+                interface.summary(self.plan(changes))
+                self.assertEqual(stream.getvalue(), "")
+
+    def test_only_actual_recording_changes_emit_one_compact_impact_notice(self):
+        actions = (
+            "set-login-environment",
+            "create-recording-directory",
+            "write-login-launch-agent",
+            "remove-owned-launch-agent",
+        )
+        for action in actions:
+            with self.subTest(action=action):
+                plan = self.plan([{"action": action, "path": "/synthetic/settings"}])
+                plan["persistentLoginSetup"] = action != "remove-owned-launch-agent"
+                interface, stream = self.interface(no_animation=True)
+                interface.summary(plan)
+                output = plain(stream.getvalue())
+                self.assertEqual(len([line for line in output.splitlines() if line.strip()]), 1)
+                self.assertIn("record", output.lower())
+                if action == "remove-owned-launch-agent":
+                    self.assertRegex(output.lower(), r"this login|current login")
+                    self.assertNotRegex(
+                        output.lower(), r"recording (?:has )?stopped|stop recording"
+                    )
+                else:
+                    self.assertRegex(output.lower(), r"private|credentials|prompts|sensitive")
+
+    def test_default_header_is_silent_to_keep_only_steps_visible(self):
+        interface, stream = self.interface(no_animation=True)
+        interface.header("0.2.20")
+        self.assertEqual(stream.getvalue(), "")
+
+    def test_verbose_header_is_one_robot_line(self):
+        interface, stream = self.interface(no_animation=True, verbose=True)
+        interface.header("0.2.20")
+        output = plain(stream.getvalue())
+        self.assertEqual(len(output.splitlines()), 1)
+        self.assertRegex(output, r"^\s*\[[^\]\s]{3}\]\s")
+
+    def test_all_enhanced_sections_are_robot_prefixed_without_blank_spacers(self):
+        interface, stream = self.interface(no_animation=True)
+        plan = self.plan([{"action": "write-login-launch-agent", "path": "/synthetic/agent"}])
+        interface.header("0.2.20")
+        interface.summary(plan)
+        interface.summary(plan, details=True)
+        interface.result(
+            {
+                "status": "configured",
+                "plan": plan,
+                "pluginVersion": "0.2.20",
+                "warnings": ["Check synthetic recovery."],
+            }
+        )
+        interface.notice("Synthetic error", face="[!_!]", code="31")
+        output = plain(stream.getvalue())
+        self.assertNotIn("\n\n", output)
+        self.assertTrue(output.splitlines())
+        for line in output.splitlines():
+            self.assertTrue(line.strip(), repr(output))
+            self.assertRegex(line, r"^\s*\[[^\]\s]{3}\]\s", line)
+
+    def test_notice_sanitizes_text_and_uses_the_requested_face(self):
+        interface, stream = self.interface(
+            environ={**self.environment, "NO_COLOR": "1"}, no_animation=True
+        )
+        interface.notice("Synthetic\nerror\x1b[2J\x07", face="[!_!]", code="31")
+        output = stream.getvalue()
+        self.assertEqual(len(output.splitlines()), 1)
+        self.assertRegex(output, r"^\s*\[!_!\]\s")
+        self.assertNotIn("\x1b", output)
+        self.assertNotIn("\x07", output)
 
     def test_verbose_plan_and_explicit_details_show_complete_commands(self):
         plan = self.plan([{"action": "persist-bundled-plugin", "path": str(self.home / "source")}])
@@ -347,6 +452,14 @@ class InstallerUITests(unittest.TestCase):
         plan = self.plan()
         plan["customTraceRoot"] = True
         plan["traceRoot"] = str(self.home / "custom-recordings")
+        interface, stream = self.interface(no_animation=True)
+        interface.summary(plan)
+        self.assertIn(plan["traceRoot"], plain(stream.getvalue()))
+
+    def test_switching_back_to_default_recording_directory_is_not_hidden(self):
+        plan = self.plan()
+        plan["recordingDirectoryChanged"] = True
+        self.assertFalse(plan["customTraceRoot"])
         interface, stream = self.interface(no_animation=True)
         interface.summary(plan)
         self.assertIn(plan["traceRoot"], plain(stream.getvalue()))

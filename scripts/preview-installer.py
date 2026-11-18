@@ -39,9 +39,7 @@ def main():
     ui = InstallerUI(stream=stream, no_animation=args.no_animation, verbose=args.verbose)
     if not ui.enhanced:
         parser.error("Open the preview in an interactive terminal with TERM other than dumb.")
-    ui.line(
-        "  PREVIEW · synthetic paths · no installation or recording settings are read or changed"
-    )
+    ui.notice("Preview only; no settings are read or changed.")
     ui.header("next preview")
     with ui.stage("Check setup"):
         time.sleep(1.5)
@@ -79,8 +77,7 @@ def main():
                 ]
             )
         ui.summary(plan)
-        ui.line("  Apply setup? [y/N/d=details] y  (simulated)")
-        ui.line()
+        ui.notice("Apply setup? [y/N/d=details] y  (simulated)", "[?_?]")
         try:
             with ui.stage("Set up Codex Trace"):
                 time.sleep(1.6)
@@ -89,8 +86,7 @@ def main():
                 if args.scenario == "error":
                     raise OSError("Synthetic error: the example plugin directory is read-only.")
         except OSError as exc:
-            ui.line("  " + str(exc))
-            ui.line("  Preview only. Nothing was installed.")
+            ui.notice(str(exc), "[!_!]")
         else:
             ui.result({"status": "configured", "pluginVersion": "next preview", "plan": plan})
     else:
