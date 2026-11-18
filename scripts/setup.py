@@ -1282,10 +1282,13 @@ class Installer:
         if self.args.yes:
             return
         try:
-            with open("/dev/tty", "r+", encoding="utf-8") as terminal:
-                terminal.write("Apply this dsh-trace-extension setup? [y/N] ")
-                terminal.flush()
-                answer = terminal.readline().strip().lower()
+            with (
+                open("/dev/tty", "r", encoding="utf-8") as terminal_in,
+                open("/dev/tty", "w", encoding="utf-8") as terminal_out,
+            ):
+                terminal_out.write("Apply this dsh-trace-extension setup? [y/N] ")
+                terminal_out.flush()
+                answer = terminal_in.readline().strip().lower()
         except OSError as exc:
             raise SetupError(
                 "No interactive terminal. Review --dry-run, then pass --yes to apply."
