@@ -81,7 +81,7 @@ def main():
         )
         helper = payload / "installer"
         helper.mkdir()
-        for name in ["setup.py", "installer_bundle.py", "installer_checks.py"]:
+        for name in ["setup.py", "installer_bundle.py", "installer_checks.py", "installer_ui.py"]:
             shutil.copy2(ROOT / "scripts" / name, helper / name)
         (stage / ".build-info.json").write_text(json.dumps({"name": NAME, "format": 1}) + "\n")
         if destination.exists():

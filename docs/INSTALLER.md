@@ -2,7 +2,7 @@
 
 GitHub 仓库已于 2026-11-16 公开；首个 npm 发行版 [`dsh-trace-extension@0.2.19`](https://www.npmjs.com/package/dsh-trace-extension/v/0.2.19) 于 2026-11-17 发布。安装设计面向全新安装，不为此前的内部开发版补做迁移路径。
 
-> 下文“后续候选的更新与恢复”描述本轮源代码，尚未发布为新 npm 版本。`0.2.19` 首发的安装生命周期证据可复用；固定哈希的 `0.2.20` 本地候选已通过隔离配置／模拟登录域下的真实 CLI 与后端验收，真实原生侧栏及重新登录仍待验，不能据此宣称新版已经交付。
+> `0.2.20` 已发布并设为 npm 默认版本，实际下载包已完成哈希核验，侧栏打开已获用户验收。新录制与重新登录的验证仍按各自证据判断。下文的终端动效属于下一版源码预览，尚未发布到 npm。
 
 ## 用户入口
 
@@ -25,7 +25,7 @@ npx dsh-trace-extension setup
 
 ## rollout-local 来源冲突
 
-`Marketplace 'rollout-local' uses a different or unknown source` 表示所选 Codex 配置中这个名字已经指向另一来源，例如源码 checkout。`0.2.19` 和 `0.2.20` 候选都保留此保护：只接续可核验的受管来源与 receipt，不自动把开发登记改成 npm 安装。移到中性 cwd 可避开项目级发现，但不会移除已有持久登记，`--yes` 也不绕过归属检查。
+`Marketplace 'rollout-local' uses a different or unknown source` 表示所选 Codex 配置中这个名字已经指向另一来源，例如源码 checkout。`0.2.19` 和 `0.2.20` 都保留此保护：只接续可核验的受管来源与 receipt，不自动把开发登记改成 npm 安装。移到中性 cwd 可避开项目级发现，但不会移除已有持久登记，`--yes` 也不绕过归属检查。
 
 在自己信任的仓库外目录，可只读查看登记；输出中的本机路径或来源信息不要原样公开：
 
@@ -47,9 +47,26 @@ npx dsh-trace-extension uninstall
 
 `--codex-home`、`--trace-root` 可指定目录。默认创建供后续登录使用的录制 LaunchAgent；`--no-persist` 只配置当前登录会话。首次仍需重启 Codex，登录时与自动启动 Codex 的先后关系也需要实际验证。
 
-## 后续候选的更新与恢复
+## 终端动效（源码预览）
 
-新版发布后，安装、更新和可确认归属的修复使用同一入口：
+交互终端中，小机器人随真实检查、准备和校验阶段显示进度；完成阶段留下静态结果，不增加人为等待。确认前仍显示将修改的路径。Python 环境变化和缓存文件缺失会分别说明原因；无需修改时不再询问是否应用。
+
+`--no-animation` 或 `DSH_TRACE_NO_ANIMATION=1` 关闭动态刷新，`NO_COLOR` 单独关闭颜色。重定向输出、`TERM=dumb`、CI 和 `--json` 使用原有静态输出，不写动效控制码。
+
+在源码工作区试看片段：
+
+```sh
+npm run demo:installer
+npm run demo:installer -- --scenario repair
+npm run demo:installer -- --scenario unchanged
+npm run demo:installer -- --scenario error
+```
+
+预览仅播放合成步骤，不调用安装器、不读取个人配置、不修改安装或录制。预览中的等待用于观察表情和光点，实际安装不会为了播放动效而延时。
+
+## 0.2.20 的更新与恢复
+
+安装、更新和可确认归属的修复使用同一入口：
 
 ```sh
 npx dsh-trace-extension@latest setup --dry-run

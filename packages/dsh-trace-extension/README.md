@@ -30,6 +30,10 @@ non-interactive use; it does not override ownership conflicts. `--codex-home` an
 `--trace-root` select configuration and recording locations. `--no-persist`
 configures only the current login instead of creating a login LaunchAgent.
 
+Interactive terminals show a small trace bot alongside real installation steps.
+`--no-animation` or `DSH_TRACE_NO_ANIMATION=1` uses static progress; `NO_COLOR`
+disables color. Piped output, CI, `TERM=dumb`, and JSON results stay plain.
+
 Setup is repeatable for its own installation and refuses to overwrite
 unrecognized or edited managed resources. Uninstall preserves recordings and
 unrelated configuration. The verified local marketplace source is retained while

@@ -564,6 +564,26 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(self.system.environment, str(custom))
         self.assertEqual(json.loads(installer.state_path.read_text())["traceRoot"], str(custom))
 
+    def test_unchanged_setup_needs_no_terminal_or_install_confirmation(self):
+        first, _ = self.run_setup()
+        before = tree_snapshot(self.home)
+        self.system.calls.clear()
+        repeated = self.installer()
+        repeated.args.yes = False
+        with patch.object(
+            setup, "open", side_effect=AssertionError("No terminal needed"), create=True
+        ):
+            result = repeated.setup()
+        self.assertEqual(result["status"], "unchanged")
+        self.assertEqual(tree_snapshot(self.home), before)
+        self.assertFalse(
+            any(
+                command[1:] == ["plugin", "add", setup.PLUGIN, "--json"]
+                for command in self.system.calls
+            )
+        )
+        self.assertEqual(first.state_path.read_bytes(), repeated.state_path.read_bytes())
+
     def test_confirmation_time_launch_agent_edit_is_preserved(self):
         installer, _ = self.run_setup()
         second = self.installer()

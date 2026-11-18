@@ -22,10 +22,16 @@ spec = importlib.util.spec_from_file_location("confirmation_fixture", sys.argv[1
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 installer = module.Installer.__new__(module.Installer)
-installer.args = SimpleNamespace(yes=sys.argv[2] == "yes")
+installer.args = SimpleNamespace(yes=sys.argv[2] == "yes", action="setup")
+installer.ui = module.terminal_ui().InstallerUI()
 print("TTY_STATE:" + json.dumps({"stdin": os.isatty(0), "stdout": os.isatty(1)}), flush=True)
 try:
-    installer.confirm({"notes": ["SYNTHETIC_TERMINAL_TEST_ONLY"]})
+    installer.confirm({
+        "notes": ["SYNTHETIC_TERMINAL_TEST_ONLY"],
+        "stateFile": "/synthetic/setup.json",
+        "commands": [],
+        "changes": [{"action": "persist-bundled-plugin", "path": "/synthetic/plugin"}],
+    })
 except module.SetupError as exc:
     print("SETUP_ERROR:" + str(exc), flush=True)
     if sys.argv[3] == "read-pipe":
@@ -48,6 +54,7 @@ class InstallerTerminalTests(unittest.TestCase):
             "CODEX_HOME": str(self.root / ".codex"),
             "PYTHONDONTWRITEBYTECODE": "1",
             "PYTHONPYCACHEPREFIX": str(self.root / "python-cache"),
+            "TERM": "xterm-256color",
         }
 
     def controlling_terminal(self, answer):
@@ -106,6 +113,8 @@ class InstallerTerminalTests(unittest.TestCase):
         self.assertTrue(prompted)
         self.assertIn('"stdin": true', output)
         self.assertIn("CONFIRMED", output)
+        self.assertIn("Here's what will change", output)
+        self.assertIn("/synthetic/plugin", output)
 
     def test_controlling_terminal_default_and_explicit_no_cancel(self):
         for answer in ("\n", "no\n"):

@@ -8,6 +8,7 @@ deleted. All runtime dependencies are in Python's standard library.
 
 import argparse
 import base64
+import contextlib
 import hashlib
 import importlib.util
 import json
@@ -34,6 +35,18 @@ class SetupError(Exception):
 
 
 _RUNTIME_CHECKS = None
+_TERMINAL_UI = None
+
+
+def terminal_ui():
+    global _TERMINAL_UI
+    if _TERMINAL_UI is None:
+        path = Path(__file__).with_name("installer_ui.py")
+        spec = importlib.util.spec_from_file_location("dsh_installer_ui", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _TERMINAL_UI = module
+    return _TERMINAL_UI
 
 
 def runtime_checks():
@@ -92,6 +105,11 @@ class Installer:
         self.system = system or System()
         self.platform = sys.platform if platform is None else platform
         self.environ = dict(os.environ if environ is None else environ)
+        self.ui = terminal_ui().InstallerUI(
+            environ=self.environ,
+            json_mode=args.json,
+            no_animation=args.no_animation,
+        )
         self.home = absolute(home or self.environ.get("HOME", Path.home()))
         self.codex_home = absolute(
             args.codex_home or self.environ.get("CODEX_HOME", self.home / ".codex"), self.home
@@ -974,6 +992,11 @@ class Installer:
                     "action": "repair-owned-installed-files",
                     "path": cache.get("path", ""),
                     "missing": cache["missing"],
+                    "reason": "python-changed"
+                    if receipt and receipt["pythonExecutable"] != self.bundle.python_executable
+                    else "missing-files",
+                    "previousPython": receipt["pythonExecutable"] if receipt else None,
+                    "pythonExecutable": self.bundle.python_executable,
                 }
             )
         if not self.trace_root.exists():
@@ -1158,13 +1181,18 @@ class Installer:
             self.release_operation_lock()
 
     def apply_setup(self):
-        self.check_dependencies()
-        self.initialize_bundle()
-        if self.load_pending():
+        self.ui.header()
+        with self.ui.stage("Check your local setup"):
+            self.check_dependencies()
+            self.initialize_bundle()
+            pending = self.load_pending()
+        if pending:
+            # Recovery can ask for confirmation. Never redraw over that prompt.
             recovered = self.recover_operation()
             if recovered is not None:
                 return recovered
-        plan = self.preflight()
+        with self.ui.stage("Review plugin files and recording settings"):
+            plan = self.preflight()
         public = {k: v for k, v in plan.items() if not k.startswith("_")}
         if self.args.dry_run:
             return {"status": "dry-run", "plan": public}
@@ -1181,7 +1209,12 @@ class Installer:
                 # also catch project-scoped sources before registering anything.
                 self.revalidate(plan)
             self.begin_operation(plan)
-            self.bundled("apply", self.write_managed, self.ensure_directory)
+            with (
+                self.ui.stage("Prepare the local plugin")
+                if plan["changes"] or plan["commands"]
+                else contextlib.nullcontext()
+            ):
+                self.bundled("apply", self.write_managed, self.ensure_directory)
             if plan["_marketplace_exists"]:
                 self.retain_bundle_source()
             self.ensure_directory(self.trace_root)
@@ -1201,7 +1234,13 @@ class Installer:
                 if command[1:3] == ["plugin", "add"]:
                     self.pending["pluginIntent"] = True
                     self.save_pending()
-                self.command(command)
+                label = (
+                    "Register the local plugin source"
+                    if command[1:3] == ["plugin", "marketplace"]
+                    else "Enable Codex Trace"
+                )
+                with self.ui.stage(label):
+                    self.command(command)
                 self.commands_done.append(command)
             plugin = self.installed_plugin()
             if not plugin or not plugin.get("enabled", True):
@@ -1213,8 +1252,13 @@ class Installer:
                     f"Codex reported plugin version {plugin.get('version')!r}, expected {self.bundle.version!r}. "
                     "The source was preserved; rerun setup after reviewing the CLI state."
                 )
-            self.require_verified_bundle(require_current=True)
-            self.repair_cache(plugin, plan)
+            with (
+                self.ui.stage("Verify the installed plugin files")
+                if plan["changes"] or plan["commands"]
+                else contextlib.nullcontext()
+            ):
+                self.require_verified_bundle(require_current=True)
+                self.repair_cache(plugin, plan)
             if self.args.no_persist and self.launch_path.exists():
                 self.check_owned_agent()
                 self.remove_managed(self.launch_path, expected=plan["_agent_before"])
@@ -1278,7 +1322,18 @@ class Installer:
         }
 
     def confirm(self, plan):
-        print_plan(plan, file=sys.stderr)
+        if (
+            "commands" in plan
+            and "changes" in plan
+            and not plan["commands"]
+            and not plan["changes"]
+        ):
+            return
+        ui = getattr(self, "ui", None)
+        if ui is not None and ui.enhanced and self.args.action == "setup" and plan.get("stateFile"):
+            ui.summary(plan)
+        else:
+            print_plan(plan, file=sys.stderr)
         if self.args.yes:
             return
         try:
@@ -1654,6 +1709,7 @@ def parser():
         action="store_true",
         help="Configure this login only, without a login LaunchAgent",
     )
+    value.add_argument("--no-animation", action="store_true", help="Use static terminal progress")
     return value
 
 
@@ -1666,7 +1722,7 @@ def main(argv=None, **dependencies):
             result.setdefault("warnings", []).extend(installer.warnings)
         if args.json:
             print(json.dumps(result, ensure_ascii=False))
-        else:
+        elif not installer.ui.result(result):
             print_result(result)
         return 0
     except (SetupError, OSError) as exc:
@@ -1678,6 +1734,13 @@ def main(argv=None, **dependencies):
             for warning in installer.warnings:
                 print(f"Warning: {warning}", file=sys.stderr)
         return 1
+    except KeyboardInterrupt:
+        message = "Interrupted. Rerun setup to check or recover any installation changes."
+        if args.json:
+            print(json.dumps({"status": "error", "error": message, "warnings": installer.warnings}))
+        else:
+            print(f"\n{message}", file=sys.stderr)
+        return 130
 
 
 if __name__ == "__main__":

@@ -39,6 +39,7 @@ test('the real npm tarball is self-contained and survives deletion of the npx ca
   assert.ok(files.includes('payload/plugins/codex-dsh-trace/assets/viewer.html'));
   assert.ok(files.includes('payload/installer/setup.py'));
   assert.ok(files.includes('payload/installer/installer_bundle.py'));
+  assert.ok(files.includes('payload/installer/installer_ui.py'));
   assert.ok(files.includes('payload/.agents/plugins/marketplace.json'));
   assert.ok(files.includes('THIRD_PARTY_NOTICES.txt'));
   assert.ok(

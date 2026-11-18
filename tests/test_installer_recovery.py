@@ -137,6 +137,12 @@ class RecoveryTests(unittest.TestCase):
         self.assertEqual(
             self.installer(action="doctor").doctor()["installedContent"]["status"], "missing-files"
         )
+        changes = self.installer().preflight()["changes"]
+        repair = next(
+            change for change in changes if change["action"] == "repair-owned-installed-files"
+        )
+        self.assertEqual(repair["reason"], "missing-files")
+        self.assertIn("server/main.py", repair["missing"])
         self.install()
         self.assertEqual(server.read_bytes(), expected)
         self.assertEqual(extra.read_text(), "keep")
@@ -282,6 +288,13 @@ class RecoveryTests(unittest.TestCase):
             receipt = instance.bundle.active_receipt()
         first.unlink()
         with patch.object(sys, "executable", str(second)):
+            changes = self.installer().preflight()["changes"]
+            repair = next(
+                change for change in changes if change["action"] == "repair-owned-installed-files"
+            )
+            self.assertEqual(repair["reason"], "python-changed")
+            self.assertEqual(repair["previousPython"], str(first))
+            self.assertEqual(repair["pythonExecutable"], str(second))
             updated, _ = self.install()
             self.assertEqual(updated.bundle.verify()["pythonExecutable"], str(second))
         mcp = json.loads((self.cache(updated) / ".mcp.json").read_text())
@@ -297,6 +310,30 @@ class RecoveryTests(unittest.TestCase):
         with contextlib.redirect_stderr(io.StringIO()):
             self.installer(action="uninstall").uninstall()
         self.assertIsNone(self.system.plugin)
+
+    def test_recovery_confirmation_is_never_inside_a_progress_stage(self):
+        self.interrupt(self.installer(), "state")
+        instance = self.installer()
+        active = []
+        confirmations = []
+
+        @contextlib.contextmanager
+        def stage(label):
+            active.append(label)
+            try:
+                yield
+            finally:
+                active.pop()
+
+        def confirm(plan):
+            self.assertEqual(active, [], "animation must stop before requesting input")
+            confirmations.append(plan)
+
+        with patch.object(instance.ui, "stage", side_effect=stage):
+            with patch.object(instance, "confirm", side_effect=confirm):
+                result = instance.setup()
+        self.assertTrue(confirmations)
+        self.assertIn(result["status"], ("configured", "unchanged"))
 
     def test_retry_after_interrupt_at_bundle_cache_and_state_checkpoints(self):
         for kind in ("bundle", "cache", "state"):
