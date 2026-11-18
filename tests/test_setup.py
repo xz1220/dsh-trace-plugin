@@ -562,6 +562,7 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(repeated.trace_root, custom)
         self.assertEqual(result["status"], "unchanged")
         self.assertEqual(self.system.environment, str(custom))
+        self.assertTrue(result["plan"]["customTraceRoot"])
         self.assertEqual(json.loads(installer.state_path.read_text())["traceRoot"], str(custom))
 
     def test_unchanged_setup_needs_no_terminal_or_install_confirmation(self):

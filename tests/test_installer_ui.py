@@ -5,6 +5,7 @@ import importlib.util
 import io
 import os
 import re
+import shlex
 import sys
 import tempfile
 import threading
@@ -97,6 +98,7 @@ class InstallerUITests(unittest.TestCase):
             "source": str(self.home / "managed-marketplace"),
             "stateFile": str(self.home / "setup.json"),
             "traceRoot": str(self.home / "rollout-traces"),
+            "customTraceRoot": False,
             "persistentLoginSetup": True,
             "commands": [],
             "changes": [] if changes is None else changes,
@@ -111,7 +113,7 @@ class InstallerUITests(unittest.TestCase):
         self.assertEqual(stream.getvalue(), settled, "progress kept writing after stage exit")
 
     def test_json_mode_never_enhances_or_emits_stage_output(self):
-        interface, stream = self.interface(json_mode=True)
+        interface, stream = self.interface(json_mode=True, verbose=True)
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             with interface.stage("Checking synthetic profile"):
@@ -224,7 +226,8 @@ class InstallerUITests(unittest.TestCase):
             environ={**self.environment, "NO_COLOR": "1"}, no_animation=True
         )
         interface.summary(
-            self.plan([{"action": "persist-bundled-plugin", "path": path, "version": "0.2.20"}])
+            self.plan([{"action": "persist-bundled-plugin", "path": path, "version": "0.2.20"}]),
+            details=True,
         )
         output = stream.getvalue()
         for control in ("\x1b", "\r", "\x07", "\x9b"):
@@ -233,14 +236,14 @@ class InstallerUITests(unittest.TestCase):
         self.assertTrue(injected_lines)
         self.assertTrue(all("/safe/" in line for line in injected_lines))
 
-    def test_summary_keeps_each_changed_path_visible(self):
+    def test_details_keep_each_changed_path_visible(self):
         changes = [
             {"action": "persist-bundled-plugin", "path": str(self.home / "source")},
             {"action": "create-recording-directory", "path": str(self.home / "recordings")},
             {"action": "write-login-launch-agent", "path": str(self.home / "agent.plist")},
         ]
         interface, stream = self.interface(no_animation=True)
-        interface.summary(self.plan(changes))
+        interface.summary(self.plan(changes), details=True)
         output = plain(stream.getvalue())
         for change in changes:
             self.assertIn(change["path"], output)
@@ -266,10 +269,170 @@ class InstallerUITests(unittest.TestCase):
             }
             interface.summary(self.plan([change]))
             outputs[reason] = plain(stream.getvalue())
-            self.assertIn(change["path"], outputs[reason])
+            for hidden in (change["path"], change["previousPython"], change["pythonExecutable"]):
+                self.assertNotIn(hidden, outputs[reason])
         self.assertIn("python", outputs["python-changed"].lower())
-        self.assertRegex(outputs["missing-files"].lower(), r"\b2\b.*missing|missing.*\b2\b")
+        self.assertRegex(outputs["missing-files"].lower(), r"missing.*files")
         self.assertNotEqual(outputs["python-changed"], outputs["missing-files"])
+
+    def test_compact_plan_keeps_effects_but_hides_technical_paths(self):
+        changes = [
+            {"action": "persist-bundled-plugin", "path": str(self.home / "source")},
+            {"action": "write-login-launch-agent", "path": str(self.home / "agent.plist")},
+            {"action": "set-login-environment", "value": str(self.home / "rollout-traces")},
+        ]
+        plan = self.plan(changes)
+        plan["commands"] = [
+            ["/synthetic/codex", "plugin", "marketplace", "add", plan["source"], "--json"]
+        ]
+        interface, stream = self.interface(no_animation=True)
+        interface.summary(plan)
+        output = plain(stream.getvalue())
+        for hidden in (
+            plan["source"],
+            plan["stateFile"],
+            plan["traceRoot"],
+            changes[0]["path"],
+            changes[1]["path"],
+            "/synthetic/codex",
+        ):
+            self.assertNotIn(hidden, output)
+        self.assertIn("codex trace", output.lower())
+        self.assertIn("record", output.lower())
+        self.assertIn("login", output.lower())
+        self.assertRegex(output.lower(), r"private|credentials|prompts|sensitive")
+
+    def test_verbose_plan_and_explicit_details_show_complete_commands(self):
+        plan = self.plan([{"action": "persist-bundled-plugin", "path": str(self.home / "source")}])
+        command = [
+            "/synthetic/codex",
+            "plugin",
+            "marketplace",
+            "add",
+            "source with spaces",
+            "--json",
+        ]
+        plan["commands"] = [command]
+        for options, details in (({"verbose": True}, None), ({}, True)):
+            with self.subTest(options=options, details=details):
+                interface, stream = self.interface(no_animation=True, **options)
+                interface.summary(plan, details=details)
+                output = plain(stream.getvalue())
+                self.assertIn(plan["stateFile"], output)
+                self.assertIn(plan["changes"][0]["path"], output)
+                self.assertIn(shlex.join(command), output)
+
+    def test_details_keep_both_recording_persistence_modes_visible(self):
+        for persistent in (False, True):
+            with self.subTest(persistent=persistent):
+                plan = self.plan()
+                plan["persistentLoginSetup"] = persistent
+                interface, stream = self.interface(no_animation=True, verbose=True)
+                interface.summary(plan)
+                output = plain(stream.getvalue()).lower()
+                if persistent:
+                    self.assertRegex(output, r"prepare.*login|login.*prepare|login.*enabled")
+                else:
+                    self.assertRegex(output, r"this login|current login")
+
+    def test_details_false_overrides_verbose_default(self):
+        plan = self.plan([{"action": "persist-bundled-plugin", "path": str(self.home / "source")}])
+        interface, stream = self.interface(no_animation=True, verbose=True)
+        interface.summary(plan, details=False)
+        output = plain(stream.getvalue())
+        self.assertNotIn(plan["changes"][0]["path"], output)
+        self.assertNotIn(plan["stateFile"], output)
+
+    def test_custom_trace_root_remains_visible_in_compact_plan(self):
+        plan = self.plan()
+        plan["customTraceRoot"] = True
+        plan["traceRoot"] = str(self.home / "custom-recordings")
+        interface, stream = self.interface(no_animation=True)
+        interface.summary(plan)
+        self.assertIn(plan["traceRoot"], plain(stream.getvalue()))
+
+    def test_unknown_action_and_command_are_never_collapsed_away(self):
+        change = {"action": "future_custom_action", "path": str(self.home / "foreign-target")}
+        command = ["/synthetic/codex", "configuration", "reset", "--profile", "synthetic profile"]
+        plan = self.plan([change])
+        plan["commands"] = [command]
+        interface, stream = self.interface(no_animation=True)
+        interface.summary(plan)
+        output = plain(stream.getvalue())
+        self.assertIn(change["action"], output)
+        self.assertIn(change["path"], output)
+        self.assertIn(shlex.join(command), output)
+
+    def test_other_plugin_ids_sources_and_extra_flags_are_not_treated_as_known(self):
+        commands = [
+            ["/synthetic/codex", "plugin", "add", "unexpected-plugin@local", "--json"],
+            ["/synthetic/codex", "plugin", "marketplace", "add", "/unexpected-source", "--json"],
+            ["/synthetic/other", "plugin", "add", "codex-dsh-trace@rollout-local", "--json"],
+            [
+                "/synthetic/codex",
+                "plugin",
+                "add",
+                "codex-dsh-trace@rollout-local",
+                "--json",
+                "--force",
+            ],
+        ]
+        for command in commands:
+            with self.subTest(command=command):
+                interface, stream = self.interface(no_animation=True)
+                plan = self.plan()
+                plan["commands"] = [command]
+                interface.summary(plan)
+                self.assertIn(shlex.join(command), plain(stream.getvalue()))
+
+    def test_detailed_commands_are_sanitized(self):
+        interface, stream = self.interface(
+            environ={**self.environment, "NO_COLOR": "1"}, no_animation=True
+        )
+        plan = self.plan()
+        plan["commands"] = [["/synthetic/codex", "plugin", "add", "bad\x1b[2J\nINJECTED\x07"]]
+        interface.summary(plan, details=True)
+        output = stream.getvalue()
+        for control in ("\x1b", "\x07", "\r"):
+            self.assertNotIn(control, output)
+        self.assertNotIn("\nINJECTED", output)
+
+    def test_compact_result_hides_technical_details_but_keeps_next_step(self):
+        result = {"status": "configured", "plan": self.plan(), "pluginVersion": "0.2.20"}
+        for verbose in (False, True):
+            with self.subTest(verbose=verbose):
+                interface, stream = self.interface(no_animation=True, verbose=verbose)
+                interface.result(result)
+                output = plain(stream.getvalue())
+                self.assertIn("0.2.20", output)
+                self.assertIn("reopen", output.lower())
+                self.assertIn("new task", output.lower())
+                if verbose:
+                    self.assertIn(result["plan"]["traceRoot"], output)
+                else:
+                    self.assertNotIn(result["plan"]["traceRoot"], output)
+
+    def test_expanding_details_also_expands_the_result(self):
+        interface, stream = self.interface(no_animation=True)
+        plan = self.plan()
+        interface.summary(plan, details=True)
+        stream.seek(0)
+        stream.truncate(0)
+        interface.result({"status": "configured", "plan": plan, "pluginVersion": "0.2.20"})
+        self.assertIn(plan["traceRoot"], plain(stream.getvalue()))
+
+    def test_compact_result_does_not_hide_warnings(self):
+        interface, stream = self.interface(no_animation=True)
+        warning = "Preserve the synthetic recovery record before retrying."
+        interface.result(
+            {
+                "status": "configured",
+                "plan": self.plan(),
+                "pluginVersion": "0.2.20",
+                "warnings": [warning],
+            }
+        )
+        self.assertIn(warning, plain(stream.getvalue()))
 
     def test_result_distinguishes_unchanged_and_never_claims_recording_verification(self):
         outputs = {}

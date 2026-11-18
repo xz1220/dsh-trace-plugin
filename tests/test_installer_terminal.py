@@ -22,14 +22,36 @@ spec = importlib.util.spec_from_file_location("confirmation_fixture", sys.argv[1
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 installer = module.Installer.__new__(module.Installer)
-installer.args = SimpleNamespace(yes=sys.argv[2] == "yes", action="setup")
-installer.ui = module.terminal_ui().InstallerUI()
+flags = set(sys.argv[4:])
+installer.args = SimpleNamespace(
+    yes=sys.argv[2] == "yes", action="setup", verbose="verbose" in flags,
+    json="json" in flags, no_animation=True,
+)
+environment = dict(os.environ)
+if "plain" in flags:
+    environment["TERM"] = "dumb"
+installer.ui = module.terminal_ui().InstallerUI(
+    environ=environment, json_mode=installer.args.json,
+    no_animation=True, verbose=installer.args.verbose,
+)
+if "guard-open" in flags:
+    import builtins
+    def unexpected_open(*args, **kwargs):
+        raise AssertionError("confirmation unexpectedly opened a terminal")
+    builtins.open = unexpected_open
 print("TTY_STATE:" + json.dumps({"stdin": os.isatty(0), "stdout": os.isatty(1)}), flush=True)
 try:
     installer.confirm({
         "notes": ["SYNTHETIC_TERMINAL_TEST_ONLY"],
         "stateFile": "/synthetic/setup.json",
-        "commands": [],
+        "source": "/synthetic/plugin",
+        "traceRoot": "/synthetic/recordings",
+        "customTraceRoot": False,
+        "persistentLoginSetup": True,
+        "bundledPluginVersion": "0.2.20",
+        "commands": [[
+            "/synthetic/codex", "plugin", "marketplace", "add", "/synthetic/plugin", "--json",
+        ]],
         "changes": [{"action": "persist-bundled-plugin", "path": "/synthetic/plugin"}],
     })
 except module.SetupError as exc:
@@ -56,19 +78,21 @@ class InstallerTerminalTests(unittest.TestCase):
             "PYTHONPYCACHEPREFIX": str(self.root / "python-cache"),
             "TERM": "xterm-256color",
         }
+        self.environment.pop("CI", None)
 
-    def controlling_terminal(self, answer):
+    def controlling_terminal(self, answer, flags=()):
+        answers = [answer] if isinstance(answer, str) else list(answer)
         pid, master = pty.fork()
         if pid == 0:
             os.chdir(self.root)
             os.execve(
                 sys.executable,
-                [sys.executable, "-B", "-c", CHILD, str(self.script), "no", "no-read"],
+                [sys.executable, "-B", "-c", CHILD, str(self.script), "no", "no-read", *flags],
                 self.environment,
             )
         output = bytearray()
         status = None
-        sent = False
+        sent = 0
         deadline = time.monotonic() + 5
         try:
             while True:
@@ -86,9 +110,12 @@ class InstallerTerminalTests(unittest.TestCase):
                         break
                     output.extend(chunk)
                     self.assertLess(len(output), 65536)
-                    if b"Apply this dsh-trace-extension setup? [y/N] " in output and not sent:
-                        os.write(master, answer.encode())
-                        sent = True
+                    prompts = output.count(b"Apply setup? [y/N/d=details] ") + output.count(
+                        b"Apply this dsh-trace-extension setup? [y/N] "
+                    )
+                    while prompts > sent and sent < len(answers):
+                        os.write(master, answers[sent].encode())
+                        sent += 1
                 if status is None:
                     done, value = os.waitpid(pid, os.WNOHANG)
                     if done:
@@ -113,8 +140,9 @@ class InstallerTerminalTests(unittest.TestCase):
         self.assertTrue(prompted)
         self.assertIn('"stdin": true', output)
         self.assertIn("CONFIRMED", output)
-        self.assertIn("Here's what will change", output)
-        self.assertIn("/synthetic/plugin", output)
+        self.assertIn("Codex Trace", output)
+        self.assertNotIn("/synthetic/plugin", output)
+        self.assertIn("Apply setup? [y/N/d=details] ", output)
 
     def test_controlling_terminal_default_and_explicit_no_cancel(self):
         for answer in ("\n", "no\n"):
@@ -124,6 +152,58 @@ class InstallerTerminalTests(unittest.TestCase):
                 self.assertTrue(prompted, output)
                 self.assertIn("Setup cancelled; no changes applied.", output)
                 self.assertNotIn("No interactive terminal", output)
+
+    def test_details_then_yes_is_the_only_authorization(self):
+        code, output, sent = self.controlling_terminal(["d\n", "yes\n"])
+        self.assertEqual(code, 0, output)
+        self.assertEqual(sent, 2)
+        self.assertIn("CONFIRMED", output)
+        self.assertEqual(output.count("Apply setup? [y/N/d=details] "), 2)
+        self.assertIn("/synthetic/setup.json", output)
+        self.assertIn("/synthetic/codex plugin marketplace add /synthetic/plugin --json", output)
+
+    def test_details_then_default_or_eof_still_cancels(self):
+        for answer in ("\n", "\x04"):
+            with self.subTest(answer=repr(answer)):
+                code, output, sent = self.controlling_terminal(["d\n", answer])
+                self.assertEqual(code, 3, output)
+                self.assertEqual(sent, 2)
+                self.assertIn("/synthetic/setup.json", output)
+                self.assertIn("Setup cancelled; no changes applied.", output)
+                self.assertNotIn("CONFIRMED", output)
+
+    def test_repeated_details_are_printed_once_and_never_apply(self):
+        code, output, sent = self.controlling_terminal(["d\n", "d\n", "y\n"])
+        self.assertEqual(code, 0, output)
+        self.assertEqual(sent, 3)
+        self.assertEqual(output.count("Apply setup? [y/N/d=details] "), 3)
+        self.assertEqual(output.count("/synthetic/setup.json"), 1)
+        self.assertIn("CONFIRMED", output)
+
+    def test_eof_at_initial_prompt_cancels(self):
+        code, output, sent = self.controlling_terminal("\x04")
+        self.assertEqual(code, 3, output)
+        self.assertEqual(sent, 1)
+        self.assertIn("Setup cancelled; no changes applied.", output)
+        self.assertNotIn("CONFIRMED", output)
+
+    def test_verbose_already_shows_details_once(self):
+        code, output, sent = self.controlling_terminal(["d\n", "y\n"], flags=("verbose",))
+        self.assertEqual(code, 0, output)
+        self.assertEqual(sent, 2)
+        self.assertEqual(output.count("/synthetic/setup.json"), 1)
+
+    def test_plain_and_json_modes_keep_original_prompt_and_complete_plan(self):
+        for flag in ("plain", "json"):
+            with self.subTest(flag=flag):
+                code, output, sent = self.controlling_terminal("y\n", flags=(flag,))
+                self.assertEqual(code, 0, output)
+                self.assertEqual(sent, 1)
+                self.assertIn("Apply this dsh-trace-extension setup? [y/N] ", output)
+                self.assertNotIn("d=details", output)
+                self.assertIn("/synthetic/setup.json", output)
+                self.assertIn("/synthetic/plugin", output)
+                self.assertNotIn("\x1b[", output)
 
     def test_no_controlling_terminal_preserves_piped_stdin(self):
         result = subprocess.run(
@@ -153,4 +233,31 @@ class InstallerTerminalTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("CONFIRMED", result.stdout)
+        self.assertNotIn("Apply this", result.stderr)
+
+    def test_yes_verbose_never_opens_a_terminal(self):
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-B",
+                "-c",
+                CHILD,
+                str(self.script),
+                "yes",
+                "no-read",
+                "verbose",
+                "guard-open",
+            ],
+            cwd=self.root,
+            env=self.environment,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            start_new_session=True,
+            timeout=5,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("CONFIRMED", result.stdout)
+        self.assertIn("/synthetic/setup.json", result.stderr)
+        self.assertNotIn("Apply setup?", result.stderr)
         self.assertNotIn("Apply this", result.stderr)

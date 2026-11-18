@@ -49,7 +49,7 @@ npx dsh-trace-extension uninstall
 
 ## 终端动效（源码预览）
 
-交互终端中，小机器人随真实检查、准备和校验阶段显示进度；完成阶段留下静态结果，不增加人为等待。确认前仍显示将修改的路径。Python 环境变化和缓存文件缺失会分别说明原因；无需修改时不再询问是否应用。
+交互终端中，小机器人随检查、安装和校验三个关键阶段显示进度；完成阶段留下静态结果，不增加人为等待。默认展示关键变更、修复原因、录制范围和隐私提示，自定义录制目录始终可见。确认时输入 `d` 展开完整路径、命令与环境详情，展开后仍需明确输入 `y` 才会安装；也可以加 `--verbose` 直接展示详情。`--dry-run` 保留完整计划，错误与恢复要求始终可见。无需修改时不再询问是否应用。
 
 `--no-animation` 或 `DSH_TRACE_NO_ANIMATION=1` 关闭动态刷新，`NO_COLOR` 单独关闭颜色。重定向输出、`TERM=dumb`、CI 和 `--json` 使用原有静态输出，不写动效控制码。
 
@@ -60,6 +60,7 @@ npm run demo:installer
 npm run demo:installer -- --scenario repair
 npm run demo:installer -- --scenario unchanged
 npm run demo:installer -- --scenario error
+npm run demo:installer -- --verbose
 ```
 
 预览仅播放合成步骤，不调用安装器、不读取个人配置、不修改安装或录制。预览中的等待用于观察表情和光点，实际安装不会为了播放动效而延时。

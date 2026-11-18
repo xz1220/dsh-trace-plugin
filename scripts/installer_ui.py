@@ -2,6 +2,7 @@
 
 import contextlib
 import os
+import shlex
 import shutil
 import sys
 import threading
@@ -28,7 +29,9 @@ class InstallerUI:
         "[o_o] ·●·",
     )
 
-    def __init__(self, stream=None, environ=None, json_mode=False, no_animation=False):
+    def __init__(
+        self, stream=None, environ=None, json_mode=False, no_animation=False, verbose=False
+    ):
         self.stream = sys.stderr if stream is None else stream
         self.environ = os.environ if environ is None else environ
         self.enhanced = bool(
@@ -41,6 +44,8 @@ class InstallerUI:
             self.enhanced and not no_animation and not self.environ.get("DSH_TRACE_NO_ANIMATION")
         )
         self.color = self.enhanced and "NO_COLOR" not in self.environ
+        self.verbose = verbose
+        self.details_shown = False
 
     def ink(self, value, code="36"):
         value = safe_text(value)
@@ -121,23 +126,89 @@ class InstallerUI:
         if not self.enhanced:
             return
         self.line()
-        self.line("  " + self.ink("[o_o]") + "  " + self.ink("dsh-trace-extension", "1"))
-        self.line("         Codex · local recording")
-        if version:
-            self.line("         Codex · " + safe_text(version))
+        suffix = " · " + safe_text(version) if version else ""
+        self.line("  " + self.ink("[o_o]") + "  " + self.ink("dsh-trace-extension" + suffix, "1"))
         self.line()
 
-    def summary(self, plan):
+    @staticmethod
+    def known_command(command, source=None):
+        if not command or os.path.basename(str(command[0])) != "codex":
+            return False
+        return bool(
+            (
+                len(command) == 6
+                and command[1:4] == ["plugin", "marketplace", "add"]
+                and source
+                and command[4] == source
+                and command[-1] == "--json"
+            )
+            or (
+                len(command) == 5
+                and command[1:4] == ["plugin", "add", "codex-dsh-trace@rollout-local"]
+                and command[-1] == "--json"
+            )
+        )
+
+    def summary(self, plan, details=None):
         if not self.enhanced:
+            return
+        expanded = self.verbose if details is None else details
+        if expanded:
+            self.show_details(plan)
             return
         changes = plan.get("changes", [])
         commands = plan.get("commands", [])
+        actions = {change["action"] for change in changes}
+        known = {
+            "persist-bundled-plugin",
+            "repair-owned-installed-files",
+            "create-codex-config-root",
+            "create-recording-directory",
+            "set-login-environment",
+            "write-login-launch-agent",
+            "remove-owned-launch-agent",
+        }
+        repairs = [
+            change for change in changes if change["action"] == "repair-owned-installed-files"
+        ]
         self.line()
-        self.line(
-            self.ink(
-                "  Here's what will change" if changes or commands else "  Already up to date", "1"
+        if repairs:
+            self.line(self.ink("  Refresh Codex Trace", "1"))
+            if any(change.get("reason") == "python-changed" for change in repairs):
+                self.line("  Python runtime changed since your last setup.")
+            if any(change.get("missing") for change in repairs):
+                self.line("  Restore missing plugin files.")
+        elif actions & known or any(
+            self.known_command(command, plan.get("source")) for command in commands
+        ):
+            self.line(self.ink("  Set up Codex Trace", "1"))
+        else:
+            self.line(self.ink("  Installation changes", "1"))
+        if plan.get("traceRoot"):
+            self.line(
+                "  Local recording · "
+                + ("prepare at login" if plan.get("persistentLoginSetup") else "this login only")
             )
-        )
+            if plan.get("customTraceRoot"):
+                self.line("  Record to " + safe_text(plan["traceRoot"]))
+            self.line("  Recordings may include prompts, code, credentials, and tool output.")
+        for change in changes:
+            if change["action"] not in known:
+                target = change.get("path") or change.get("value") or change.get("name", "")
+                self.line("  " + safe_text(change["action"]) + ": " + safe_text(target))
+        for command in commands:
+            if not self.known_command(command, plan.get("source")):
+                self.line("  Run: " + safe_text(shlex.join(str(part) for part in command)))
+        self.line()
+
+    def show_details(self, plan):
+        if not self.enhanced:
+            return
+        self.details_shown = True
+        changes = plan.get("changes", [])
+        commands = plan.get("commands", [])
+        self.line()
+        self.line(self.ink("  Installation details", "1"))
         labels = {
             "persist-bundled-plugin": "Keep a stable local copy of the plugin",
             "repair-owned-installed-files": "Refresh the installed plugin",
@@ -161,18 +232,16 @@ class InstallerUI:
             if change.get("missing"):
                 self.line(f"    Restore {len(change['missing'])} missing plugin file(s).")
         for command in commands:
-            label = (
-                "Register the local plugin source"
-                if command[1:3] == ["plugin", "marketplace"]
-                else "Enable Codex Trace"
-            )
-            self.line("  + " + label)
-            if command[1:3] == ["plugin", "marketplace"]:
-                self.line("    " + safe_text(plan.get("source", "")))
+            self.line("  Run: " + safe_text(shlex.join(str(part) for part in command)))
         if plan.get("stateFile"):
             self.line("  Settings  " + safe_text(plan["stateFile"]))
         if plan.get("traceRoot"):
             self.line("  Record to " + safe_text(plan["traceRoot"]))
+        if "persistentLoginSetup" in plan:
+            self.line(
+                "  Login setup: "
+                + ("enabled" if plan["persistentLoginSetup"] else "this login only")
+            )
         self.line()
         self.line("  Recordings may include prompts, code, credentials, and tool output.")
         self.line("  Codex must be reopened before new tasks can use these settings.")
@@ -187,26 +256,26 @@ class InstallerUI:
             return False
         self.line()
         unchanged = result["status"] == "unchanged"
-        self.line(
-            "  "
-            + self.ink("[^_^]")
-            + "  "
-            + self.ink("Already up to date" if unchanged else "Local setup complete", "1")
-        )
-        self.line("         Codex Trace · " + safe_text(result.get("pluginVersion", "")))
+        version = result.get("pluginVersion")
+        title = "Already up to date" if unchanged else "Local setup complete"
+        if version:
+            title += " · " + safe_text(version)
+        self.line("  " + self.ink("[^_^]") + "  " + self.ink(title, "1"))
         self.line()
-        self.line("  Recordings  " + safe_text(result["plan"]["traceRoot"]))
+        expanded = self.verbose or self.details_shown
+        if expanded or result["plan"].get("customTraceRoot"):
+            self.line("  Recordings  " + safe_text(result["plan"]["traceRoot"]))
         if unchanged:
-            self.line("  No installation changes were needed.")
             self.line(
                 "  If you haven't reopened Codex since setup, fully quit and reopen it first."
             )
         else:
             self.line("  Fully quit and reopen Codex to load this setup.")
         self.line("  Run a new task, then open Codex Trace in the conversation sidebar.")
-        self.line(
-            "  Opening the panel alone does not verify that new recordings are being created."
-        )
+        if expanded:
+            self.line(
+                "  Opening the panel alone does not verify that new recordings are being created."
+            )
         for warning in result.get("warnings", []):
             self.line("  Warning: " + safe_text(warning))
         self.line()

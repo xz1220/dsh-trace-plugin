@@ -109,6 +109,7 @@ class Installer:
             environ=self.environ,
             json_mode=args.json,
             no_animation=args.no_animation,
+            verbose=args.verbose,
         )
         self.home = absolute(home or self.environ.get("HOME", Path.home()))
         self.codex_home = absolute(
@@ -1018,6 +1019,7 @@ class Installer:
             "source": self.install_source,
             "traceRoot": str(self.trace_root),
             "stateFile": str(self.state_path),
+            "customTraceRoot": self.trace_root != self.codex_home / "rollout-traces",
             "persistentLoginSetup": not self.args.no_persist,
             "commands": commands,
             "changes": changes,
@@ -1182,17 +1184,19 @@ class Installer:
 
     def apply_setup(self):
         self.ui.header()
-        with self.ui.stage("Check your local setup"):
+        with self.ui.stage("Check setup"):
             self.check_dependencies()
             self.initialize_bundle()
             pending = self.load_pending()
+            if not pending:
+                plan = self.preflight()
         if pending:
             # Recovery can ask for confirmation. Never redraw over that prompt.
             recovered = self.recover_operation()
             if recovered is not None:
                 return recovered
-        with self.ui.stage("Review plugin files and recording settings"):
-            plan = self.preflight()
+            with self.ui.stage("Check setup"):
+                plan = self.preflight()
         public = {k: v for k, v in plan.items() if not k.startswith("_")}
         if self.args.dry_run:
             return {"status": "dry-run", "plan": public}
@@ -1210,38 +1214,34 @@ class Installer:
                 self.revalidate(plan)
             self.begin_operation(plan)
             with (
-                self.ui.stage("Prepare the local plugin")
+                self.ui.stage("Set up Codex Trace")
                 if plan["changes"] or plan["commands"]
                 else contextlib.nullcontext()
             ):
                 self.bundled("apply", self.write_managed, self.ensure_directory)
-            if plan["_marketplace_exists"]:
-                self.retain_bundle_source()
-            self.ensure_directory(self.trace_root)
-            if plan["_agent"] is not None:
-                self.write_managed(self.launch_path, plan["_agent"], expected=plan["_agent_before"])
-            elif self.launch_path.exists():
-                # Delaying removal until after success keeps failed setup reversible.
-                pass
-            if plan["_environment"] != str(self.trace_root):
-                self.pending["environmentIntent"] = True
-                self.save_pending()
-                self.command([self.launchctl, "setenv", ENV_KEY, str(self.trace_root)])
-                env_changed = True
-            for command in plan["commands"]:
-                # Once registration is attempted, Codex may retain this path.
-                self.retain_bundle_source()
-                if command[1:3] == ["plugin", "add"]:
-                    self.pending["pluginIntent"] = True
+                if plan["_marketplace_exists"]:
+                    self.retain_bundle_source()
+                self.ensure_directory(self.trace_root)
+                if plan["_agent"] is not None:
+                    self.write_managed(
+                        self.launch_path, plan["_agent"], expected=plan["_agent_before"]
+                    )
+                elif self.launch_path.exists():
+                    # Delaying removal until after success keeps failed setup reversible.
+                    pass
+                if plan["_environment"] != str(self.trace_root):
+                    self.pending["environmentIntent"] = True
                     self.save_pending()
-                label = (
-                    "Register the local plugin source"
-                    if command[1:3] == ["plugin", "marketplace"]
-                    else "Enable Codex Trace"
-                )
-                with self.ui.stage(label):
+                    self.command([self.launchctl, "setenv", ENV_KEY, str(self.trace_root)])
+                    env_changed = True
+                for command in plan["commands"]:
+                    # Once registration is attempted, Codex may retain this path.
+                    self.retain_bundle_source()
+                    if command[1:3] == ["plugin", "add"]:
+                        self.pending["pluginIntent"] = True
+                        self.save_pending()
                     self.command(command)
-                self.commands_done.append(command)
+                    self.commands_done.append(command)
             plugin = self.installed_plugin()
             if not plugin or not plugin.get("enabled", True):
                 raise SetupError(
@@ -1253,7 +1253,7 @@ class Installer:
                     "The source was preserved; rerun setup after reviewing the CLI state."
                 )
             with (
-                self.ui.stage("Verify the installed plugin files")
+                self.ui.stage("Verify plugin files")
                 if plan["changes"] or plan["commands"]
                 else contextlib.nullcontext()
             ):
@@ -1322,15 +1322,20 @@ class Installer:
         }
 
     def confirm(self, plan):
+        ui = getattr(self, "ui", None)
+        compact = (
+            ui is not None and ui.enhanced and self.args.action == "setup" and plan.get("stateFile")
+        )
         if (
             "commands" in plan
             and "changes" in plan
             and not plan["commands"]
             and not plan["changes"]
         ):
+            if compact and ui.verbose:
+                ui.summary(plan, details=True)
             return
-        ui = getattr(self, "ui", None)
-        if ui is not None and ui.enhanced and self.args.action == "setup" and plan.get("stateFile"):
+        if compact:
             ui.summary(plan)
         else:
             print_plan(plan, file=sys.stderr)
@@ -1341,9 +1346,20 @@ class Installer:
                 open("/dev/tty", "r", encoding="utf-8") as terminal_in,
                 open("/dev/tty", "w", encoding="utf-8") as terminal_out,
             ):
-                terminal_out.write("Apply this dsh-trace-extension setup? [y/N] ")
-                terminal_out.flush()
-                answer = terminal_in.readline().strip().lower()
+                prompt = (
+                    "Apply setup? [y/N/d=details] "
+                    if compact
+                    else "Apply this dsh-trace-extension setup? [y/N] "
+                )
+                while True:
+                    terminal_out.write(prompt)
+                    terminal_out.flush()
+                    answer = terminal_in.readline().strip().lower()
+                    if compact and answer == "d":
+                        if not ui.details_shown:
+                            ui.summary(plan, details=True)
+                        continue
+                    break
         except OSError as exc:
             raise SetupError(
                 "No interactive terminal. Review --dry-run, then pass --yes to apply."
@@ -1710,6 +1726,7 @@ def parser():
         help="Configure this login only, without a login LaunchAgent",
     )
     value.add_argument("--no-animation", action="store_true", help="Use static terminal progress")
+    value.add_argument("--verbose", action="store_true", help="Show full installation details")
     return value
 
 

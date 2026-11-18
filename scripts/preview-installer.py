@@ -32,25 +32,25 @@ def main():
         "--scenario", choices=("install", "repair", "unchanged", "error"), default="install"
     )
     parser.add_argument("--no-animation", action="store_true")
+    parser.add_argument("--verbose", action="store_true")
     parser.add_argument("--record", type=Path, help="Save a synthetic terminal replay as JSON")
     args = parser.parse_args()
     stream = RecordingStream()
-    ui = InstallerUI(stream=stream, no_animation=args.no_animation)
+    ui = InstallerUI(stream=stream, no_animation=args.no_animation, verbose=args.verbose)
     if not ui.enhanced:
         parser.error("Open the preview in an interactive terminal with TERM other than dumb.")
     ui.line(
         "  PREVIEW · synthetic paths · no installation or recording settings are read or changed"
     )
     ui.header("next preview")
-    with ui.stage("Check your local setup"):
+    with ui.stage("Check setup"):
         time.sleep(1.5)
-    with ui.stage("Review plugin files and recording settings"):
-        time.sleep(0.8)
     root = "/Users/demo/.codex"
     plan = {
         "source": root + "/dsh-trace-extension/marketplace",
         "stateFile": root + "/dsh-trace-extension/setup.json",
         "traceRoot": root + "/rollout-traces",
+        "customTraceRoot": False,
         "persistentLoginSetup": True,
         "changes": [],
         "commands": [],
@@ -79,12 +79,12 @@ def main():
                 ]
             )
         ui.summary(plan)
-        ui.line("  Apply this dsh-trace-extension setup? [y/N] y  (simulated)")
+        ui.line("  Apply setup? [y/N/d=details] y  (simulated)")
         ui.line()
         try:
-            with ui.stage("Prepare the local plugin"):
+            with ui.stage("Set up Codex Trace"):
                 time.sleep(1.6)
-            with ui.stage("Verify the installed plugin files"):
+            with ui.stage("Verify plugin files"):
                 time.sleep(1.1)
                 if args.scenario == "error":
                     raise OSError("Synthetic error: the example plugin directory is read-only.")
