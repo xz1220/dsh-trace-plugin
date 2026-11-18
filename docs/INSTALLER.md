@@ -2,9 +2,11 @@
 
 GitHub 仓库已于 2026-11-16 公开；首个 npm 发行版 [`dsh-trace-extension@0.2.19`](https://www.npmjs.com/package/dsh-trace-extension/v/0.2.19) 于 2026-11-17 发布。安装设计面向全新安装，不为此前的内部开发版补做迁移路径。
 
-> 下文“后续候选的更新与恢复”描述本轮源代码，尚未发布为新 npm 版本。`0.2.19` 首发的安装生命周期证据可复用；新候选仍需用同一 tarball 完成真实 CLI、原生侧栏及重新登录验收，不能据此宣称新版已经交付。
+> 下文“后续候选的更新与恢复”描述本轮源代码，尚未发布为新 npm 版本。`0.2.19` 首发的安装生命周期证据可复用；固定哈希的 `0.2.20` 本地候选已通过隔离配置／模拟登录域下的真实 CLI 与后端验收，真实原生侧栏及重新登录仍待验，不能据此宣称新版已经交付。
 
 ## 用户入口
+
+在自己信任的仓库外目录运行：
 
 ```sh
 npx dsh-trace-extension setup
@@ -20,6 +22,41 @@ npx dsh-trace-extension setup
 - 首版面向 macOS / Codex；Antigravity 等尚未接入。
 
 安装助手展示具体操作计划，确认后准备持久插件副本、登记本地来源、安装插件并配置录制。安装后手动完全退出并重新打开 Codex，再运行一个新任务并打开 **Codex Trace**。
+
+## 试用本地候选包
+
+`npx dsh-trace-extension setup` 使用 npm 发布包，切换工作树分支不会让它运行本地源码。目前正式版本为 `0.2.19`，本地 `0.2.20` 候选尚未发布；请取得已核对的 `.tgz`，或按[维护者打包和验收](#维护者打包和验收)生成，再显式指定绝对路径。在自己信任的仓库外目录试跑；下面创建当前用户独占的临时 cwd，只生成计划：
+
+```sh
+# 替换为已取得或打包的候选文件绝对路径
+dsh_candidate_tgz="/absolute/path/to/dsh-trace-extension-0.2.20.tgz"
+(
+  dsh_trial_root="$(mktemp -d)" || exit 1
+  [ -n "$dsh_trial_root" ] || exit 1
+  cd "$dsh_trial_root" || exit 1
+  dsh_trial_root="$(pwd -P)" || exit 1
+  [ -n "$dsh_trial_root" ] || exit 1
+  mkdir -m 700 "$dsh_trial_root/home" || exit 1
+  HOME="$dsh_trial_root/home" CODEX_HOME="$dsh_trial_root/codex" \
+    npx --yes --offline --ignore-scripts --cache "$dsh_trial_root/npm-cache" \
+    --package "$dsh_candidate_tgz" -- dsh-trace-extension setup --dry-run \
+    --codex-home "$dsh_trial_root/codex" --trace-root "$dsh_trial_root/recordings"
+)
+```
+
+这里 npx 可写临时缓存，安装助手只读检查计划；真实登录域若已有不同录制配置，仍会保留并拒绝。`--codex-home` 和临时 HOME 只分开 CLI 文件，不能替代原生 GUI／登录域隔离；不要直接去掉 `--dry-run` 当作隔离安装，`--no-persist` 也仍可能设置当前登录环境。候选的更新基线是可核验的 npm `0.2.19` 受管安装，原生侧栏与重新登录仍未验收。
+
+## rollout-local 来源冲突
+
+`Marketplace 'rollout-local' uses a different or unknown source` 表示所选 Codex 配置中这个名字已经指向另一来源，例如源码 checkout。`0.2.19` 和 `0.2.20` 候选都保留此保护：只接续可核验的受管来源与 receipt，不自动把开发登记改成 npm 安装。移到中性 cwd 可避开项目级发现，但不会移除已有持久登记，`--yes` 也不绕过归属检查。
+
+在自己信任的仓库外目录，可只读查看登记；输出中的本机路径或来源信息不要原样公开：
+
+```sh
+codex plugin marketplace list --json
+```
+
+已有个人源码注册时先保留它；只试候选可用上节的新测试身份和 dry-run。若以后选择切换个人开发注册，需要先明确要保留的来源、插件、录制和配置，以及重启与登录环境影响，再由用户授权处理该项登记；不要为解决冲突删除整个 CODEX_HOME、录制或无关配置。正式入口仍使用已发布的 npm 包。
 
 ## 检查与卸载
 

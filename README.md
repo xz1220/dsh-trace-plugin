@@ -1,73 +1,139 @@
+<div align="center">
+
 # Codex Trace
 
-Bring the DSH trace-viewing experience into Codex. Inspect agent actions and their recorded evidence to understand and use agents better.
+**When an agent stalls or surprises you, inspect what it received and which tools it called.**
 
-View recorded model requests, tool calls, context changes, and execution timing alongside your conversation. The current integration is **macOS / Codex**.
+Bring the DeepSeek Harness (DSH) timeline, execution ledger, and detail inspector into the Codex conversation sidebar.
 
-[简体中文](README.zh-CN.md) · [Installer guide](docs/INSTALLER.md) · [Contributing](.github/CONTRIBUTING.md) · [Security](.github/SECURITY.md)
+[简体中文](README.zh-CN.md) · [Quick start](#quick-start) · [How it works](#how-it-works) · [What you can inspect](#what-you-can-inspect) · [FAQ](#faq) · [Documentation](#documentation)
 
-![Codex Trace displaying a synthetic execution recording](docs/images/trace-viewer.png)
-
-_The screenshot uses synthetic data in the local preview. It contains no private conversation and does not demonstrate native Codex acceptance._
-
-## What you can inspect
-
-- **How execution unfolds:** use the DSH timeline and ledger to inspect requests, nested tool calls, results, and recorded images, with search, folding, and a detail inspector.
-- **What the model receives:** compare reconstructed complete context, the incremental request actually sent, and original response JSON.
-- **Where time goes:** inspect available request and tool timing to locate steps that need closer examination.
-- **How history continues:** keep existing history and its sources visible across resumed tasks, forks, and compaction, while following new events for the current chat.
-
-The viewer uses official `rollout-trace` recordings. Uncaptured images, opaque compacted text, and missing timing remain unavailable. It cannot recover earlier unrecorded execution or guarantee an explanation of every model decision.
-
-## Get started
-
-You need macOS and a compatible Codex client with local plugins, MCP Apps, and official recording support. Setup also needs a `codex` CLI on PATH with plugin commands, `python3` (Python 3.9+), and Node.js 20.19+ with npm/npx. The reader supports recording schemas 1 and 2; other systems and hosts are not claimed as supported.
-
-**Validation scope:** the first npm release, `0.2.19`, has installation-lifecycle evidence from an isolated environment. Native-sidebar acceptance and recording startup order after login remain unverified. Compatibility depends on the client version and recording format; installation success alone does not establish native readiness.
+</div>
 
 ```sh
 npx dsh-trace-extension setup
 ```
 
-1. Review the files and settings in the setup plan, then confirm installation.
-2. Fully quit and reopen Codex so the new process receives the recording settings.
-3. Run a new task, then open **Codex Trace** from the conversation's right-panel tools menu.
+_The npm release is **0.2.19**; **0.2.20 on this branch is unpublished**. See [Try the local candidate package](docs/INSTALLER.md#试用本地候选包)._
 
-The package includes the built plugin: no GitHub login, source checkout, or local build is required. Setup installs a stable local copy and configures recording; clearing the npm cache does not remove that copy. Recording must be enabled before the Codex process starts. Opening the viewer does not start recording.
+![Codex Trace timeline, execution ledger, and detail inspector](docs/images/trace-viewer.png)
 
-See the [installer guide](docs/INSTALLER.md) for options and validation limits. To review the plan first:
+_Synthetic data in the local preview. It contains no private conversation and does not demonstrate native Codex acceptance._
+
+## Quick start
+
+### Requirements
+
+- **macOS / Codex**: a client with local plugins, MCP Apps, and official `rollout-trace` recording support.
+- **Node.js 20.19+** and npm/npx to run the setup helper.
+- **Python 3.9+** available as `python3`, and a **Codex CLI** on PATH with plugin commands. The Python reader needs no additional Python packages.
+
+Release `0.2.19` has isolated, real-CLI evidence for installation, repeat setup, doctor, uninstall, and backend startup after clearing the npm cache. **Native-sidebar acceptance, recording after a real login, and Finder drag-out remain unverified.** Client compatibility depends on its version and recording format.
+
+### 1. Install the release
+
+Open a terminal in a trusted directory outside the checkout. Review the plan, then confirm installation:
 
 ```sh
 npx dsh-trace-extension setup --dry-run
+npx dsh-trace-extension setup
 ```
 
-## Check and uninstall
+The package includes the built plugin: no GitHub login, source checkout, or local build is required. Setup shows the files and settings it will change, then installs a stable local copy and configures recording after confirmation.
+
+### 2. Start a new recording
+
+Fully quit and reopen Codex, then run a new task. Recording settings must take effect **before the new Codex process starts**. Opening the viewer does not enable recording or capture earlier execution retroactively.
+
+### 3. Open the conversation sidebar
+
+Choose **Codex Trace** from the conversation's right-panel tools menu. The panel finds recordings for the current chat and follows new events. Use the timeline to locate steps, the ledger to follow calls, and the inspector to expand content.
+
+See the [installer guide](docs/INSTALLER.md) for options. To test this branch, follow [Try the local candidate package](docs/INSTALLER.md#试用本地候选包); the npm commands above do not install the unpublished `0.2.20`.
+
+## How it works
+
+```text
+Official Codex recordings → local Python reader → DSH view in the Codex sidebar
+```
+
+Codex records execution; the viewer reads official trace bundles, currently schemas **1 and 2**. It does not modify recordings. Installation and explicit recording-directory registration write local configuration.
+
+The reader has no active trace upload, analytics, or remote-service integration. Native mode passes content to the local Codex host for display; optional preview uses authenticated loopback HTTP. The host controls its own handling of received data.
+
+Recordings may contain prompts, tool output, private code, images, and credentials. Read [Security and privacy](.github/SECURITY.md) before copying, exporting, or sharing them.
+
+## What you can inspect
+
+Suppose you ask an agent to fix a failing test. Find the waiting period on the **timeline**, locate file reads and test runs in the **ledger**, then open the **inspector** to check arguments, results, and the context sent to the model.
+
+| What you want to check                       | Where to look                                                                                    |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Which step is running or complete?           | Requests, nested tool calls, and results in the timeline and ledger.                             |
+| What did a tool actually do?                 | Call details with arguments, results, and supported recorded images.                             |
+| What did the model receive?                  | Separate views of reconstructed complete context, incremental input, and original response JSON. |
+| Where did time go?                           | Available request and tool timings in the recording.                                             |
+| What continued after a resume or compaction? | Existing history, fork and compaction records, and their sources.                                |
+
+Complete context is reconstructed from available recordings. Uncaptured text or images, opaque compacted content, and missing timing remain explicitly unavailable. These records provide observable execution evidence, not a view of every internal model thought.
+
+## FAQ
+
+<details>
+<summary><strong>Why does the npm command still install 0.2.19?</strong></summary>
+
+`npx dsh-trace-extension setup` downloads the npm release, currently `0.2.19`. This branch's `0.2.20` is unpublished; running inside a checkout does not make npm use local source automatically. Candidate testing is a separate path: [Try the local candidate package](docs/INSTALLER.md#试用本地候选包).
+
+</details>
+
+<details>
+<summary><strong>rollout-local points to an earlier checkout. Will changing directories fix it?</strong></summary>
+
+Inspect the current source without changing it:
+
+```sh
+codex plugin marketplace list --json
+```
+
+Moving outside the repository may help only when temporary project discovery causes the conflict. If an earlier source checkout still appears outside the repository, for example in `/private/tmp`, changing directories does not remove the persistent registration. Setup preserves that source and stops. This is separate from which npm version is downloaded.
+
+For a persistent conflict, use a clean test identity and preserve the original registration, settings, and recordings. Do not force-delete or overwrite them. Follow [rollout-local source conflicts](docs/INSTALLER.md#rollout-local-来源冲突) for diagnosis and test options.
+
+</details>
+
+<details>
+<summary><strong>Why is the panel empty, or some content missing?</strong></summary>
+
+Check that recording settings took effect before Codex started and that the recording belongs to the current chat. An empty resumed recording keeps waiting. The viewer displays captured content and cannot recover missing evidence. Unsupported formats and exceeded limits produce explicit errors; event logs are limited to 256 MiB and each payload to 64 MiB.
+
+</details>
+
+<details>
+<summary><strong>How do I check or uninstall a helper-managed installation?</strong></summary>
 
 ```sh
 npx dsh-trace-extension doctor
 npx dsh-trace-extension uninstall
 ```
 
-doctor checks settings and files. Repeat setup reuses its own unchanged installation; uninstall preserves recordings and unrelated configuration. Cross-version upgrade behavior will be documented and verified before a future release, using `0.2.19` as the compatibility baseline.
+doctor checks settings and files without changing them; it does not establish native-panel readiness. Uninstall preserves recordings and unrelated configuration. Installed files and an open panel can differ, so reopen the client before checking the interface. See the [installer guide](docs/INSTALLER.md) for version-specific update and recovery boundaries.
 
-## Troubleshooting
+</details>
 
-**The panel is empty.** Check that recording was enabled before Codex started and that the recording belongs to the current chat. Earlier execution cannot be captured retroactively. An empty resumed recording continues waiting for new events.
+## Documentation
 
-**Text, images, or timing are missing.** The viewer displays available evidence without inventing uncaptured content. Unsupported formats and exceeded limits produce explicit errors; event logs are limited to 256 MiB and each payload to 64 MiB.
+- [Installer guide](docs/INSTALLER.md): release installation, candidate testing, source conflicts, and validation scope.
+- [Product behavior](docs/PRODUCT.md) · [Architecture](docs/ARCHITECTURE.md): recorded evidence, data flow, and implementation boundaries.
+- [Security and privacy](.github/SECURITY.md) · [Roadmap](docs/ROADMAP.md): data handling and future directions.
 
-**The panel still looks like an older version.** Installed files and an open panel can differ. Fully quit and reopen the client before checking again. See the [installer guide](docs/INSTALLER.md).
+## Contributing
 
-## Data handling
+Use [GitHub Issues and PRs](.github/CONTRIBUTING.md#issues-and-proposals) for synthetic reproductions and focused improvements. Discuss larger changes first. The maintainer prioritizes work using scope and evidence, without fixed response or repair deadlines.
 
-The plugin reads official recordings locally without modifying them; explicit directory registration writes local configuration. The reader has no active recording upload, analytics, or remote-service integration. Native mode passes content to the local Codex host for display; optional preview uses authenticated loopback HTTP.
+See [Contributing](.github/CONTRIBUTING.md) for development setup and checks, and [source installation and manual recording](.github/CONTRIBUTING.md#source-installation-and-manual-recording) for development usage. Run `npm run demo` from a source checkout for isolated synthetic recordings without reading personal Codex data.
 
-Recordings can contain prompts, credentials, private code, tool output, and images. Local processing does not eliminate every risk or guarantee how the host handles received data. Read [Security](.github/SECURITY.md) before copying, exporting, sharing screenshots, or following external links.
+## Attribution and license
 
-## Contribute
+Independently maintained; **not an official OpenAI or DeepSeek product**. The interface includes pinned, MIT-licensed components from [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH); see [vendor/dsh/PATCHES.md](vendor/dsh/PATCHES.md) for adaptations.
 
-Use [GitHub Issues and PRs](.github/CONTRIBUTING.md#issues-and-proposals) for feedback and contributions. Discuss larger changes first. The maintainer prioritizes work using evidence and scope, without fixed response or repair deadlines. See [Contributing](.github/CONTRIBUTING.md) for development setup, repository paths, and checks, and [development usage](.github/CONTRIBUTING.md#source-installation-and-manual-recording) for source installation and manual recording. Run `npm run demo` from a source checkout for isolated synthetic recordings without reading personal Codex data. Use synthetic examples in reports.
-
-See [Architecture](docs/ARCHITECTURE.md), [Product behavior](docs/PRODUCT.md), and the [Roadmap](docs/ROADMAP.md) for implementation and behavior boundaries.
-
-Independently maintained; **not an official OpenAI or DeepSeek product**. The interface includes pinned, MIT-licensed components from [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH); see [vendor/dsh/PATCHES.md](vendor/dsh/PATCHES.md) for adaptations. This project is [MIT licensed](LICENSE), and distributions include third-party notices.
+This project is [MIT licensed](LICENSE). Distributions include `LICENSE` and third-party notices.
