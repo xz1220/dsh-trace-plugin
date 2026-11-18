@@ -261,6 +261,9 @@ def known_bytecode(path, root, expected):
         compiled = compile(
             data, str(source), "exec", dont_inherit=True, optimize=int(match[2] or 0)
         )
-        return cached[16:] == marshal.dumps(compiled)
+        # CPython 3.14 may pass locals as borrowed references. Keep two owning
+        # refs to match py_compile/importlib's root FLAG_REF and reference indexes.
+        compiled_refs = (compiled, compiled)
+        return cached[16:] == marshal.dumps(compiled_refs[0])
     except (SyntaxError, ValueError):
         return False

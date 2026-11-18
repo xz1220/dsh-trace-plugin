@@ -1,6 +1,8 @@
 """Release updates and recovery use isolated synthetic files and fake commands."""
 
 import contextlib
+import hashlib
+import importlib.machinery
 import io
 import json
 import py_compile
@@ -73,14 +75,59 @@ class RecoveryTests(unittest.TestCase):
         self.assertFalse(updated.pending_path.exists())
 
     def test_verified_generated_bytecode_does_not_block_normal_update(self):
+        relative = "plugins/codex-dsh-trace/server/store.py"
+        owned_source = self.payload / relative
+        owned_source.write_text(
+            '"""Module docstring."""\n'
+            "assert __debug__\n"
+            "def outer(value):\n"
+            '    """Function docstring."""\n'
+            "    assert value\n"
+            "    def inner():\n"
+            "        return value, 'shared constant'\n"
+            "    return inner\n"
+        )
+        manifest_path = self.payload / "bundle-manifest.json"
+        manifest = json.loads(manifest_path.read_text())
+        manifest["files"][relative] = hashlib.sha256(owned_source.read_bytes()).hexdigest()
+        manifest_path.write_text(json.dumps(manifest))
         instance, _ = self.install()
         source = self.cache(instance) / "server/store.py"
-        target = source.parent / "__pycache__" / f"store.{sys.implementation.cache_tag}.pyc"
-        py_compile.compile(str(source), cfile=str(target), doraise=True)
+        for optimization in (0, 1, 2):
+            suffix = f".opt-{optimization}" if optimization else ""
+            target = (
+                source.parent / "__pycache__" / f"store.{sys.implementation.cache_tag}{suffix}.pyc"
+            )
+            py_compile.compile(str(source), cfile=str(target), doraise=True, optimize=optimization)
+        report = self.installer(action="doctor").doctor()["installedContent"]
+        self.assertEqual(report["extra"], [])
+        self.assertEqual(len(report["generatedBytecode"]), 3)
+        self.assertEqual(self.install(self.newer())[1]["pluginVersion"], "0.2.20")
+
+    def test_importlib_generated_bytecode_is_verified_without_running_module(self):
+        instance, _ = self.install()
+        source = self.cache(instance) / "server/store.py"
+        loader = importlib.machinery.SourceFileLoader("owned_store", str(source))
+        with (
+            patch.object(sys, "dont_write_bytecode", False),
+            patch.object(sys, "pycache_prefix", None),
+        ):
+            self.assertIsNotNone(loader.get_code("owned_store"))
         report = self.installer(action="doctor").doctor()["installedContent"]
         self.assertEqual(report["extra"], [])
         self.assertEqual(len(report["generatedBytecode"]), 1)
-        self.assertEqual(self.install(self.newer())[1]["pluginVersion"], "0.2.20")
+
+    def test_bytecode_with_changed_code_filename_is_preserved_as_unowned(self):
+        instance, _ = self.install()
+        source = self.cache(instance) / "server/store.py"
+        target = source.parent / "__pycache__" / f"store.{sys.implementation.cache_tag}.pyc"
+        py_compile.compile(
+            str(source), cfile=str(target), dfile=str(self.case.root / "unowned.py"), doraise=True
+        )
+        before = fixtures.tree_snapshot(self.home)
+        with self.assertRaisesRegex(fixtures.setup.SetupError, "unowned files"):
+            self.install(self.newer())
+        self.assertEqual(fixtures.tree_snapshot(self.home), before)
 
     def test_edited_bytecode_is_preserved_as_unowned_content(self):
         instance, _ = self.install()
