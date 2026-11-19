@@ -11,9 +11,10 @@ const result = await build({
   format: 'esm',
   platform: 'browser',
 });
-const { t, dictionary, dictionaries, supportedLocales, translatorFor } = await import(
-  `data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`
-);
+const { t, dictionary, dictionaries, supportedLocales, translatorFor, defaultLocale } =
+  await import(
+    `data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`
+  );
 
 test('all literal translation calls in the shipped DSH controls resolve', async () => {
   for (const file of [
@@ -62,4 +63,35 @@ test('backend search group templates match the displayed pinned dictionaries', a
       step: dictionaries[locale]['group.step'],
       compaction: dictionaries[locale]['group.compaction'],
     });
+});
+test('default locale follows navigator language with English fallback and English item labels', () => {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  try {
+    Object.defineProperty(globalThis, 'navigator', {
+      configurable: true,
+      value: { language: 'en-US' },
+    });
+    assert.equal(defaultLocale(), 'en');
+    Object.defineProperty(globalThis, 'navigator', {
+      configurable: true,
+      value: { language: 'zh-CN' },
+    });
+    assert.equal(defaultLocale(), 'zh');
+    Object.defineProperty(globalThis, 'navigator', {
+      configurable: true,
+      value: { language: 'sv-SE' },
+    });
+    assert.equal(defaultLocale(), 'en');
+  } finally {
+    if (previous) Object.defineProperty(globalThis, 'navigator', previous);
+    else delete globalThis.navigator;
+  }
+  const en = translatorFor('en-US');
+  assert.equal(en('codex.itemType.function_call_output'), 'Tool result');
+  assert.equal(en('codex.itemType.reasoning'), 'Reasoning');
+  assert.equal(
+    en('codex.compactionCount', { label: 'Before compaction', count: 3 }),
+    'Before compaction: 3 items',
+  );
+  assert.doesNotMatch(en('codex.recordedReadableSummaryHeading'), /：/);
 });

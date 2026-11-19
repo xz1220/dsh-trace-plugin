@@ -1,16 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { build } from 'esbuild';
-import { fileURLToPath } from 'node:url';
-const result = await build({
-  entryPoints: [fileURLToPath(new URL('../src/preferences.js', import.meta.url))],
-  bundle: true,
-  write: false,
-  format: 'esm',
-});
-const { createBooleanPreference } = await import(
-  `data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`
-);
+import { createBooleanPreference } from '../src/preferences.js';
 
 test('fresh views default to equal widths and preferences survive recreation', () => {
   const data = new Map(),

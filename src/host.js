@@ -39,7 +39,11 @@ export function createHost({ onResult, onContext, onError }) {
       pending.delete(message.id);
       clearTimeout(p.timer);
       message.error
-        ? p.reject(new Error(message.error.message || '工具调用失败'))
+        ? p.reject(
+            message.error.message
+              ? new Error(message.error.message)
+              : apiError({ errorCode: 'tool_failed' }),
+          )
         : p.resolve(message.result);
       return;
     }

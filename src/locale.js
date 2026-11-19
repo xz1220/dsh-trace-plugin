@@ -23,9 +23,10 @@ const evidence = {
 };
 export const supportedLocales = Object.keys(common);
 export const normalizeLocale = (value) => {
-  const language = typeof value === 'string' ? value.toLowerCase().split(/[-_]/)[0] : 'zh';
+  const language = typeof value === 'string' ? value.toLowerCase().split(/[-_]/)[0] : 'en';
   return supportedLocales.includes(language) ? language : 'en';
 };
+export const defaultLocale = () => normalizeLocale(globalThis.navigator?.language || 'en');
 export const dictionaries = Object.fromEntries(
   supportedLocales.map((locale) => [
     locale,

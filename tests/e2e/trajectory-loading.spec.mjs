@@ -32,19 +32,19 @@ test('failed detail hydration waits for retry and completed detail is reused', a
 
   // DSH reports the current selection again after view updates. An error must
   // remain stable until the user explicitly asks for another read.
-  const duration = page.getByRole('button', { name: '使用实际时长', exact: true });
+  const duration = page.getByRole('button', { name: 'Use actual duration', exact: true });
   await duration.click();
   await duration.click();
   await expect(page.getByRole('alert')).toBeVisible();
   expect(attempts).toBe(1);
 
   succeed = true;
-  await page.getByRole('button', { name: '重试', exact: true }).click();
+  await page.getByRole('button', { name: 'Retry', exact: true }).click();
   await expect(page.getByRole('alert')).toHaveCount(0);
   await expect(page.getByRole('tabpanel')).toContainText('Inspect code, tools and images.');
   expect(attempts).toBe(2);
 
-  await page.getByRole('button', { name: '关闭详情', exact: true }).click();
+  await page.getByRole('button', { name: 'Close details', exact: true }).click();
   await input.click();
   await expect(page.getByRole('tabpanel')).toContainText('Inspect code, tools and images.');
   expect(attempts).toBe(2);

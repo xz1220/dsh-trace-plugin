@@ -1,5 +1,5 @@
 import { errorMessage, apiError } from './errors.js';
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { Component, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../vendor/dsh/packages/client/ui-theme/src/styles/base.css';
 import '../vendor/dsh/packages/client/ui-theme/src/styles/design-platform.css';
@@ -13,8 +13,37 @@ import Trajectory from './Trajectory.jsx';
 import { installIconSprite } from '../vendor/dsh/packages/client/ui-theme/src/client/icon-sprite.ts';
 import { disposeImageTransfers } from './images.jsx';
 import { LocaleContext } from './locale-context.jsx';
-import { translatorFor, normalizeLocale } from './locale.js';
+import { translatorFor, normalizeLocale, defaultLocale } from './locale.js';
 import { useChat } from './use-chat.js';
+
+class ViewerErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  componentDidUpdate(prevProps) {
+    if (prevProps.resetKey !== this.props.resetKey && this.state.error) {
+      this.setState({ error: null });
+    }
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <Failure
+          error={this.state.error}
+          retry={() => {
+            this.setState({ error: null });
+            this.props.onRetry?.();
+          }}
+        />
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function App() {
   const host = useRef(),
@@ -22,7 +51,7 @@ function App() {
   const [dark, setDark] = useState(false),
     [toast, setToast] = useState('');
   const [connected, setConnected] = useState(false);
-  const [locale, setLocale] = useState('zh');
+  const [locale, setLocale] = useState(() => defaultLocale());
   const t = useMemo(() => translatorFor(locale), [locale]);
   const call = useCallback(
     (name, args = {}) =>
@@ -159,12 +188,17 @@ function App() {
             </p>
           </section>
         ) : (
-          <Trajectory
-            key={`${data.trace.id}:${data.revision.split(':')[0]}:${data.projectionRevision || 0}`}
-            {...{ data, call, earlier, copy, focusCallId }}
-            reloadTrace={loadTrace}
-            onFocusApplied={() => setFocusCallId(null)}
-          />
+          <ViewerErrorBoundary
+            resetKey={`${data.trace.id}:${data.revision.split(':')[0]}:${data.projectionRevision || 0}`}
+            onRetry={() => loadTrace(data.trace.id, null, { quiet: true, preserve: true })}
+          >
+            <Trajectory
+              key={`${data.trace.id}:${data.revision.split(':')[0]}:${data.projectionRevision || 0}`}
+              {...{ data, call, earlier, copy, focusCallId }}
+              reloadTrace={loadTrace}
+              onFocusApplied={() => setFocusCallId(null)}
+            />
+          </ViewerErrorBoundary>
         )}
         <div className={`app-toast ${toast ? 'visible' : ''}`} role="status">
           {toast}

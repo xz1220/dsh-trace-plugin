@@ -10,33 +10,38 @@ test('cold load, request inspection, search and persisted duration', async ({
   recordingServer,
 }) => {
   await page.goto(recordingServer.url);
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   await expect(page.getByRole('searchbox')).toBeVisible();
   await expect(
     page.getByText('Inspect code, tools and images.', { exact: false }).first(),
   ).toBeVisible();
-  const request = page.getByRole('button', { name: '请求 #1', exact: true });
+  const request = page.getByRole('button', { name: 'Request #1', exact: true });
   await request.focus();
   await expect(request).toBeFocused();
   await page.keyboard.press('Enter');
-  await page.getByRole('tab', { name: '完整上下文', exact: true }).click();
-  await expect(page.getByRole('button', { name: '复制完整上下文', exact: true })).toBeVisible();
+  await page.getByRole('tab', { name: 'Complete context', exact: true }).click();
   await expect(
-    page.getByText('You are reviewing a synthetic recording.', { exact: false }).first(),
+    page.getByRole('button', { name: 'Copy complete context', exact: true }),
   ).toBeVisible();
+  const contextPanel = page.getByRole('tabpanel', { name: 'Complete context', exact: true });
+  await expect(
+    contextPanel.getByText('You are reviewing a synthetic recording.', { exact: false }).first(),
+  ).toBeVisible();
+  await expect(contextPanel).not.toContainText(/[\u4e00-\u9fff]/);
   if (process.env.UPDATE_DOC_SCREENSHOT) {
     await page.screenshot({ path: 'docs/images/trace-viewer.png' });
   }
-  await page.getByRole('tab', { name: '原始请求', exact: true }).click();
-  await expect(page.getByRole('tabpanel', { name: '原始请求', exact: true })).toContainText(
+  await page.getByRole('tab', { name: 'Raw request', exact: true }).click();
+  await expect(page.getByRole('tabpanel', { name: 'Raw request', exact: true })).toContainText(
     'review-model',
   );
-  await page.getByRole('button', { name: '关闭详情', exact: true }).click();
+  await page.getByRole('button', { name: 'Close details', exact: true }).click();
   await page.getByRole('searchbox').fill('SCHEMA_SEARCH_MARKER');
-  await expect(page.getByRole('status').filter({ hasText: '匹配' })).toContainText(
-    /[1-9]\d* 条匹配/,
+  await expect(page.getByRole('status').filter({ hasText: 'matches' })).toContainText(
+    /[1-9]\d* matches in loaded records/,
   );
   await page.getByRole('searchbox').fill('');
-  const duration = page.getByRole('button', { name: '使用实际时长', exact: true });
+  const duration = page.getByRole('button', { name: 'Use actual duration', exact: true });
   await duration.click();
   const pressed = await duration.getAttribute('aria-pressed');
   await page.reload();

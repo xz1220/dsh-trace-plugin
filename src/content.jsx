@@ -54,7 +54,7 @@ export function compactionText(info, t) {
     const value = info?.[field];
     if (value)
       lines.push(
-        `${label}：${value.items} ${t('codex.items')}${
+        `${t('codex.compactionCount', { label, count: value.items })}${
           Object.keys(value.roles || {}).length
             ? ` (${Object.entries(value.roles)
                 .map(([role, count]) => `${roles[role] || role} ${count}`)
@@ -68,7 +68,7 @@ export function compactionText(info, t) {
     lines.push(t('codex.theCompactedContextContainsOpaqueEncryptedItems'));
   if (info?.readableSummary)
     lines.push(
-      `${t('codex.recordedReadableSummary')}：\n\n${info.readableSummary}${info.readableSummaryTruncated ? `\n\n${t('codex.summaryPreviewTruncatedSeeTheRawResponse')}` : ''}`,
+      `${t('codex.recordedReadableSummaryHeading')}\n\n${info.readableSummary}${info.readableSummaryTruncated ? `\n\n${t('codex.summaryPreviewTruncatedSeeTheRawResponse')}` : ''}`,
     );
   return lines.join('\n\n');
 }
@@ -247,6 +247,12 @@ export function TextContent({ rowId, section, itemIndex, api, copy, label }) {
   );
 }
 
+function messageItemLabel(message, t) {
+  const key = `codex.itemType.${message.type}`;
+  const translated = t(key);
+  return translated !== key ? translated : message.label || message.type;
+}
+
 function PromptContext({ request, detail, api, copy }) {
   const t = useTranslation();
   const [mode, setMode] = useState('full'),
@@ -350,51 +356,52 @@ function PromptContext({ request, detail, api, copy }) {
         </span>
       </div>
       {error && <Failure error={error} retry={copyContext} />}
-      {visible.map((message) => (
-        <section className="app-message" key={message.index}>
-          <button
-            type="button"
-            className="app-message-heading"
-            aria-expanded={opened === message.index}
-            onClick={() => setExpanded(opened === message.index ? -1 : message.index)}
-          >
-            <IconChevronRightOutlineRegular
-              size={11}
-              style={{ transform: opened === message.index ? 'rotate(90deg)' : undefined }}
-            />
-            <span className="app-role">{message.role}</span>
-            <strong title={message.preview || message.label}>
-              {message.preview || message.label}
-            </strong>
-            <em>{message.inherited ? t('codex.inherited') : ''}</em>
-            <small>
-              {message.chars.toLocaleString()} {t('codex.chars')}
-            </small>
-          </button>
-          {opened === message.index && (
-            <>
-              <div className="app-message-origin">
-                {t('codex.item')} {message.index + 1} ·{' '}
-                {message.origin === 'response'
-                  ? t('codex.previousModelOutput')
-                  : t('codex.requestInput')}
-              </div>
-              {message.hasEncryptedContent && (
-                <p className="app-note">{t('codex.containsOpaqueEncryptedData')}</p>
-              )}
-              <TextContent
-                key={message.index}
-                rowId={request.rowId}
-                section="message"
-                itemIndex={message.index}
-                api={api}
-                copy={copy}
-                label={`${message.role} ${message.label}`}
+      {visible.map((message) => {
+        const typeLabel = messageItemLabel(message, t);
+        return (
+          <section className="app-message" key={message.index}>
+            <button
+              type="button"
+              className="app-message-heading"
+              aria-expanded={opened === message.index}
+              onClick={() => setExpanded(opened === message.index ? -1 : message.index)}
+            >
+              <IconChevronRightOutlineRegular
+                size={11}
+                style={{ transform: opened === message.index ? 'rotate(90deg)' : undefined }}
               />
-            </>
-          )}
-        </section>
-      ))}
+              <span className="app-role">{message.role}</span>
+              <strong title={message.preview || typeLabel}>{message.preview || typeLabel}</strong>
+              <em>{message.inherited ? t('codex.inherited') : ''}</em>
+              <small>
+                {message.chars.toLocaleString()} {t('codex.chars')}
+              </small>
+            </button>
+            {opened === message.index && (
+              <>
+                <div className="app-message-origin">
+                  {t('codex.item')} {message.index + 1} ·{' '}
+                  {message.origin === 'response'
+                    ? t('codex.previousModelOutput')
+                    : t('codex.requestInput')}
+                </div>
+                {message.hasEncryptedContent && (
+                  <p className="app-note">{t('codex.containsOpaqueEncryptedData')}</p>
+                )}
+                <TextContent
+                  key={message.index}
+                  rowId={request.rowId}
+                  section="message"
+                  itemIndex={message.index}
+                  api={api}
+                  copy={copy}
+                  label={`${message.role} ${typeLabel}`}
+                />
+              </>
+            )}
+          </section>
+        );
+      })}
       {!visible.length && <p className={table.noPayload}>{t('codex.noInputItemsMatchThisRole')}</p>}
       <details className="app-tool-catalog">
         <summary>{t('codex.toolDeclarations')}</summary>

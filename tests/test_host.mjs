@@ -277,3 +277,16 @@ test('unsupported host versions reject startup with a localizable error', async 
   await assert.rejects(state.host.start(), (error) => error.code === 'unsupported_host');
   assert.equal(state.errorObjects[0].code, 'unsupported_host');
 });
+
+test('empty JSON-RPC error messages fall back to the localizable tool_failed code', async (t) => {
+  const state = setup(t, { output: { view: 'select', traces: [] } });
+  await state.host.start();
+  const pendingEmpty = state.host.call('get_rollout_detail');
+  const emptyId = state.calls.at(-1).id;
+  state.send({ id: emptyId, error: { code: -32603, message: '' } });
+  await assert.rejects(pendingEmpty, (error) => error.code === 'tool_failed');
+  const pendingExplicit = state.host.call('get_rollout_detail');
+  const explicitId = state.calls.at(-1).id;
+  state.send({ id: explicitId, error: { code: -32603, message: 'Host refused tool' } });
+  await assert.rejects(pendingExplicit, /Host refused tool/);
+});

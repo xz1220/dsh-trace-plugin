@@ -54,7 +54,9 @@ export default function Trajectory({
           ? t('codex.contextCompactionApplied')
           : t('codex.contextCompaction');
       if (cell.kind === 'message' && cell.text === '（仅工具调用）')
-        return `（${t('layout.toolCallOnly')}）`;
+        return t.locale === 'zh' || t.locale === 'ja'
+          ? `（${t('layout.toolCallOnly')}）`
+          : `(${t('layout.toolCallOnly')})`;
       if (['user', 'context', 'message'].includes(cell.kind) && /^(图片|文件) ×/.test(cell.text)) {
         const images = cell.sourceBlocks?.filter((block) => block.attachment).length ?? 0,
           files = cell.sourceBlocks?.filter((block) => block.file).length ?? 0;

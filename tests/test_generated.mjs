@@ -32,3 +32,10 @@ test('frontend and server version metadata derive from the package version', asy
   );
   await updateGeneratedFiles(files, { check: true });
 });
+
+test('built viewer.html embeds only woff2 KaTeX fonts without legacy woff/ttf duplicates', async () => {
+  const html = await readFile('plugins/codex-dsh-trace/assets/viewer.html', 'utf8');
+  assert.match(html, /data:font\/woff2;base64,/);
+  assert.doesNotMatch(html, /data:font\/woff;base64,/);
+  assert.doesNotMatch(html, /data:font\/ttf;base64,/);
+});
