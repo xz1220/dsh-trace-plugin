@@ -14,9 +14,7 @@
 npx dsh-trace-extension setup
 ```
 
-![Codex Trace 的时间轴、执行列表与详情面板](docs/images/trace-viewer.png)
-
-_合成数据的本地预览，不含私人聊天。_
+![Codex Trace 的时间轴、执行列表与详情面板](docs/images/trace-viewer.gif)
 
 ## 快速开始
 

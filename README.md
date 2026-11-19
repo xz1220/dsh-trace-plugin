@@ -14,9 +14,7 @@ Bring the DeepSeek Harness (DSH) timeline, execution ledger, and detail inspecto
 npx dsh-trace-extension setup
 ```
 
-![Codex Trace timeline, execution ledger, and detail inspector](docs/images/trace-viewer.png)
-
-_Synthetic data in the local preview. It contains no private conversation._
+![Codex Trace timeline, execution ledger, and detail inspector](docs/images/trace-viewer.gif)
 
 ## Quick start
 
