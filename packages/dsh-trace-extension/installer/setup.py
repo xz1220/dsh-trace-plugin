@@ -6,11 +6,10 @@ state file and an optional login LaunchAgent; recorded conversations are never
 deleted. All runtime dependencies are in Python's standard library.
 """
 
+from __future__ import annotations
+
 import argparse
-import base64
 import contextlib
-import hashlib
-import importlib.util
 import json
 import os
 import plistlib
@@ -18,80 +17,81 @@ import shlex
 import shutil
 import subprocess
 import sys
-import tempfile
+from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import Any
 
-OWNER = "dsh-trace-extension"
-STATE_VERSION = 1
-MARKETPLACE = "rollout-local"
-PLUGIN = "codex-dsh-trace@rollout-local"
-ENV_KEY = "CODEX_ROLLOUT_TRACE_ROOT"
-LABEL = "io.dsh-trace-extension.codex-recording"
-UNSET = object()
+# Support direct execution (`python3 .../installer/setup.py`) as well as package imports.
+_INSTALLER_DIR = str(Path(__file__).resolve().parent)
+if _INSTALLER_DIR not in sys.path:
+    sys.path.insert(0, _INSTALLER_DIR)
 
+import installer_bundle  # noqa: E402
+import installer_checks  # noqa: E402
+import installer_ui  # noqa: E402
+from installer_journal import (  # noqa: E402
+    ENV_KEY,
+    LABEL,
+    MARKETPLACE,
+    OWNER,
+    PLUGIN,
+    STATE_VERSION,
+    UNSET,
+    OperationJournalMixin,
+    SetupError,
+    absolute,
+    digest,
+    safe_path,
+)
 
-class SetupError(Exception):
-    """A preflight, configuration, or command error with an actionable message."""
-
-
-_RUNTIME_CHECKS = None
-_TERMINAL_UI = None
-
-
-def terminal_ui():
-    global _TERMINAL_UI
-    if _TERMINAL_UI is None:
-        path = Path(__file__).with_name("installer_ui.py")
-        spec = importlib.util.spec_from_file_location("dsh_installer_ui", path)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        _TERMINAL_UI = module
-    return _TERMINAL_UI
-
-
-def runtime_checks():
-    global _RUNTIME_CHECKS
-    if _RUNTIME_CHECKS is None:
-        path = Path(__file__).with_name("installer_checks.py")
-        if not path.is_file():
-            raise SetupError(
-                "The npm package lacks installation checks. Reinstall the reviewed package."
-            )
-        spec = importlib.util.spec_from_file_location("dsh_installer_checks", path)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        _RUNTIME_CHECKS = module
-    return _RUNTIME_CHECKS
-
-
-def digest(data):
-    return hashlib.sha256(data).hexdigest()
-
-
-def absolute(value, home=None):
-    value = os.fspath(value)
-    if home is not None and (value == "~" or value.startswith("~/")):
-        value = str(home) + value[1:]
-    return Path(os.path.abspath(os.path.expanduser(value)))
+__all__ = [
+    "ENV_KEY",
+    "LABEL",
+    "MARKETPLACE",
+    "OWNER",
+    "PLUGIN",
+    "STATE_VERSION",
+    "UNSET",
+    "Installer",
+    "SetupError",
+    "System",
+    "absolute",
+    "digest",
+    "main",
+    "parser",
+    "print_plan",
+    "print_result",
+    "runtime_checks",
+    "safe_path",
+    "terminal_ui",
+]
 
 
-def safe_path(path):
-    """Refuse symlinks, including symlinked ancestors, before managed writes."""
-    path = Path(path)
-    for candidate in (path, *path.parents):
-        if candidate.is_symlink():
-            raise SetupError(f"Refusing symlinked setup path: {candidate}")
-    return path
+def terminal_ui() -> Any:
+    return installer_ui
+
+
+def runtime_checks() -> Any:
+    return installer_checks
 
 
 class System:
-    def run(self, command, env=None):
+    def run(
+        self, command: list[str], env: dict[str, str] | None = None
+    ) -> subprocess.CompletedProcess[str]:
         return subprocess.run(command, capture_output=True, text=True, check=False, env=env)
 
-    def which(self, command, path=None):
+    def which(self, command: str, path: str | None = None) -> str | None:
         return shutil.which(command, path=path)
 
-    def probe_backend(self, python, cache, expected, timeout=5.0, limit=128 * 1024):
+    def probe_backend(
+        self,
+        python: str,
+        cache: Path,
+        expected: dict[str, str],
+        timeout: float = 5.0,
+        limit: int = 128 * 1024,
+    ) -> dict[str, Any]:
         checks = runtime_checks()
         try:
             return checks.probe_backend(python, cache, expected, timeout, limit)
@@ -99,8 +99,15 @@ class System:
             return {"status": "unknown", "reason": str(exc)}
 
 
-class Installer:
-    def __init__(self, args, system=None, platform=None, home=None, environ=None):
+class Installer(OperationJournalMixin):
+    def __init__(
+        self,
+        args: argparse.Namespace,
+        system: Any = None,
+        platform: str | None = None,
+        home: Path | str | None = None,
+        environ: Mapping[str, str] | None = None,
+    ) -> None:
         self.args = args
         self.system = system or System()
         self.platform = sys.platform if platform is None else platform
@@ -111,7 +118,9 @@ class Installer:
             no_animation=args.no_animation,
             verbose=args.verbose,
         )
-        self.home = absolute(home or self.environ.get("HOME", Path.home()))
+        self.home = absolute(
+            home if home is not None else (self.environ.get("HOME") or Path.home())
+        )
         self.codex_home = absolute(
             args.codex_home or self.environ.get("CODEX_HOME", self.home / ".codex"), self.home
         )
@@ -119,49 +128,43 @@ class Installer:
         self.pending_path = self.state_path.with_name("operation.json")
         self.trace_root = absolute(args.trace_root or self.codex_home / "rollout-traces", self.home)
         self.launch_path = self.home / "Library" / "LaunchAgents" / f"{LABEL}.plist"
-        self.codex = None
-        self.launchctl = None
-        self.commands_done = []
-        self.journal = []
-        self.created_dirs = []
-        self.warnings = []
-        self.state = None
-        self.last_state_bytes = None
-        self.bundle = None
-        self.bundle_error = None
-        self.install_source = None
-        self.observed_source = None
+        self.codex: str | None = None
+        self.launchctl: str | None = None
+        self.commands_done: list[list[Any]] = []
+        self.journal: list[tuple[Path, bytes | None, str | None]] = []
+        self.created_dirs: list[Path] = []
+        self.warnings: list[str] = []
+        self.state: dict[str, Any] | None = None
+        self.last_state_bytes: bytes | None = None
+        self.bundle: Any = None
+        self.bundle_error: type[Exception] = installer_bundle.BundleError
+        self.install_source: str | None = None
+        self.observed_source: str | None = None
         self.bundle_retained = False
-        self.pending = None
-        self.pending_raw = None
+        self.pending: dict[str, Any] | None = None
+        self.pending_raw: bytes | None = None
         self.recording_intents = False
-        self.operation_lock = None
+        self.operation_lock: int | None = None
 
-    def initialize_bundle(self):
+    def initialize_bundle(self) -> None:
         if self.bundle is not None:
             return
-        module_path = Path(__file__).resolve().with_name("installer_bundle.py")
-        if not module_path.is_file():
-            raise SetupError("The npm package is incomplete. Reinstall dsh-trace-extension.")
-        spec = importlib.util.spec_from_file_location("dsh_trace_installer_bundle", module_path)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        self.bundle_error = module.BundleError
+        self.bundle_error = installer_bundle.BundleError
         try:
-            self.bundle = module.BundledMarketplace(
+            self.bundle = installer_bundle.BundledMarketplace(
                 absolute(self.args.bundle, self.home), self.codex_home, sys.executable
             )
         except self.bundle_error as exc:
             raise SetupError(str(exc)) from exc
         self.install_source = str(self.bundle.source_path)
 
-    def bundled(self, method, *args, **kwargs):
+    def bundled(self, method: str, *args: Any, **kwargs: Any) -> Any:
         try:
             return getattr(self.bundle, method)(*args, **kwargs)
         except self.bundle_error as exc:
             raise SetupError(str(exc)) from exc
 
-    def bundle_source(self, value):
+    def bundle_source(self, value: Any) -> bool:
         return bool(
             self.bundle is not None
             and isinstance(value, str)
@@ -169,8 +172,10 @@ class Installer:
             and absolute(value, self.home) == self.bundle.source_path
         )
 
-    def require_verified_bundle(self, require_current=False, check_runtime=True):
-        result = self.bundled(
+    def require_verified_bundle(
+        self, require_current: bool = False, check_runtime: bool = True
+    ) -> dict[str, Any]:
+        result: dict[str, Any] = self.bundled(
             "verify", require_current=require_current, check_runtime=check_runtime
         )
         if not result.get("valid"):
@@ -179,442 +184,12 @@ class Installer:
             )
         return result
 
-    def retain_bundle_source(self):
+    def retain_bundle_source(self) -> None:
         paths = self.bundled("commit_source")
         self.journal = [entry for entry in self.journal if entry[0] not in paths]
         self.bundle_retained = True
 
-    def bytes_at(self, path):
-        safe_path(path)
-        if not path.exists():
-            return None
-        if not path.is_file():
-            raise SetupError(f"Preserving non-file configuration path: {path}")
-        if path.stat().st_size > 128 * 1024 * 1024:
-            raise SetupError(f"Preserving oversized configuration file: {path}")
-        return path.read_bytes()
-
-    def managed_operation_path(self, value):
-        path = absolute(value)
-        safe_path(path)
-        if path in (self.state_path, self.launch_path):
-            return path
-        roots = (
-            self.codex_home / OWNER / "marketplace",
-            self.codex_home / "plugins/cache" / MARKETPLACE / "codex-dsh-trace",
-        )
-        if any(root in path.parents for root in roots):
-            return path
-        raise SetupError("Recovery record names an unrelated path; preserve it for review.")
-
-    def acquire_operation_lock(self):
-        if self.operation_lock is not None:
-            return
-        import fcntl
-
-        path = self.operation_lock_path()
-        safe_path(path)
-        self.ensure_directory(path.parent)
-        descriptor = os.open(path, os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0), 0o600)
-        try:
-            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError as exc:
-            os.close(descriptor)
-            raise SetupError(
-                "Another setup/uninstall is running in this Codex profile. Wait for it to finish, then retry."
-            ) from exc
-        self.operation_lock = descriptor
-
-    def release_operation_lock(self):
-        if self.operation_lock is not None:
-            os.close(self.operation_lock)
-            self.operation_lock = None
-
-    def operation_busy(self):
-        import fcntl
-
-        path = self.operation_lock_path()
-        safe_path(path)
-        if not path.exists() or self.operation_lock is not None:
-            return False
-        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
-        try:
-            try:
-                fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                return False
-            except BlockingIOError:
-                return True
-        finally:
-            os.close(descriptor)
-
-    def operation_lock_path(self):
-        return (
-            self.home / "Library/Caches" / OWNER / (digest(str(self.codex_home).encode()) + ".lock")
-        )
-
-    def operation_directory(self, value, trace_root):
-        path = absolute(value)
-        safe_path(path)
-        roots = (
-            self.codex_home / OWNER / "marketplace",
-            self.codex_home / "plugins/cache" / MARKETPLACE / "codex-dsh-trace",
-        )
-        if path in (
-            absolute(trace_root),
-            self.launch_path.parent,
-            self.launch_path.parent.parent,
-        ) or any(path == root or root in path.parents for root in roots):
-            return path
-        raise SetupError("Recovery record names an unrelated directory; preserve it for review.")
-
-    @staticmethod
-    def decode_before(value):
-        if value is None:
-            return None
-        if not isinstance(value, str) or len(value) > 4 * 1024 * 1024:
-            raise SetupError("Invalid recovery snapshot; preserve operation.json for review.")
-        try:
-            return base64.b64decode(value, validate=True)
-        except ValueError as exc:
-            raise SetupError("Invalid recovery snapshot encoding.") from exc
-
-    @staticmethod
-    def matches_recorded_write(current, checksum):
-        return (
-            current is None
-            if checksum is None
-            else current is not None and digest(current) == checksum
-        )
-
-    def load_pending(self):
-        raw = self.bytes_at(self.pending_path)
-        if raw is None:
-            self.pending = self.pending_raw = None
-            return None
-        try:
-            if len(raw) > 16 * 1024 * 1024:
-                raise ValueError("oversized")
-            value = json.loads(raw)
-            if (
-                not isinstance(value, dict)
-                or set(value)
-                != {
-                    "format",
-                    "owner",
-                    "source",
-                    "candidate",
-                    "traceRoot",
-                    "origin",
-                    "writes",
-                    "directories",
-                    "environmentIntent",
-                    "pluginIntent",
-                    "phase",
-                    "persist",
-                }
-                or value["format"] != 1
-                or value["owner"] != OWNER
-                or value["source"] != self.install_source
-                or value["phase"] not in ("applying", "recovered")
-                or not isinstance(value["persist"], bool)
-                or not isinstance(value["candidate"], dict)
-                or set(value["candidate"]) != {"version", "packageDigest"}
-                or not isinstance(value["traceRoot"], str)
-                or not Path(value["traceRoot"]).is_absolute()
-                or not isinstance(value["origin"], dict)
-                or set(value["origin"])
-                != {
-                    "state",
-                    "receipt",
-                    "environment",
-                    "plugin",
-                    "pluginOwned",
-                    "environmentOwned",
-                    "previousEnvironment",
-                }
-                or not isinstance(value["origin"]["pluginOwned"], bool)
-                or not isinstance(value["origin"]["environmentOwned"], bool)
-                or not isinstance(value["writes"], list)
-                or len(value["writes"]) > 4096
-                or not isinstance(value["directories"], list)
-                or len(value["directories"]) > 4000
-                or not isinstance(value["environmentIntent"], bool)
-                or not isinstance(value["pluginIntent"], bool)
-            ):
-                raise ValueError("identity")
-            candidate = value["candidate"]
-            if (
-                not isinstance(candidate["version"], str)
-                or len(candidate["version"]) > 80
-                or not all(c.isascii() and (c.isalnum() or c in ".-") for c in candidate["version"])
-                or not isinstance(candidate["packageDigest"], str)
-                or len(candidate["packageDigest"]) != 64
-                or any(c not in "0123456789abcdef" for c in candidate["packageDigest"])
-            ):
-                raise ValueError("candidate")
-            if value["origin"]["plugin"] is not None and (
-                not isinstance(value["origin"]["plugin"], dict)
-                or value["origin"]["plugin"].get("pluginId") != PLUGIN
-            ):
-                raise ValueError("plugin")
-            for key in ("environment", "previousEnvironment"):
-                if value["origin"][key] is not None and not isinstance(value["origin"][key], str):
-                    raise ValueError("environment")
-            for key in ("state", "receipt"):
-                self.decode_before(value["origin"][key])
-            for directory in value["directories"]:
-                if str(self.operation_directory(directory, value["traceRoot"])) != directory:
-                    raise ValueError("directory")
-            seen = set()
-            for entry in value["writes"]:
-                if not isinstance(entry, dict) or set(entry) != {"path", "before", "after"}:
-                    raise ValueError("write")
-                path = self.managed_operation_path(entry["path"])
-                if str(path) != entry["path"] or path in seen:
-                    raise ValueError("path")
-                seen.add(path)
-                self.decode_before(entry["before"])
-                if entry["after"] is not None and (
-                    not isinstance(entry["after"], str)
-                    or len(entry["after"]) != 64
-                    or any(c not in "0123456789abcdef" for c in entry["after"])
-                ):
-                    raise ValueError("checksum")
-            self.pending, self.pending_raw = value, raw
-            return value
-        except (ValueError, TypeError, KeyError, AttributeError) as exc:
-            raise SetupError(
-                f"Unrecognized recovery record at {self.pending_path}; preserve it and review the file before retrying. No automatic adoption is allowed."
-            ) from exc
-
-    def save_pending(self):
-        data = (json.dumps(self.pending, sort_keys=True, indent=2) + "\n").encode()
-        self.atomic_bytes(self.pending_path, data, expected=self.pending_raw)
-        self.pending_raw = data
-
-    def begin_operation(self, plan):
-        if self.pending is None:
-
-            def encode(value):
-                return base64.b64encode(value).decode() if value is not None else None
-
-            owned = bool((self.state and self.state["pluginOwned"]) or not plan["_plugin"])
-            self.pending = {
-                "format": 1,
-                "owner": OWNER,
-                "source": self.install_source,
-                "candidate": {
-                    "version": self.bundle.version,
-                    "packageDigest": self.bundle.package_digest,
-                },
-                "traceRoot": str(self.trace_root),
-                "origin": {
-                    "state": encode(plan["_state_bytes"]),
-                    "receipt": encode(self.bytes_at(self.bundle.receipt_path)),
-                    "plugin": plan["_plugin"],
-                    "environment": plan["_environment"],
-                    "pluginOwned": owned,
-                    "environmentOwned": bool(
-                        plan["_environment_owned"] or plan["_environment"] != str(self.trace_root)
-                    ),
-                    "previousEnvironment": self.state.get("previousEnvironment")
-                    if plan["_environment_owned"]
-                    else plan["_environment"],
-                },
-                "writes": [],
-                "directories": [],
-                "environmentIntent": False,
-                "pluginIntent": False,
-                "phase": "applying",
-                "persist": not self.args.no_persist,
-            }
-        self.pending["phase"] = "applying"
-        self.save_pending()
-        self.recording_intents = True
-
-    def record_write(self, path, before, after):
-        if not self.recording_intents:
-            return
-        self.managed_operation_path(str(path))
-        entry = {
-            "path": str(path),
-            "before": base64.b64encode(before).decode() if before is not None else None,
-            "after": digest(after) if after is not None else None,
-        }
-        existing = next(
-            (item for item in self.pending["writes"] if item["path"] == str(path)), None
-        )
-        if existing is not None:
-            if existing == entry:
-                return
-            raise SetupError(
-                "A recovery path was staged twice; preserve operation.json and retry setup."
-            )
-        if len(self.pending["writes"]) >= 4096:
-            raise SetupError(
-                "The operation reached its write budget. Keep operation.json for recovery."
-            )
-        self.pending["writes"].append(entry)
-        self.save_pending()
-
-    def recover_operation(self):
-        operation = self.pending
-        if self.operation_busy():
-            raise SetupError(
-                "The recorded installation is still running. Wait for it to finish before retrying recovery."
-            )
-        if operation["candidate"] != {
-            "version": self.bundle.version,
-            "packageDigest": self.bundle.package_digest,
-        }:
-            raise SetupError(
-                f"Finish the interrupted version first: npx dsh-trace-extension@{operation['candidate']['version']} setup. Keep {self.pending_path} for recovery."
-            )
-        self.trace_root = absolute(operation["traceRoot"])
-        if self.args.trace_root and absolute(self.args.trace_root, self.home) != self.trace_root:
-            raise SetupError(
-                "Finish the recorded trace-root first. Omit --trace-root when retrying this operation; choose a new location after recovery completes."
-            )
-        self.args.no_persist = not operation["persist"]
-        report = {
-            "commands": [],
-            "changes": [{"action": "recover-interrupted-setup", "path": str(self.pending_path)}],
-            "notes": [
-                "Restore only recorded, unchanged writes, preserve Codex registrations, then retry this verified package. Recordings are retained."
-            ],
-        }
-        for entry in operation["writes"]:
-            path = self.managed_operation_path(entry["path"])
-            current, before = self.bytes_at(path), self.decode_before(entry["before"])
-            if current != before and not self.matches_recorded_write(current, entry["after"]):
-                raise SetupError(
-                    f"Recovery found a user edit at {path}; preserve it and operation.json, review that path, then retry. Nothing was overwritten."
-                )
-        written = {entry["path"] for entry in operation["writes"]}
-        if str(self.state_path) not in written and self.bytes_at(
-            self.state_path
-        ) != self.decode_before(operation["origin"]["state"]):
-            raise SetupError(
-                "Setup state changed after interruption; preserve it and operation.json for review."
-            )
-        receipt_before = self.decode_before(operation["origin"]["receipt"])
-        if receipt_before is not None:
-            try:
-                receipt = json.loads(receipt_before)
-                manifest, templates = self.bundled("_receipt_payload", receipt)
-                expected_files = self.bundle._receipt_files(
-                    manifest, templates, receipt["activeBundle"], receipt["pythonExecutable"]
-                )
-                if expected_files != receipt["files"]:
-                    raise ValueError("receipt")
-                for name, checksum in expected_files.items():
-                    path = self.bundle.source_path / name
-                    if str(path) not in written:
-                        current = self.bytes_at(path)
-                        if current is None or digest(current) != checksum:
-                            raise SetupError(
-                                f"Previous source changed after interruption: {path}. Preserve it before recovery."
-                            )
-            except (ValueError, KeyError, TypeError) as exc:
-                raise SetupError(
-                    "Recovery contains an invalid prior receipt; preserve it for review."
-                ) from exc
-        current_env = self.environment()
-        if operation["environmentIntent"] and current_env not in (
-            operation["origin"]["environment"],
-            str(self.trace_root),
-        ):
-            raise SetupError(
-                "Recording environment changed after interruption; preserve it and review operation.json before retrying."
-            )
-        if not operation["environmentIntent"] and current_env != operation["origin"]["environment"]:
-            raise SetupError(
-                "Recording environment changed outside this operation; preserve it before recovery."
-            )
-        market = self.inspect_marketplace()
-        plugin = self.installed_plugin(market)
-        if plugin and operation["origin"]["state"] is None and not operation["pluginIntent"]:
-            raise SetupError(
-                "A plugin appeared without a recorded installation attempt; preserve the registration and review operation.json before retrying."
-            )
-
-        def identity(row):
-            return (
-                (row.get("pluginId"), row.get("version"), row.get("enabled", True)) if row else None
-            )
-
-        expected_plugin = (PLUGIN, operation["candidate"]["version"], True)
-        if plugin and identity(plugin) not in (
-            identity(operation["origin"]["plugin"]),
-            expected_plugin,
-        ):
-            raise SetupError(
-                "Plugin metadata changed outside the recorded operation; preserve it before recovery."
-            )
-        if self.args.dry_run:
-            return {"status": "dry-run", "plan": report}
-        self.confirm(report)
-        self.acquire_operation_lock()
-        self.expect_bytes(self.pending_path, self.pending_raw)
-        # Check again after confirmation before changing any resource.
-        for entry in reversed(operation["writes"]):
-            path = self.managed_operation_path(entry["path"])
-            before, current = self.decode_before(entry["before"]), self.bytes_at(path)
-            if current == before:
-                continue
-            if not self.matches_recorded_write(current, entry["after"]):
-                raise SetupError(
-                    f"Recovery path changed during confirmation: {path}. Preserve it and retry."
-                )
-            if before is None:
-                path.unlink()
-            else:
-                self.atomic_bytes(path, before, expected=current)
-        if operation["environmentIntent"] and self.environment() == str(self.trace_root):
-            previous = operation["origin"]["environment"]
-            self.command(
-                [self.launchctl, "unsetenv", ENV_KEY]
-                if previous is None
-                else [self.launchctl, "setenv", ENV_KEY, previous]
-            )
-        directories = {
-            parent
-            for entry in operation["writes"]
-            for parent in Path(entry["path"]).parents
-            if self.bundle.source_path == parent or self.bundle.source_path in parent.parents
-        }
-        directories.update(
-            self.operation_directory(value, operation["traceRoot"])
-            for value in operation["directories"]
-        )
-        for directory in sorted(directories, key=lambda p: len(p.parts), reverse=True):
-            try:
-                directory.rmdir()
-            except OSError:
-                pass
-        operation["writes"] = []
-        operation["directories"] = []
-        operation["environmentIntent"] = False
-        operation["phase"] = "recovered"
-        self.save_pending()
-        self.journal = []
-        self.created_dirs = []
-        if operation["origin"]["receipt"] is None:
-            # A first-install source may already be registered. Recreate its
-            # verified catalog before asking Codex to inspect that registration.
-            self.recording_intents = True
-            self.bundled("plan")
-            self.bundled("apply", self.write_managed, self.ensure_directory)
-            self.retain_bundle_source()
-        return None
-
-    def expect_bytes(self, path, expected):
-        if self.bytes_at(path) != expected:
-            raise SetupError(
-                f"Configuration changed since inspection; preserving {path}. Rerun setup."
-            )
-
-    def command(self, command, required=True):
+    def command(self, command: list[Any], required: bool = True) -> Any:
         environment = dict(self.environ)
         environment["HOME"] = str(self.home)
         environment["CODEX_HOME"] = str(self.codex_home)
@@ -624,7 +199,7 @@ class Installer:
             raise SetupError(f"Command failed: {' '.join(map(str, command))}\n{detail}")
         return result
 
-    def json_command(self, command):
+    def json_command(self, command: list[Any]) -> dict[str, Any]:
         result = self.command(command)
         try:
             value = json.loads(result.stdout)
@@ -634,7 +209,7 @@ class Installer:
             raise SetupError("Unsupported Codex CLI response; expected a JSON object.")
         return value
 
-    def load_state(self):
+    def load_state(self) -> dict[str, Any] | None:
         self.last_state_bytes = self.bytes_at(self.state_path)
         if self.last_state_bytes is None:
             return None
@@ -692,10 +267,10 @@ class Installer:
             raise SetupError("Setup state contains an unrecognized bundled marketplace.")
         return state
 
-    def check_dependencies(self):
+    def check_dependencies(self) -> str:
         if self.platform != "darwin":
             raise SetupError("This installer currently supports macOS and Codex only.")
-        if sys.version_info < (3, 9):
+        if sys.version_info < (3, 9):  # noqa: UP036
             raise SetupError("Python 3.9 or newer is required.")
         search_path = self.environ.get("PATH", os.defpath)
         self.codex = self.system.which("codex", path=search_path)
@@ -706,11 +281,11 @@ class Installer:
             )
         if not self.launchctl or not Path(self.launchctl).is_absolute():
             raise SetupError("An absolute launchctl executable is required on macOS.")
-        version = self.command([self.codex, "--version"]).stdout.strip()
+        version = str(self.command([self.codex, "--version"]).stdout).strip()
         self.command([self.codex, "plugin", "add", "--help"])
         return version
 
-    def installed_plugin(self, marketplace_exists=True):
+    def installed_plugin(self, marketplace_exists: bool = True) -> dict[str, Any] | None:
         if not marketplace_exists or not self.codex_home.exists():
             return None
         data = self.json_command(
@@ -735,7 +310,7 @@ class Installer:
             )
         return plugin
 
-    def inspect_marketplace(self):
+    def inspect_marketplace(self) -> bool:
         safe_path(self.codex_home)
         if not self.codex_home.exists():
             # Codex refuses metadata commands for an absent explicit CODEX_HOME.
@@ -767,17 +342,14 @@ class Installer:
         self.observed_source = source
         return True
 
-    def environment(self):
+    def environment(self) -> str | None:
         result = self.command([self.launchctl, "getenv", ENV_KEY], required=False)
         if result.returncode not in (0, 1):
             raise SetupError("Unable to inspect the current macOS login recording environment.")
-        return (
-            result.stdout.rstrip("\n")
-            if not result.returncode and result.stdout.rstrip("\n")
-            else None
-        )
+        value = str(result.stdout).rstrip("\n")
+        return value if not result.returncode and value else None
 
-    def desired_agent(self):
+    def desired_agent(self) -> bytes:
         return plistlib.dumps(
             {
                 "Label": LABEL,
@@ -787,7 +359,7 @@ class Installer:
             sort_keys=True,
         )
 
-    def check_owned_agent(self):
+    def check_owned_agent(self) -> None:
         safe_path(self.launch_path)
         agent = self.state.get("launchAgent") if self.state else None
         if self.launch_path.exists():
@@ -798,7 +370,9 @@ class Installer:
                     f"LaunchAgent is not owned by this setup or was edited; preserving {self.launch_path}"
                 )
 
-    def cache_report(self, plugin, expected=None):
+    def cache_report(
+        self, plugin: dict[str, Any] | None, expected: dict[str, str] | None = None
+    ) -> dict[str, Any]:
         if not plugin:
             return {
                 "status": "not-installed",
@@ -808,11 +382,7 @@ class Installer:
                 "extra": [],
             }
         version = plugin.get("version")
-        if (
-            not isinstance(version, str)
-            or not all(c in "0123456789." for c in version)
-            or len(version.split(".")) != 3
-        ):
+        if not isinstance(version, str) or not installer_bundle.VERSION.fullmatch(version):
             return {
                 "status": "unknown",
                 "verified": False,
@@ -834,9 +404,9 @@ class Installer:
                     "extra": [],
                 }
             expected = self.bundled("cache_files", receipt)
-        return runtime_checks().inspect_cache(root, version, expected)
+        return dict(runtime_checks().inspect_cache(root, version, expected))
 
-    def repair_cache(self, plugin, plan):
+    def repair_cache(self, plugin: dict[str, Any], plan: dict[str, Any]) -> None:
         target = (
             self.codex_home
             / "plugins/cache"
@@ -844,6 +414,7 @@ class Installer:
             / "codex-dsh-trace"
             / self.bundle.version
         )
+        assert self.pending is not None
         owned = self.pending["origin"]["pluginOwned"]
         previous = (
             plan["_cache_expected"]
@@ -869,7 +440,7 @@ class Installer:
                 "Installed files could not be verified. Keep operation.json and rerun setup after reviewing doctor."
             )
 
-    def preflight(self):
+    def preflight(self) -> dict[str, Any]:
         version = self.check_dependencies()
         self.state = self.load_state()
         self.initialize_bundle()
@@ -931,7 +502,7 @@ class Installer:
                 raise SetupError(
                     f"Preserving an edited or unowned target cache at {target_cache.get('path', 'unknown')}. Review those paths before installing this release."
                 )
-        recovery_files = {}
+        recovery_files: dict[str, bytes] = {}
         source_recovery_cache = None
         if receipt and self.bundle.missing_files and plugin_owned:
             old_plugin = plugin
@@ -968,7 +539,7 @@ class Installer:
                 f"{ENV_KEY} already points elsewhere; preserving its current value. "
                 "Use the same --trace-root or review the existing recording configuration."
             )
-        commands = []
+        commands: list[list[Any]] = []
         if not marketplace_exists:
             commands.append(
                 [self.codex, "plugin", "marketplace", "add", self.install_source, "--json"]
@@ -980,7 +551,7 @@ class Installer:
         ):
             commands.append([self.codex, "plugin", "add", PLUGIN, "--json"])
         agent_bytes = None if self.args.no_persist else self.desired_agent()
-        changes = []
+        changes: list[dict[str, Any]] = []
         if not self.codex_home.exists():
             changes.append({"action": "create-codex-config-root", "path": str(self.codex_home)})
         changes.extend(bundle_plan["changes"])
@@ -1047,7 +618,7 @@ class Installer:
             "_source_recovery_cache": source_recovery_cache,
         }
 
-    def revalidate(self, plan):
+    def revalidate(self, plan: dict[str, Any]) -> None:
         self.expect_bytes(self.state_path, plan["_state_bytes"])
         self.expect_bytes(self.launch_path, plan["_agent_before"])
         self.bundled("revalidate")
@@ -1076,116 +647,13 @@ class Installer:
                     "Old cache changed since source recovery was inspected; preserve it before retrying."
                 )
 
-    def ensure_directory(self, path):
-        safe_path(path)
-        if path.exists():
-            if not path.is_dir():
-                raise SetupError(f"Expected a directory: {path}")
-            return
-        missing = []
-        current = path
-        while not current.exists():
-            missing.append(current)
-            current = current.parent
-        for directory in reversed(missing):
-            if self.recording_intents:
-                try:
-                    owned_directory = self.operation_directory(str(directory), str(self.trace_root))
-                except SetupError:
-                    owned_directory = None
-                if (
-                    owned_directory is not None
-                    and str(directory) not in self.pending["directories"]
-                ):
-                    self.pending["directories"].append(str(directory))
-                    self.save_pending()
-            directory.mkdir(mode=0o700)
-            self.created_dirs.append(directory)
-
-    def atomic_bytes(self, path, data, expected=UNSET):
-        safe_path(path)
-        self.ensure_directory(path.parent)
-        fd, temporary = tempfile.mkstemp(prefix=".dsh-setup-", dir=path.parent)
-        try:
-            os.fchmod(fd, 0o600)
-            with os.fdopen(fd, "wb") as stream:
-                stream.write(data)
-                stream.flush()
-                os.fsync(stream.fileno())
-            safe_path(path)
-            if expected is not UNSET:
-                self.expect_bytes(path, expected)
-            os.replace(temporary, path)
-        finally:
-            if os.path.exists(temporary):
-                os.unlink(temporary)
-        if path.read_bytes() != data:
-            raise SetupError(f"Configuration changed while being written: {path}")
-
-    def write_managed(self, path, data, expected=UNSET):
-        safe_path(path)
-        previous = self.bytes_at(path)
-        if expected is not UNSET and previous != expected:
-            raise SetupError(f"Configuration changed since inspection; preserving {path}")
-        if previous == data:
-            return
-        if previous is not None:
-            backup = self.state_path.parent / "backups" / f"{path.name}.{digest(previous)}.bak"
-            backup_bytes = self.bytes_at(backup)
-            if backup_bytes is None:
-                self.atomic_bytes(backup, previous, expected=None)
-            elif backup_bytes != previous:
-                raise SetupError(f"Preserving conflicting recovery backup: {backup}")
-        self.journal.append((path, previous, digest(data)))
-        self.record_write(path, previous, data)
-        self.atomic_bytes(path, data, expected=previous)
-
-    def rollback(self, previous_env, set_env):
-        for path, previous, expected in reversed(self.journal):
-            if expected is None:
-                if path.exists() or path.is_symlink():
-                    self.warnings.append(f"Concurrent edit preserved during rollback: {path}")
-                else:
-                    self.atomic_bytes(path, previous, expected=None)
-                continue
-            if self.bytes_at(path) == previous:
-                continue
-            if path.is_symlink() or not path.is_file() or digest(path.read_bytes()) != expected:
-                self.warnings.append(f"Concurrent edit preserved during rollback: {path}")
-                continue
-            if previous is None:
-                path.unlink()
-            else:
-                self.atomic_bytes(path, previous, expected=path.read_bytes())
-        if set_env:
-            if self.environment() == str(self.trace_root):
-                self.command(
-                    [self.launchctl, "unsetenv", ENV_KEY]
-                    if previous_env is None
-                    else [self.launchctl, "setenv", ENV_KEY, previous_env]
-                )
-            else:
-                self.warnings.append("Concurrent recording environment edit preserved.")
-        for directory in reversed(self.created_dirs):
-            try:
-                directory.rmdir()
-            except OSError:
-                pass
-
-    def remove_managed(self, path, expected):
-        safe_path(path)
-        self.expect_bytes(path, expected)
-        self.journal.append((path, path.read_bytes(), None))
-        self.record_write(path, path.read_bytes(), None)
-        path.unlink()
-
-    def setup(self):
+    def setup(self) -> dict[str, Any]:
         try:
             return self.apply_setup()
         finally:
             self.release_operation_lock()
 
-    def apply_setup(self):
+    def apply_setup(self) -> dict[str, Any]:
         self.ui.header()
         with self.ui.stage("Check setup"):
             self.check_dependencies()
@@ -1216,6 +684,7 @@ class Installer:
                 # also catch project-scoped sources before registering anything.
                 self.revalidate(plan)
             self.begin_operation(plan)
+            assert self.pending is not None
             with (
                 self.ui.stage("Set up Codex Trace")
                 if plan["changes"] or plan["commands"]
@@ -1268,7 +737,7 @@ class Installer:
             self.expect_bytes(self.launch_path, plan["_agent"])
             if self.environment() != str(self.trace_root):
                 raise SetupError("Recording environment changed during setup; preserving it.")
-            state = {
+            state: dict[str, Any] = {
                 "owner": OWNER,
                 "stateVersion": STATE_VERSION,
                 "client": "codex",
@@ -1295,6 +764,7 @@ class Installer:
             self.pending_path.unlink()
             self.pending = self.pending_raw = None
             self.recording_intents = False
+            pruned = self.bundled("prune_superseded_bundles", retain=2)
         except (SetupError, OSError) as exc:
             try:
                 self.rollback(plan["_environment"], env_changed)
@@ -1316,17 +786,20 @@ class Installer:
                 partial += f"\nRetry: npx dsh-trace-extension@{self.bundle.version} setup. Recovery record: {self.pending_path}."
             raise SetupError(str(exc) + partial) from exc
         changed = bool(plan["changes"] or plan["commands"] or self.journal)
-        return {
+        result: dict[str, Any] = {
             "status": "configured" if changed else "unchanged",
             "plan": public,
             "pluginVersion": plugin.get("version"),
             "next": "Fully quit and reopen Codex, run a new task, then open Codex Trace.",
             "nativeVerified": False,
         }
+        if pruned:
+            result["prunedBundles"] = pruned
+        return result
 
-    def confirm(self, plan):
+    def confirm(self, plan: dict[str, Any]) -> None:
         ui = getattr(self, "ui", None)
-        compact = (
+        compact = bool(
             ui is not None and ui.enhanced and self.args.action == "setup" and plan.get("stateFile")
         )
         if (
@@ -1335,10 +808,10 @@ class Installer:
             and not plan["commands"]
             and not plan["changes"]
         ):
-            if compact and ui.verbose:
+            if compact and ui is not None and ui.verbose:
                 ui.summary(plan, details=True)
             return
-        if compact:
+        if compact and ui is not None:
             ui.summary(plan)
         else:
             print_plan(plan, file=sys.stderr)
@@ -1346,19 +819,19 @@ class Installer:
             return
         try:
             with (
-                open("/dev/tty", "r", encoding="utf-8") as terminal_in,
+                open("/dev/tty", encoding="utf-8") as terminal_in,
                 open("/dev/tty", "w", encoding="utf-8") as terminal_out,
             ):
                 prompt = (
                     ui.prefix("[?_?]") + "Apply setup? [y/N/d=details] "
-                    if compact
+                    if compact and ui is not None
                     else "Apply this dsh-trace-extension setup? [y/N] "
                 )
                 while True:
                     terminal_out.write(prompt)
                     terminal_out.flush()
                     answer = terminal_in.readline().strip().lower()
-                    if compact and answer == "d":
+                    if compact and ui is not None and answer == "d":
                         if not ui.details_shown:
                             ui.summary(plan, details=True)
                         continue
@@ -1370,7 +843,7 @@ class Installer:
         if answer not in ("y", "yes"):
             raise SetupError("Setup cancelled; no changes applied.")
 
-    def doctor(self):
+    def doctor(self) -> dict[str, Any]:
         version = self.check_dependencies()
         self.initialize_bundle()
         pending = self.load_pending()
@@ -1448,18 +921,21 @@ class Installer:
             and environment == str(self.trace_root)
             and (not agent or agent_status == "unchanged")
         )
-        bundle_report = self.bundled("verify")
+        bundle_report: dict[str, Any] = self.bundled("verify")
         installed_version = plugin.get("version") if plugin else None
         bundle_report["pluginVersionMatches"] = bool(
             bundle_report.get("valid") and installed_version == bundle_report.get("version")
         )
         bundle_report["marketplaceMatches"] = market
-        cache = (
+        cache: dict[str, Any] = (
             self.cache_report(plugin)
             if bundle_report["valid"]
             else {"verified": False, "status": "unknown-source-not-verified"}
         )
-        backend = {"status": "not-run", "reason": "Verified, owned installed files are required."}
+        backend: dict[str, Any] = {
+            "status": "not-run",
+            "reason": "Verified, owned installed files are required.",
+        }
         if cache["verified"] and self.state and self.state["pluginOwned"] and not cache["extra"]:
             if bundle_report["pythonExecutable"] != str(Path(sys.executable).resolve()):
                 backend = {
@@ -1526,16 +1002,17 @@ class Installer:
             else "Review these checks, then run npx dsh-trace-extension@latest setup --dry-run and setup. Edited or unowned paths require review; they are not overwritten.",
         }
 
-    def uninstall(self):
+    def uninstall(self) -> dict[str, Any]:
         try:
             return self.apply_uninstall()
         finally:
             self.release_operation_lock()
 
-    def apply_uninstall(self):
+    def apply_uninstall(self) -> dict[str, Any]:
         self.check_dependencies()
         self.initialize_bundle()
         if self.load_pending():
+            assert self.pending is not None
             raise SetupError(
                 f"Finish the recorded setup before uninstalling: npx dsh-trace-extension@{self.pending['candidate']['version']} setup. Keep {self.pending_path}; recordings are unchanged."
             )
@@ -1548,13 +1025,14 @@ class Installer:
         agent_before = self.bytes_at(self.launch_path)
         environment = self.environment()
         env_owned = self.state.get("environmentOwned")
-        conflicts = []
+        conflicts: list[str] = []
         if env_owned and environment not in (None, self.state["traceRoot"]):
             conflicts.append("Recording environment changed after setup and will be preserved.")
-        commands = []
+        commands: list[list[Any]] = []
         plugin_owned = self.state.get("pluginOwned")
         marketplace_exists = self.inspect_marketplace()
         plugin_before = self.installed_plugin(marketplace_exists) if plugin_owned else None
+        cache: dict[str, Any] = {}
         if plugin_before:
             cache = self.cache_report(plugin_before)
             if cache["status"] == "unknown" or cache["modified"] or cache["extra"]:
@@ -1563,7 +1041,7 @@ class Installer:
                 )
         if plugin_before:
             commands.append([self.codex, "plugin", "remove", PLUGIN, "--json"])
-        plan = {
+        plan: dict[str, Any] = {
             "client": "codex",
             "commands": commands,
             "removeOwnedLaunchAgent": bool(
@@ -1628,7 +1106,7 @@ class Installer:
         }
 
 
-def print_plan(plan, file=None):
+def print_plan(plan: dict[str, Any], file: Any = None) -> None:
     file = sys.stdout if file is None else file
     print("dsh-trace-extension — Codex setup plan", file=file)
     for command in plan.get("commands", []):
@@ -1652,7 +1130,7 @@ def print_plan(plan, file=None):
         print(f"  Note: {note}", file=file)
 
 
-def print_result(result):
+def print_result(result: dict[str, Any]) -> None:
     status = result["status"]
     if status == "dry-run":
         print_plan(result["plan"])
@@ -1703,7 +1181,7 @@ def print_result(result):
         print(f"Warning: {warning}")
 
 
-def parser():
+def parser() -> argparse.ArgumentParser:
     value = argparse.ArgumentParser(description=__doc__)
     value.add_argument(
         "action", choices=("setup", "doctor", "uninstall"), nargs="?", default="setup"
@@ -1733,7 +1211,7 @@ def parser():
     return value
 
 
-def main(argv=None, **dependencies):
+def main(argv: Sequence[str] | None = None, **dependencies: Any) -> int:
     args = parser().parse_args(argv)
     installer = Installer(args, **dependencies)
     try:

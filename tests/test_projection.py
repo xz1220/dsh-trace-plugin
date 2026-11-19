@@ -98,6 +98,16 @@ class ProjectionTests(ProjectionFixture, unittest.TestCase):
         found = projector.search("unique_deep_body", page["rowIds"])
         self.assertIn("request:first:prompt", found)
 
+    def test_search_does_not_thrash_selected_detail_cache(self):
+        self.fixture.conversation("needle in conversation")
+        projector = self.project()
+        page = projector.page()
+        projector.detail("request:first", "assistant")
+        cached_keys = list(projector.detail_cache.keys())
+        self.assertEqual(len(cached_keys), 1)
+        projector.search("needle", page["rowIds"])
+        self.assertEqual(list(projector.detail_cache.keys()), cached_keys)
+
     def test_search_includes_the_displayed_locale_group_labels(self):
         self.fixture.conversation()
         projector = self.project()

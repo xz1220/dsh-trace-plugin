@@ -1,5 +1,7 @@
 """Small terminal-only progress display. Never reads or changes an installation."""
 
+from __future__ import annotations
+
 import contextlib
 import os
 import shlex
@@ -7,9 +9,11 @@ import shutil
 import sys
 import threading
 import unicodedata
+from collections.abc import Iterator, Mapping, Sequence
+from typing import Any
 
 
-def safe_text(value):
+def safe_text(value: Any) -> str:
     return "".join(char if char.isprintable() else "?" for char in str(value))
 
 
@@ -31,8 +35,13 @@ class InstallerUI:
     )
 
     def __init__(
-        self, stream=None, environ=None, json_mode=False, no_animation=False, verbose=False
-    ):
+        self,
+        stream: Any = None,
+        environ: Mapping[str, str] | None = None,
+        json_mode: bool = False,
+        no_animation: bool = False,
+        verbose: bool = False,
+    ) -> None:
         self.stream = sys.stderr if stream is None else stream
         self.environ = os.environ if environ is None else environ
         self.enhanced = bool(
@@ -48,11 +57,11 @@ class InstallerUI:
         self.verbose = verbose
         self.details_shown = False
 
-    def ink(self, value, code="36"):
-        value = safe_text(value)
-        return f"\033[{code}m{value}\033[0m" if self.color else value
+    def ink(self, value: Any, code: str = "36") -> str:
+        text = safe_text(value)
+        return f"\033[{code}m{text}\033[0m" if self.color else text
 
-    def write(self, value):
+    def write(self, value: str) -> None:
         # A detached or closed terminal must not change installation behavior.
         try:
             self.stream.write(value)
@@ -60,19 +69,19 @@ class InstallerUI:
         except (OSError, ValueError):
             pass
 
-    def line(self, value=""):
+    def line(self, value: str = "") -> None:
         self.write(value + "\n")
 
-    def prefix(self, marker):
+    def prefix(self, marker: str) -> str:
         return "  " + safe_text(marker).ljust(self.marker_width) + "  "
 
-    def notice(self, value, face="[o_o]", code=None):
+    def notice(self, value: Any, face: str = "[o_o]", code: str | None = None) -> None:
         if not self.enhanced:
             return
         text = self.ink(value, code) if code else safe_text(value)
         self.line(self.ink(self.prefix(face)) + text)
 
-    def progress_line(self, marker, label):
+    def progress_line(self, marker: str, label: str) -> str:
         width = max(1, shutil.get_terminal_size((80, 24)).columns - 1)
         text = self.prefix(marker) + safe_text(label)
         used = 0
@@ -95,14 +104,14 @@ class InstallerUI:
         return self.ink(text)
 
     @contextlib.contextmanager
-    def stage(self, label):
+    def stage(self, label: str) -> Iterator[None]:
         if not self.enhanced:
             yield
             return
         stop = threading.Event()
-        worker = None
+        worker: threading.Thread | None = None
 
-        def draw():
+        def draw() -> None:
             index = 0
             while not stop.wait(0.12):
                 self.write(
@@ -134,32 +143,33 @@ class InstallerUI:
                 marker = "[o_o] ✓" if completed else "[!_!] ×"
                 self.line(self.progress_line(marker, label if completed else f"Stopped: {label}"))
 
-    def header(self, version=None):
+    def header(self, version: str | None = None) -> None:
         if not self.enhanced or not self.verbose:
             return
         suffix = " · " + safe_text(version) if version else ""
         self.notice("dsh-trace-extension" + suffix, code="1")
 
     @staticmethod
-    def known_command(command, source=None):
+    def known_command(command: Sequence[Any], source: str | None = None) -> bool:
         if not command or os.path.basename(str(command[0])) != "codex":
             return False
+        parts = list(command)
         return bool(
             (
-                len(command) == 6
-                and command[1:4] == ["plugin", "marketplace", "add"]
+                len(parts) == 6
+                and parts[1:4] == ["plugin", "marketplace", "add"]
                 and source
-                and command[4] == source
-                and command[-1] == "--json"
+                and parts[4] == source
+                and parts[-1] == "--json"
             )
             or (
-                len(command) == 5
-                and command[1:4] == ["plugin", "add", "codex-dsh-trace@rollout-local"]
-                and command[-1] == "--json"
+                len(parts) == 5
+                and parts[1:4] == ["plugin", "add", "codex-dsh-trace@rollout-local"]
+                and parts[-1] == "--json"
             )
         )
 
-    def summary(self, plan, details=None):
+    def summary(self, plan: dict[str, Any], details: bool | None = None) -> None:
         if not self.enhanced:
             return
         expanded = self.verbose if details is None else details
@@ -197,7 +207,7 @@ class InstallerUI:
             if not self.known_command(command, plan.get("source")):
                 self.notice("Run: " + safe_text(shlex.join(str(part) for part in command)), "[!_!]")
 
-    def show_details(self, plan):
+    def show_details(self, plan: dict[str, Any]) -> None:
         if not self.enhanced:
             return
         self.details_shown = True
@@ -245,7 +255,7 @@ class InstallerUI:
                 "Login setup prepares future sessions; Codex auto-start ordering is unverified."
             )
 
-    def result(self, result):
+    def result(self, result: dict[str, Any]) -> bool:
         if not self.enhanced or result["status"] not in ("configured", "unchanged"):
             return False
         unchanged = result["status"] == "unchanged"

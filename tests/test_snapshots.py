@@ -120,8 +120,8 @@ class SnapshotTests(unittest.TestCase):
         ):
             with self.subTest(row=row, section=section, position=position):
                 self.assert_content_updated(
-                    lambda: self.store.text(
-                        "one", row, section, item_index=position, snapshot=first["snapshot"]
+                    lambda _row=row, _section=section, _position=position: self.store.text(
+                        "one", _row, _section, item_index=_position, snapshot=first["snapshot"]
                     )
                 )
 
@@ -163,8 +163,8 @@ class SnapshotTests(unittest.TestCase):
         ):
             with self.subTest(trace=trace, row=row, cell=cell, field=field):
                 self.assert_content_updated(
-                    lambda: self.store.cell_text(
-                        trace, row, cell, field, snapshot=metadata["snapshot"]
+                    lambda _trace=trace, _row=row, _cell=cell, _field=field: self.store.cell_text(
+                        _trace, _row, _cell, _field, snapshot=metadata["snapshot"]
                     )
                 )
 

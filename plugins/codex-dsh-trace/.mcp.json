@@ -2,7 +2,7 @@
   "mcpServers": {
     "rollout-viewer": {
       "command": "python3",
-      "args": ["./server/main.py"],
+      "args": ["-B", "./server/main.py"],
       "cwd": ".",
       "env_vars": ["CODEX_HOME", "CODEX_ROLLOUT_TRACE_ROOT"]
     }

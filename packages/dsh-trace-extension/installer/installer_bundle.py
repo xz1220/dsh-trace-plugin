@@ -1,11 +1,16 @@
 """Validate and persist the self-contained npm plugin without an npm-cache dependency."""
 
+from __future__ import annotations
+
 import hashlib
 import json
 import os
 import re
+import shutil
 import sys
+from collections.abc import Callable
 from pathlib import Path, PurePosixPath
+from typing import Any
 
 OWNER = "dsh-trace-extension"
 REPOSITORY = "xz1220/dsh-trace-plugin"
@@ -14,6 +19,7 @@ PLUGIN = "codex-dsh-trace"
 CATALOG = ".agents/plugins/marketplace.json"
 RECEIPT = ".dsh-trace-bundle.json"
 PREFIX = f"plugins/{PLUGIN}/"
+SUPPORTED_MCP_ARGS = (["./server/main.py"], ["-B", "./server/main.py"])
 REQUIRED = {
     CATALOG,
     PREFIX + ".mcp.json",
@@ -25,7 +31,13 @@ REQUIRED = {
     PREFIX + "THIRD_PARTY_NOTICES.txt",
 }
 SHA = re.compile(r"[0-9a-f]{64}\Z")
-VERSION = re.compile(r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z.-]+))?\Z")
+VERSION = re.compile(
+    r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*))?\Z"
+)
+BUNDLE_TOKEN = re.compile(
+    r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?-[0-9a-f]{16}-[0-9a-f]{8}\Z"
+)
+BASELINE_VERSION = "0.2.19"
 
 # Public 0.2.19 is the only format-1 release accepted as an update baseline.
 RELEASE_0219_DIGEST = "f17fca3dcfbb1c9a8a43fae57652f287f813361f1a45af02709066dc2d7750eb"
@@ -38,10 +50,10 @@ RELEASE_0219_MANIFEST = {
         "plugins/codex-dsh-trace/README.md": "1846eea2ab0a7d4cca51137db52b3beb7c3c5d9197fc70741757221db8dc551e",
         "plugins/codex-dsh-trace/THIRD_PARTY_NOTICES.txt": "c5b806d4f1639d6189709dd44927d4116d8768abe4e3cf8ba2fba16eced2bc46",
         "plugins/codex-dsh-trace/assets/icon.png": "546d57ec1f1e118543fe0d0a213f68e8946cfc760478318552d1a38ee0c49743",
-        "plugins/codex-dsh-trace/assets/icon.svg": "1838b9a931c427e48bd28ef4a27260c32154f71e8de2399a61c1a66d4d0e912d",
+        "plugins/codex-dsh-trace/assets/icon.svg": "1838b9a931c48bd28ef4a27260c32154f71e8de2399a61c1a66d4d0e912d",
         "plugins/codex-dsh-trace/assets/logo-dark.png": "1e0d9dfa4aca65294b3818b12a77bd93576e83fab44f05dbfec0998494cbca64",
         "plugins/codex-dsh-trace/assets/logo-dark.svg": "83b2c2412d3f2136ceaf7411b1fb12689dc0c8f922e952782554e0a526e92906",
-        "plugins/codex-dsh-trace/assets/logo.png": "8baa625615a41d12fc579b0fef30a4f251ba3033ab1b60ca21b8b6897861da46",
+        "plugins/codex-dsh-trace/assets/logo.png": "8baa25615a41d12fc579b0fef30a4f251ba3033ab1b60ca21b8b6897861da46",
         "plugins/codex-dsh-trace/assets/viewer.html": "c4db62d1ee2cdea1aeec62df30946bc448bd865354d4407e55a2e1733e886c73",
         "plugins/codex-dsh-trace/server/_version.py": "6c9bef731c420fb39b3ed308997731d3c356b6ce0d5022054f0a84d6e782ce2a",
         "plugins/codex-dsh-trace/server/bridge-harness.html": "0cfbb6db136de317dc1df9f58a2b3b34b8a3a6b829e8c6ee051137048c7a88ae",
@@ -72,23 +84,23 @@ class BundleError(Exception):
     """An invalid payload or a destination that must be preserved."""
 
 
-def digest(data):
+def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def encoded(value):
+def encoded(value: Any) -> bytes:
     return (json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode()
 
 
-def safe_path(path):
-    path = Path(path)
-    for candidate in (path, *path.parents):
+def safe_path(path: Path | str) -> Path:
+    resolved = Path(path)
+    for candidate in (resolved, *resolved.parents):
         if candidate.is_symlink():
             raise BundleError(f"Preserving symlinked bundle path: {candidate}")
-    return path
+    return resolved
 
 
-def read_bytes(path):
+def read_bytes(path: Path) -> bytes | None:
     safe_path(path)
     if not path.exists():
         return None
@@ -99,7 +111,7 @@ def read_bytes(path):
     return path.read_bytes()
 
 
-def relative_name(value):
+def relative_name(value: Any) -> str:
     if not isinstance(value, str) or not value or "\\" in value or "\0" in value:
         raise BundleError("Invalid path in bundle manifest.")
     path = PurePosixPath(value)
@@ -108,18 +120,18 @@ def relative_name(value):
     return value
 
 
-def runtime_name(value):
-    value = relative_name(value)
-    if value != CATALOG and not value.startswith(PREFIX):
-        raise BundleError(f"File is outside the plugin distribution allowlist: {value}")
-    return value
+def runtime_name(value: Any) -> str:
+    name = relative_name(value)
+    if name != CATALOG and not name.startswith(PREFIX):
+        raise BundleError(f"File is outside the plugin distribution allowlist: {name}")
+    return name
 
 
-def installed_name(value):
-    value = relative_name(value)
-    if value == CATALOG:
-        return value
-    parts = value.split("/")
+def installed_name(value: Any) -> str:
+    name = relative_name(value)
+    if name == CATALOG:
+        return name
+    parts = name.split("/")
     if (
         len(parts) < 5
         or parts[0] != "bundles"
@@ -127,27 +139,87 @@ def installed_name(value):
         or not "/".join(parts[2:]).startswith(PREFIX)
     ):
         raise BundleError("Receipt contains a path outside the managed plugin bundles.")
-    return value
+    return name
 
 
-def validate_version(value):
-    if not isinstance(value, str) or not VERSION.fullmatch(value):
+def parse_semver(
+    value: Any,
+) -> tuple[tuple[int, int, int], tuple[tuple[int, int | str], ...] | None]:
+    if not isinstance(value, str):
         raise BundleError("Bundle version is missing or invalid.")
+    match = VERSION.fullmatch(value)
+    if not match:
+        raise BundleError("Bundle version is missing or invalid.")
+    core = (int(match[1]), int(match[2]), int(match[3]))
+    if match[4] is None:
+        return core, None
+    identifiers: list[tuple[int, int | str]] = []
+    for part in match[4].split("."):
+        if part.isdigit():
+            identifiers.append((0, int(part)))
+        else:
+            identifiers.append((1, part))
+    return core, tuple(identifiers)
+
+
+def compare_semver(left: str, right: str) -> int:
+    """Compare two SemVer 2.0 versions (-1 if left < right, 0 if equal, 1 if left > right)."""
+    left_core, left_pre = parse_semver(left)
+    right_core, right_pre = parse_semver(right)
+    if left_core != right_core:
+        return -1 if left_core < right_core else 1
+    if left_pre is None and right_pre is None:
+        return 0
+    if left_pre is None:
+        return 1
+    if right_pre is None:
+        return -1
+    for a, b in zip(left_pre, right_pre):
+        if a[0] != b[0]:
+            return -1 if a[0] < b[0] else 1
+        if a[1] != b[1]:
+            if isinstance(a[1], int) and isinstance(b[1], int):
+                return -1 if a[1] < b[1] else 1
+            return -1 if str(a[1]) < str(b[1]) else 1
+    if len(left_pre) != len(right_pre):
+        return -1 if len(left_pre) < len(right_pre) else 1
+    return 0
+
+
+def validate_version(value: Any) -> str:
+    parse_semver(value)
+    return str(value)
 
 
 class BundledMarketplace:
-    def __init__(self, bundle_root, codex_home, python_executable=None):
+    def __init__(
+        self,
+        bundle_root: Path | str,
+        codex_home: Path | str,
+        python_executable: str | None = None,
+    ) -> None:
         if Path(bundle_root).is_symlink():
             raise BundleError("Preserving a symlinked npm payload directory.")
         self.bundle_root = Path(bundle_root).resolve()
         self.source_path = Path(os.path.abspath(codex_home)) / OWNER / "marketplace"
         self.receipt_path = self.source_path / RECEIPT
         self.python_executable = str(Path(python_executable or sys.executable).resolve())
-        self._snapshot = None
-        self._desired_files = None
+        self._snapshot: dict[str, bytes | None] | None = None
+        self._desired_files: dict[str, bytes] | None = None
+        self._receipt_before: bytes | None = None
+        self.previous_receipt: dict[str, Any] | None = None
+        self.missing_files: list[str] = []
+        self.version = ""
+        self.repository = ""
+        self.payload: dict[str, bytes] = {}
+        self.manifest: dict[str, Any] = {}
+        self.package_digest = ""
+        self.token = ""
+        self.bundle_relative = ""
+        self.bundle_path = self.source_path
         self._read_payload()
 
-    def _read_payload(self):
+    def _read_payload(self) -> None:
         manifest_file = self.bundle_root / "bundle-manifest.json"
         raw = read_bytes(manifest_file)
         if raw is None or len(raw) > 1024 * 1024:
@@ -164,8 +236,7 @@ class BundledMarketplace:
             or not isinstance(manifest.get("files"), dict)
         ):
             raise BundleError("Unrecognized npm bundle identity.")
-        self.version = manifest.get("version")
-        validate_version(self.version)
+        self.version = validate_version(manifest.get("version"))
         self.repository = manifest["repository"]
         files = manifest["files"]
         if not REQUIRED.issubset(files) or len(files) > 1000:
@@ -198,7 +269,7 @@ class BundledMarketplace:
         self.bundle_path = self.source_path / self.bundle_relative
 
     @staticmethod
-    def _validate_catalog(raw):
+    def _validate_catalog(raw: bytes) -> dict[str, Any]:
         try:
             catalog = json.loads(raw)
             plugins = catalog.get("plugins")
@@ -215,7 +286,9 @@ class BundledMarketplace:
         except (ValueError, TypeError, AttributeError) as exc:
             raise BundleError("Invalid bundled marketplace catalog.") from exc
 
-    def _load_owned(self, allow_missing=False):
+    def _load_owned(
+        self, allow_missing: bool = False
+    ) -> tuple[dict[str, Any] | None, bytes | None]:
         safe_path(self.source_path)
         receipt_raw = read_bytes(self.receipt_path)
         if receipt_raw is None:
@@ -296,7 +369,9 @@ class BundledMarketplace:
             self.missing_files = missing
             if missing:
                 return receipt, receipt_raw
-            catalog = json.loads(read_bytes(self.source_path / CATALOG))
+            catalog_bytes = read_bytes(self.source_path / CATALOG)
+            assert catalog_bytes is not None
+            catalog = json.loads(catalog_bytes)
             expected_path = f"./{active}/{PREFIX.rstrip('/')}"
             if (
                 catalog.get("name") != MARKETPLACE
@@ -305,10 +380,13 @@ class BundledMarketplace:
                 or catalog["plugins"][0].get("source") != {"source": "local", "path": expected_path}
             ):
                 raise BundleError("Managed marketplace catalog does not match its receipt.")
-            plugin = json.loads(
-                read_bytes(self.source_path / active / PREFIX / ".codex-plugin/plugin.json")
+            plugin_bytes = read_bytes(
+                self.source_path / active / PREFIX / ".codex-plugin/plugin.json"
             )
-            mcp = json.loads(read_bytes(self.source_path / active / PREFIX / ".mcp.json"))
+            mcp_bytes = read_bytes(self.source_path / active / PREFIX / ".mcp.json")
+            assert plugin_bytes is not None and mcp_bytes is not None
+            plugin = json.loads(plugin_bytes)
+            mcp = json.loads(mcp_bytes)
             if plugin.get("name") != PLUGIN or plugin.get("version") != receipt["version"]:
                 raise BundleError("Managed plugin version does not match its receipt.")
             if (
@@ -320,7 +398,9 @@ class BundledMarketplace:
             raise BundleError("Preserving an invalid marketplace receipt.") from exc
         return receipt, receipt_raw
 
-    def _receipt_payload(self, receipt):
+    def _receipt_payload(self, receipt: dict[str, Any]) -> tuple[dict[str, Any], dict[str, str]]:
+        manifest: Any
+        templates: Any
         if receipt["format"] == 1:
             if receipt["version"] != "0.2.19" or receipt["packageDigest"] != RELEASE_0219_DIGEST:
                 raise BundleError(
@@ -344,7 +424,8 @@ class BundledMarketplace:
             or set(templates) != {CATALOG, PREFIX + ".mcp.json"}
         ):
             raise BundleError("Invalid retained payload identity; preserve the receipt for review.")
-        for name, checksum in manifest["files"].items():
+        files_map: dict[str, Any] = manifest["files"]
+        for name, checksum in files_map.items():
             runtime_name(name)
             if not isinstance(checksum, str) or not SHA.fullmatch(checksum):
                 raise BundleError("Invalid retained payload checksum.")
@@ -352,14 +433,16 @@ class BundledMarketplace:
             if (
                 not isinstance(raw, str)
                 or len(raw) > 65536
-                or digest(raw.encode()) != manifest["files"][name]
+                or digest(raw.encode()) != files_map[name]
             ):
                 raise BundleError("Invalid retained configuration template.")
         self._validate_catalog(templates[CATALOG].encode())
         return manifest, templates
 
     @staticmethod
-    def _receipt_files(manifest, templates, active, python):
+    def _receipt_files(
+        manifest: dict[str, Any], templates: dict[str, str], active: str, python: str
+    ) -> dict[str, str]:
         catalog = json.loads(templates[CATALOG])
         catalog["plugins"][0]["source"]["path"] = f"./{active}/{PREFIX.rstrip('/')}"
         mcp = json.loads(templates[PREFIX + ".mcp.json"])
@@ -367,7 +450,7 @@ class BundledMarketplace:
         if (
             set(servers) != {"rollout-viewer"}
             or servers["rollout-viewer"].get("command") != "python3"
-            or servers["rollout-viewer"].get("args") != ["./server/main.py"]
+            or servers["rollout-viewer"].get("args") not in SUPPORTED_MCP_ARGS
         ):
             raise BundleError("Invalid retained MCP template.")
         servers["rollout-viewer"]["command"] = python
@@ -380,10 +463,10 @@ class BundledMarketplace:
             for name, checksum in manifest["files"].items()
         }
 
-    def active_receipt(self, allow_missing=False):
+    def active_receipt(self, allow_missing: bool = False) -> dict[str, Any] | None:
         return self._load_owned(allow_missing)[0]
 
-    def cache_files(self, receipt=None):
+    def cache_files(self, receipt: dict[str, Any] | None = None) -> dict[str, str]:
         receipt = receipt or self.active_receipt()
         if receipt is None:
             return {}
@@ -394,14 +477,14 @@ class BundledMarketplace:
             if name.startswith(prefix)
         }
 
-    def candidate_files(self):
+    def candidate_files(self) -> dict[str, bytes]:
         return {
             name[len(PREFIX) :]: self._patched_plugin_file(name, data)
             for name, data in self.payload.items()
             if name.startswith(PREFIX)
         }
 
-    def _patched_plugin_file(self, name, data):
+    def _patched_plugin_file(self, name: str, data: bytes) -> bytes:
         if name != PREFIX + ".mcp.json":
             return data
         try:
@@ -410,32 +493,32 @@ class BundledMarketplace:
             if not isinstance(servers, dict) or set(servers) != {"rollout-viewer"}:
                 raise BundleError("Unexpected bundled MCP server configuration.")
             server = servers["rollout-viewer"]
-            if server.get("command") != "python3" or server.get("args") != ["./server/main.py"]:
+            if server.get("command") != "python3" or server.get("args") not in SUPPORTED_MCP_ARGS:
                 raise BundleError("Unexpected bundled Python launch configuration.")
             server["command"] = self.python_executable
             return encoded(value)
         except (ValueError, TypeError, AttributeError) as exc:
             raise BundleError("Invalid bundled MCP configuration.") from exc
 
-    def _same_candidate(self, receipt):
-        return (
+    def _same_candidate(self, receipt: dict[str, Any]) -> bool:
+        return bool(
             receipt["version"] == self.version
             and receipt["packageDigest"] == self.package_digest
             and receipt["pythonExecutable"] == self.python_executable
             and receipt["activeBundle"] == self.bundle_relative
         )
 
-    def _different_candidate_message(self):
+    def _different_candidate_message(self) -> str:
         return (
             f"The same version has different package contents at {self.source_path}. "
             "Keep the installed release and select a newer stable package; do not replace a published version's contents. "
             "Historical development sources and user changes are preserved."
         )
 
-    def plan(self, recovery_files=None):
+    def plan(self, recovery_files: dict[str, bytes] | None = None) -> dict[str, Any]:
         receipt, receipt_raw = self._load_owned(allow_missing=True)
         self.previous_receipt = receipt
-        repairs = {}
+        repairs: dict[str, bytes] = {}
         for name, data in (recovery_files or {}).items():
             if (
                 not receipt
@@ -449,13 +532,18 @@ class BundledMarketplace:
                 )
             repairs[name] = data
         if receipt:
-            old = tuple(int(x) for x in receipt["version"].split("-")[0].split("."))
-            new = tuple(int(x) for x in self.version.split("-")[0].split("."))
-            if "-" in receipt["version"] or "-" in self.version or old < (0, 2, 19) or new < old:
+            if (
+                compare_semver(receipt["version"], BASELINE_VERSION) < 0
+                or compare_semver(self.version, BASELINE_VERSION) < 0
+                or compare_semver(self.version, receipt["version"]) < 0
+            ):
                 raise BundleError(
-                    "Downgrades and historical development migrations are not supported. Keep the installed release or select a newer stable version."
+                    "Downgrades and historical development migrations are not supported. Keep the installed release or select a newer version."
                 )
-            if new == old and receipt["packageDigest"] != self.package_digest:
+            if (
+                compare_semver(self.version, receipt["version"]) == 0
+                and receipt["packageDigest"] != self.package_digest
+            ):
                 raise BundleError(self._different_candidate_message())
             unresolved = sorted(set(self.missing_files) - set(repairs))
             if unresolved and receipt["packageDigest"] != self.package_digest:
@@ -470,7 +558,7 @@ class BundledMarketplace:
                         else "No original bytes will be guessed or downloaded automatically."
                     )
                 )
-        desired = {}
+        desired: dict[str, bytes] = {}
         for name, data in self.payload.items():
             if name != CATALOG:
                 desired[self.bundle_relative + "/" + name] = self._patched_plugin_file(name, data)
@@ -496,7 +584,7 @@ class BundledMarketplace:
         # Retain only exact old bytes, outside the new receipt's active-file map.
         # They go through the caller's normal confirmation, CAS and durable journal.
         desired = {**repairs, **desired}
-        snapshot = {}
+        snapshot: dict[str, bytes | None] = {}
         for name, data in desired.items():
             current = read_bytes(self.source_path / name)
             if current is not None and name not in (CATALOG, RECEIPT) and current != data:
@@ -535,7 +623,7 @@ class BundledMarketplace:
             else [],
         }
 
-    def revalidate(self):
+    def revalidate(self) -> None:
         if self._snapshot is None:
             raise BundleError("Inspect the npm bundle plan before applying it.")
         self._load_owned(allow_missing=True)
@@ -545,8 +633,13 @@ class BundledMarketplace:
             if read_bytes(self.source_path / name) != expected:
                 raise BundleError(f"Bundle destination changed since inspection: {name}")
 
-    def apply(self, write_managed, ensure_directory):
+    def apply(
+        self,
+        write_managed: Callable[..., None],
+        ensure_directory: Callable[[Path], None],
+    ) -> dict[str, Any]:
         self.revalidate()
+        assert self._desired_files is not None and self._snapshot is not None
         # Immutable plugin files first; publish the catalog and receipt last.
         names = sorted(n for n in self._desired_files if n not in (CATALOG, RECEIPT))
         names.extend([CATALOG, RECEIPT])
@@ -559,7 +652,62 @@ class BundledMarketplace:
             raise BundleError(result["reason"])
         return result
 
-    def verify(self, require_current=False, check_runtime=True):
+    def prune_superseded_bundles(self, retain: int = 2) -> list[str]:
+        """Safely prune old superseded managed bundles while keeping the active and immediate prior bundle."""
+        bundles_dir = self.source_path / "bundles"
+        safe_path(bundles_dir)
+        if not bundles_dir.is_dir():
+            return []
+        keep = {self.token}
+        if self.previous_receipt and isinstance(self.previous_receipt.get("activeBundle"), str):
+            keep.add(Path(self.previous_receipt["activeBundle"]).name)
+        candidates: list[tuple[int, str, Path]] = []
+        for entry in bundles_dir.iterdir():
+            if entry.is_symlink() or not entry.is_dir():
+                continue
+            if not BUNDLE_TOKEN.fullmatch(entry.name):
+                continue
+            try:
+                mtime = entry.stat().st_mtime_ns
+            except OSError:
+                continue
+            candidates.append((mtime, entry.name, entry))
+        # Retain newest managed bundles up to `retain`, plus active and immediate previous.
+        candidates.sort(key=lambda item: (item[0], item[1]), reverse=True)
+        for _, name, _ in candidates[: max(1, retain)]:
+            keep.add(name)
+        pruned: list[str] = []
+        for _, name, directory in candidates:
+            if name in keep:
+                continue
+            if not self._is_safe_managed_bundle_dir(directory):
+                continue
+            try:
+                shutil.rmtree(directory)
+                pruned.append(f"bundles/{name}")
+            except OSError:
+                continue
+        return pruned
+
+    @staticmethod
+    def _is_safe_managed_bundle_dir(directory: Path) -> bool:
+        """Only remove directories that match the managed plugin layout and have no symlinks or foreign roots."""
+        if directory.is_symlink() or not directory.is_dir():
+            return False
+        for current, dirnames, filenames in os.walk(directory, followlinks=False):
+            current_path = Path(current)
+            for name in (*dirnames, *filenames):
+                child = current_path / name
+                if child.is_symlink():
+                    return False
+                relative = child.relative_to(directory).as_posix()
+                if child.is_file() and not relative.startswith(PREFIX):
+                    return False
+            if current_path == directory and any(name != "plugins" for name in dirnames):
+                return False
+        return True
+
+    def verify(self, require_current: bool = False, check_runtime: bool = True) -> dict[str, Any]:
         try:
             receipt, _ = self._load_owned()
             if receipt is None:
@@ -591,7 +739,7 @@ class BundledMarketplace:
         except (BundleError, OSError) as exc:
             return {"valid": False, "status": "missing-or-edited", "reason": str(exc)}
 
-    def commit_source(self):
+    def commit_source(self) -> set[Path]:
         """Paths to retain if Codex may already refer to this source on failure."""
         if self._desired_files is None:
             raise BundleError("Inspect the npm bundle plan before retaining its files.")

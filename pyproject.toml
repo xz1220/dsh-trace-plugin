@@ -19,7 +19,8 @@ extend-exclude = ["vendor", "local-context", "node_modules"]
 exclude = ["plugins/codex-dsh-trace/server/_version.py"]
 
 [tool.ruff.lint]
-select = ["E4", "E7", "E9", "F", "I"]
+select = ["E4", "E7", "E9", "F", "I", "B", "UP", "SIM"]
+ignore = ["SIM105", "SIM117"]
 
 [tool.ruff.lint.per-file-ignores]
 # Tests and standalone tools add the unpackaged plugin to sys.path.
@@ -29,16 +30,17 @@ select = ["E4", "E7", "E9", "F", "I"]
 [tool.mypy]
 cache_dir = ".cache/mypy"
 python_version = "3.9"
-files = ["plugins/codex-dsh-trace/server"]
+mypy_path = ["plugins/codex-dsh-trace/server", "packages/dsh-trace-extension/installer"]
+files = ["plugins/codex-dsh-trace/server", "packages/dsh-trace-extension/installer"]
 check_untyped_defs = true
 warn_unused_ignores = true
 warn_redundant_casts = true
 
 [tool.coverage.run]
 data_file = ".cache/coverage/python/.coverage"
-source = ["plugins/codex-dsh-trace/server"]
+source = ["plugins/codex-dsh-trace/server", "packages/dsh-trace-extension/installer"]
 branch = true
-omit = ["*/_version.py"]
+omit = ["*/_version.py", "*/__init__.py"]
 
 [tool.coverage.report]
 show_missing = true

@@ -108,3 +108,27 @@ class ImageIdentityTests(ProjectionFixture, unittest.TestCase):
                     {"content": [{"type": "image", "image_url": url}]}, "row", "output"
                 )[0]["attachment"]
                 self.assertNotIn("bytes", attachment)
+
+    def test_uppercase_base64_header_resolves_content_hash_and_png_dimensions(self):
+        # Minimal PNG signature + IHDR chunk (32x18 pixels).
+        png_bytes = (
+            b"\x89PNG\r\n\x1a\n"
+            b"\x00\x00\x00\x0dIHDR"
+            + (32).to_bytes(4, "big")
+            + (18).to_bytes(4, "big")
+            + b"\x08\x02\x00\x00\x00"
+        )
+        encoded = base64.b64encode(png_bytes).decode()
+        lower = source_blocks(
+            {"content": [{"type": "image", "image_url": f"data:image/png;base64,{encoded}"}]},
+            "row",
+            "output",
+        )[0]["attachment"]
+        upper = source_blocks(
+            {"content": [{"type": "image", "image_url": f"data:image/png;BASE64,{encoded}"}]},
+            "row",
+            "output",
+        )[0]["attachment"]
+        self.assertEqual(upper["attachmentId"], lower["attachmentId"])
+        self.assertEqual(upper["bytes"], len(png_bytes))
+        self.assertEqual((upper["width"], upper["height"]), (32, 18))

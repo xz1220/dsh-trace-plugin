@@ -151,7 +151,7 @@ try:
             "schemaVersion": data["trace"].get("schemaVersion"),
         }
     if args.out:
-        args.out.write_text(json.dumps(report, indent=2) + "\n")
+        args.out.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(report, indent=2))
 finally:
     process.stdin.close()

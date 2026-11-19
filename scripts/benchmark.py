@@ -198,7 +198,7 @@ def main():
         parser.error("--rows must be between 1 and 100000")
     synthetic = synthetic_sample(args.rows)
     report = {
-        "pluginVersion": json.loads((ROOT / "package.json").read_text())["version"],
+        "pluginVersion": json.loads((ROOT / "package.json").read_text(encoding="utf-8"))["version"],
         "python": platform.python_version(),
         "platform": platform.machine(),
         "syntheticRows": args.rows,

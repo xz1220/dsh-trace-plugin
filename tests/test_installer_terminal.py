@@ -81,7 +81,9 @@ class InstallerTerminalTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory(prefix="installer-terminal-")
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name).resolve()
-        self.script = Path(__file__).resolve().parents[1] / "scripts/setup.py"
+        self.script = (
+            Path(__file__).resolve().parents[1] / "packages/dsh-trace-extension/installer/setup.py"
+        )
         self.environment = {
             **os.environ,
             "HOME": str(self.root),

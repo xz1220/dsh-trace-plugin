@@ -18,7 +18,7 @@ ARTIFACTS = (
     "playwright-report",
     "test-results",
 )
-SOURCE_ROOTS = ("plugins", "scripts", "tests")
+SOURCE_ROOTS = ("packages", "plugins", "scripts", "tests")
 
 
 def directories(root):

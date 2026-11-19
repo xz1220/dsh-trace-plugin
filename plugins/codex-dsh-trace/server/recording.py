@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 MAX_LOG = 256 * 1024 * 1024
 MAX_PAYLOAD = 64 * 1024 * 1024
@@ -19,7 +19,7 @@ class TraceError(ValueError):
     """A user-facing error with a stable code for client localization."""
 
     def __init__(
-        self, message: str, *, code: str = "trace_error", params: Optional[dict[str, Any]] = None
+        self, message: str, *, code: str = "trace_error", params: dict[str, Any] | None = None
     ):
         super().__init__(message)
         self.code = code

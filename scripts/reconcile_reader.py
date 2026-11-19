@@ -206,11 +206,11 @@ def run(spec, reader_dir):
                     if not (is_user or is_delegation):
                         continue
                     rendered = pages(
-                        lambda offset, snapshot: store.text(
+                        lambda offset, snapshot, _row_id=row["id"], _position=position: store.text(
                             identity,
-                            row["id"],
+                            _row_id,
                             "message",
-                            item_index=position,
+                            item_index=_position,
                             offset=offset,
                             snapshot=snapshot,
                         )
@@ -235,9 +235,9 @@ def run(spec, reader_dir):
                 if (row["id"], "assistant") in cells:
                     response = json.loads(
                         pages(
-                            lambda offset, snapshot: store.text(
+                            lambda offset, snapshot, _row_id=row["id"]: store.text(
                                 identity,
-                                row["id"],
+                                _row_id,
                                 "response",
                                 offset=offset,
                                 snapshot=snapshot,

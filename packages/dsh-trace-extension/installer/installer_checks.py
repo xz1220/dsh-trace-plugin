@@ -1,5 +1,7 @@
 """Bounded, read-only installation inspection and isolated backend probes."""
 
+from __future__ import annotations
+
 import hashlib
 import importlib.util
 import json
@@ -13,26 +15,28 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+from typing import Any
 
 ENV_KEY = "CODEX_ROLLOUT_TRACE_ROOT"
+FOREIGN_PYC_RE = re.compile(r"(.+)\.(cpython-3(?:9|1\d))(?:\.opt-([12]))?\.pyc\Z")
 
 
 class CheckError(Exception):
     """An inspection cannot safely establish runtime health."""
 
 
-def digest(data):
+def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def safe_path(path):
+def safe_path(path: Path) -> Path:
     for candidate in (path, *path.parents):
         if candidate.is_symlink():
             raise CheckError(f"Preserving symlinked installed path: {candidate}")
     return path
 
 
-def read_bytes(path):
+def read_bytes(path: Path) -> bytes | None:
     safe_path(path)
     if not path.exists():
         return None
@@ -41,7 +45,13 @@ def read_bytes(path):
     return path.read_bytes()
 
 
-def probe_backend(python, cache, expected, timeout=5.0, limit=128 * 1024):
+def probe_backend(
+    python: str,
+    cache: Path,
+    expected: dict[str, str],
+    timeout: float = 5.0,
+    limit: int = 128 * 1024,
+) -> dict[str, Any]:
     """Probe only copied, hash-verified code with empty data and bounded I/O."""
     if not isinstance(expected, dict) or len(expected) > 1000:
         return {"status": "unknown", "reason": "Invalid installed file inventory."}
@@ -108,15 +118,16 @@ def probe_backend(python, cache, expected, timeout=5.0, limit=128 * 1024):
             stderr=subprocess.PIPE,
             start_new_session=True,
         )
-        output = {"stdout": bytearray(), "stderr": bytearray()}
+        output: dict[str, bytearray] = {"stdout": bytearray(), "stderr": bytearray()}
         deadline, problem = time.monotonic() + timeout, None
         selector = selectors.DefaultSelector()
         try:
-            for name in output:
-                stream = getattr(process, name)
+            for stream_name in output:
+                stream = getattr(process, stream_name)
                 os.set_blocking(stream.fileno(), False)
-                selector.register(stream, selectors.EVENT_READ, name)
+                selector.register(stream, selectors.EVENT_READ, stream_name)
             try:
+                assert process.stdin is not None
                 process.stdin.write(
                     ("\n".join(json.dumps(item) for item in requests) + "\n").encode()
                 )
@@ -129,11 +140,11 @@ def probe_backend(python, cache, expected, timeout=5.0, limit=128 * 1024):
                     problem = "timeout"
                     break
                 for key, _ in selector.select(min(remaining, 0.1)):
-                    data = os.read(key.fd, min(65536, limit + 1))
-                    if not data:
+                    chunk = os.read(key.fd, min(65536, limit + 1))
+                    if not chunk:
                         selector.unregister(key.fileobj)
                         continue
-                    output[key.data].extend(data)
+                    output[key.data].extend(chunk)
                     if sum(map(len, output.values())) > limit:
                         problem = "output-limit"
                         break
@@ -152,11 +163,13 @@ def probe_backend(python, cache, expected, timeout=5.0, limit=128 * 1024):
                 pass
             process.wait(timeout=1)
             selector.close()
-            for name in ("stdin", "stdout", "stderr"):
-                try:
-                    getattr(process, name).close()
-                except BrokenPipeError:
-                    pass
+            for stream_name in ("stdin", "stdout", "stderr"):
+                pipe = getattr(process, stream_name)
+                if pipe is not None:
+                    try:
+                        pipe.close()
+                    except BrokenPipeError:
+                        pass
         if problem:
             return {
                 "status": problem,
@@ -194,8 +207,8 @@ def probe_backend(python, cache, expected, timeout=5.0, limit=128 * 1024):
             }
 
 
-def inspect_cache(root, version, expected):
-    result = {
+def inspect_cache(root: Path, version: str, expected: dict[str, str]) -> dict[str, Any]:
+    result: dict[str, Any] = {
         "status": "verified",
         "verified": True,
         "path": str(root),
@@ -238,24 +251,59 @@ def inspect_cache(root, version, expected):
     return result
 
 
-def known_bytecode(path, root, expected):
-    """Recognize only exact compiled copies of verified public source, never execute them."""
-    if not isinstance(sys.implementation.cache_tag, str):
+def _matches_foreign_pyc_header(cached: bytes, source_data: bytes) -> bool:
+    """Validate PEP 552 header fields for a stale CPython 3.9+ bytecode file without running it."""
+    if len(cached) < 17 or cached[2:4] != b"\r\n":
         return False
-    match = re.fullmatch(
-        r"(.+)\." + re.escape(sys.implementation.cache_tag) + r"(?:\.opt-([12]))?\.pyc",
-        path.name,
+    magic = int.from_bytes(cached[:2], "little")
+    # CPython 3.9 starts at 3420; reject obviously unrelated binary headers.
+    if not 3400 <= magic <= 4500:
+        return False
+    bitfield = int.from_bytes(cached[4:8], "little")
+    if bitfield == 0:
+        recorded_size = int.from_bytes(cached[12:16], "little")
+        if recorded_size != (len(source_data) & 0xFFFFFFFF):
+            return False
+    elif bitfield in (1, 3):
+        if cached[8:16] != importlib.util.source_hash(source_data):
+            return False
+    else:
+        return False
+    # CPython marshal code object type marker ('c' = 0x63, with optional FLAG_REF 0x80 = 0xE3).
+    return cached[16:17] in (b"c", b"\xe3")
+
+
+def known_bytecode(path: Path, root: Path, expected: dict[str, str]) -> bool:
+    """Recognize only compiled copies of verified public source, never execute them."""
+    if path.parent.name != "__pycache__" or path.stat().st_size > 16 * 1024 * 1024:
+        return False
+    cache_tag = sys.implementation.cache_tag
+    current_match = (
+        re.fullmatch(
+            r"(.+)\." + re.escape(cache_tag) + r"(?:\.opt-([12]))?\.pyc",
+            path.name,
+        )
+        if isinstance(cache_tag, str)
+        else None
     )
-    if path.parent.name != "__pycache__" or not match or path.stat().st_size > 16 * 1024 * 1024:
+    foreign_match = None if current_match else FOREIGN_PYC_RE.fullmatch(path.name)
+    match = current_match or foreign_match
+    if not match:
         return False
     source = path.parent.parent / (match[1] + ".py")
     if not source.is_file() or source.stat().st_size > 1024 * 1024:
         return False
     data = read_bytes(source)
-    if digest(data) != expected.get(source.relative_to(root).as_posix()):
+    if data is None or digest(data) != expected.get(source.relative_to(root).as_posix()):
         return False
     cached = read_bytes(path)
-    if cached[:4] != importlib.util.MAGIC_NUMBER or len(cached) < 16:
+    if cached is None or len(cached) < 16:
+        return False
+    if foreign_match is not None:
+        if cached[:4] == importlib.util.MAGIC_NUMBER:
+            return False
+        return _matches_foreign_pyc_header(cached, data)
+    if cached[:4] != importlib.util.MAGIC_NUMBER:
         return False
     try:
         compiled = compile(

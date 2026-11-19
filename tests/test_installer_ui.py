@@ -15,7 +15,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 SPEC = importlib.util.spec_from_file_location(
-    "installer_ui_fixture", Path(__file__).resolve().parents[1] / "scripts/installer_ui.py"
+    "installer_ui_fixture",
+    Path(__file__).resolve().parents[1] / "packages/dsh-trace-extension/installer/installer_ui.py",
 )
 ui_module = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = ui_module

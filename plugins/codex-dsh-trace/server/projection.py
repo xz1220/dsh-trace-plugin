@@ -9,7 +9,7 @@ import re
 from collections import OrderedDict
 from itertools import islice
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import unquote_to_bytes
 
 from bundle_index import preview, recorded_duration
@@ -183,7 +183,7 @@ def source_blocks(item, owner, label, metadata_only=False):
                 attachment["attachmentId"] = hashlib.sha256(url.encode()).hexdigest()
                 header, separator, encoded = url.partition(",")
                 attachment["mediaType"] = header[5:].split(";")[0]
-                if separator and ";base64" in header:
+                if separator and ";base64" in header.lower():
                     try:
                         data = base64.b64decode(encoded, validate=True)
                         attachment["bytes"] = len(data)
@@ -195,11 +195,7 @@ def source_blocks(item, owner, label, metadata_only=False):
                         pass
                 elif separator:
                     try:
-                        data = (
-                            base64.b64decode(encoded, validate=True)
-                            if header.lower().endswith(";base64")
-                            else unquote_to_bytes(encoded)
-                        )
+                        data = unquote_to_bytes(encoded)
                         attachment["bytes"] = len(data)
                     except ValueError:
                         pass
@@ -351,7 +347,7 @@ class Projection:
             self.previous_requests = {}
             self.inherited_requests = {}
             self.locations = {}
-            counters: dict[tuple[str, Optional[str]], int] = {}
+            counters: dict[tuple[str, str | None], int] = {}
             previous: dict[str, dict[str, Any]] = {}
             root_path = self.index.threads.get(self.index.meta.get("threadId"))
             for row in self.request_rows:
@@ -1066,12 +1062,26 @@ class Projection:
         terms = query.casefold().split()
         labels = GROUP_LABELS.get(locale, GROUP_LABELS["en"])
         matches = []
+        self.requests()
         for row_id in rows:
             row = self.index.get_row(row_id)
             for cell in self.cells(row):
                 if cell.get("requestOnly"):
                     continue
-                value = self.detail(row_id, cell["cellKey"])
+                cache_key = (
+                    row_id,
+                    cell["cellKey"],
+                    row.get("_updated"),
+                    self.index.epoch,
+                    self.index.projection_revision,
+                )
+                cached = self.detail_cache.get(cache_key)
+                if cached is not None:
+                    value = cached[0]
+                else:
+                    self.index.prepare([row])
+                    row = self.index.get_row(row_id)
+                    value = self.build_detail(row_id, cell["cellKey"])
                 sources = [
                     f"turn {value['turn']}" if value["turn"] is not None else "between turns",
                     value["group"],

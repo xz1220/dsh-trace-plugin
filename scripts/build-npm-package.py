@@ -20,7 +20,7 @@ def main():
     plugin_package = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(plugin_package)
     plugin_package.main()
-    version = json.loads((ROOT / "package.json").read_text())["version"]
+    version = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))["version"]
     source = ROOT / "packages" / NAME
     destination = ROOT / "dist/npm" / NAME
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -29,7 +29,7 @@ def main():
     if destination.exists():
         marker = destination / ".build-info.json"
         try:
-            owned = json.loads(marker.read_text()).get("name") == NAME
+            owned = json.loads(marker.read_text(encoding="utf-8")).get("name") == NAME
         except (OSError, ValueError):
             owned = False
         if not owned:
@@ -37,10 +37,10 @@ def main():
     with tempfile.TemporaryDirectory(prefix=".npm-build-", dir=destination.parent) as temporary:
         stage = Path(temporary) / NAME
         stage.mkdir()
-        metadata = json.loads((source / "package.json").read_text())
+        metadata = json.loads((source / "package.json").read_text(encoding="utf-8"))
         metadata.pop("private", None)
         metadata["version"] = version
-        (stage / "package.json").write_text(json.dumps(metadata, indent=2) + "\n")
+        (stage / "package.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
         shutil.copytree(source / "bin", stage / "bin")
         (stage / "bin/dsh-trace-extension.mjs").chmod(0o755)
         shutil.copy2(source / "README.md", stage / "README.md")
@@ -77,13 +77,22 @@ def main():
             "files": files,
         }
         (payload / "bundle-manifest.json").write_text(
-            json.dumps(manifest, sort_keys=True, indent=2) + "\n"
+            json.dumps(manifest, sort_keys=True, indent=2) + "\n", encoding="utf-8"
         )
         helper = payload / "installer"
         helper.mkdir()
-        for name in ["setup.py", "installer_bundle.py", "installer_checks.py", "installer_ui.py"]:
-            shutil.copy2(ROOT / "scripts" / name, helper / name)
-        (stage / ".build-info.json").write_text(json.dumps({"name": NAME, "format": 1}) + "\n")
+        installer_source = source / "installer"
+        for name in (
+            "setup.py",
+            "installer_bundle.py",
+            "installer_checks.py",
+            "installer_journal.py",
+            "installer_ui.py",
+        ):
+            shutil.copy2(installer_source / name, helper / name)
+        (stage / ".build-info.json").write_text(
+            json.dumps({"name": NAME, "format": 1}) + "\n", encoding="utf-8"
+        )
         if destination.exists():
             shutil.rmtree(destination)
         shutil.move(str(stage), destination)

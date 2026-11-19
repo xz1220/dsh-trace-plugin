@@ -213,12 +213,12 @@ def source_snapshot(paths, thread_id, turn_ids):
                 continue
             base = {"turnId": turn, "sourceTraceId": trace_id, "seq": event["seq"]}
 
-            def payload(reference):
+            def payload(reference, _path=path, _trace_id=trace_id):
                 if not isinstance(reference, dict) or not io.PAYLOAD_RE.fullmatch(
                     reference.get("path", "")
                 ):
                     raise io.TraceError("", code="unsafe_payload_pointer")
-                location = io.safe_file(path, reference["path"])
+                location = io.safe_file(_path, reference["path"])
                 before_payload = location.stat()
                 result = io.read_json(location)
                 after_payload = location.stat()
@@ -229,7 +229,7 @@ def source_snapshot(paths, thread_id, turn_ids):
                 ):
                     raise io.TraceError("", code="payload_changed_during_read")
                 payloads.append(
-                    {"traceId": trace_id, "path": reference["path"], "value": digest(result)}
+                    {"traceId": _trace_id, "path": reference["path"], "value": digest(result)}
                 )
                 return result
 

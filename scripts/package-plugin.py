@@ -40,8 +40,8 @@ FILES = (
 
 
 def main() -> None:
-    version = json.loads((ROOT / "package.json").read_text())["version"]
-    manifest = json.loads((PLUGIN / ".codex-plugin/plugin.json").read_text())
+    version = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))["version"]
+    manifest = json.loads((PLUGIN / ".codex-plugin/plugin.json").read_text(encoding="utf-8"))
     if manifest["version"] != version:
         raise SystemExit("Plugin version is stale; run npm run build.")
     # New backend modules must be consciously added to the distribution rather

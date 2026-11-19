@@ -63,7 +63,7 @@ class Catalog:
                 config.setdefault("labels", {})[meta["id"]] = str(label)[:120]
             self.config_file.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
             temp = self.config_file.with_suffix(f".{os.getpid()}.tmp")
-            temp.write_text(json.dumps(config, ensure_ascii=False, indent=2))
+            temp.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
             temp.chmod(0o600)
             temp.replace(self.config_file)
             self.last_scan = None

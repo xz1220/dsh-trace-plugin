@@ -393,7 +393,7 @@ def handle(method, params, *, store=None):
                 {
                     "uri": params["uri"],
                     "mimeType": "text/html;profile=mcp-app",
-                    "text": (PLUGIN / "assets/viewer.html").read_text(),
+                    "text": (PLUGIN / "assets/viewer.html").read_text(encoding="utf-8"),
                     "_meta": {"ui": {"prefersBorder": True}},
                 }
             ]

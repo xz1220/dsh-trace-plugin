@@ -9,7 +9,9 @@ import unittest
 from pathlib import Path
 
 SPEC = importlib.util.spec_from_file_location(
-    "installer_bundle", Path(__file__).resolve().parents[1] / "scripts/installer_bundle.py"
+    "installer_bundle",
+    Path(__file__).resolve().parents[1]
+    / "packages/dsh-trace-extension/installer/installer_bundle.py",
 )
 bundle = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(bundle)
@@ -157,7 +159,7 @@ class BundleTests(unittest.TestCase):
             with self.subTest(name=name):
                 path = self.payload / "bundle-manifest.json"
                 original = path.read_bytes()
-                self.change_manifest(lambda m: m["files"].update({name: "a" * 64}))
+                self.change_manifest(lambda m, _name=name: m["files"].update({_name: "a" * 64}))
                 with self.assertRaises(bundle.BundleError):
                     self.manager()
                 path.write_bytes(original)
@@ -314,6 +316,67 @@ class BundleTests(unittest.TestCase):
             manager.apply(fail_after_one, transaction.ensure)
         transaction.rollback()
         self.assertFalse(any(p.is_file() for p in self.home.rglob("*")))
+
+    def test_mcp_json_supports_python_no_bytecode_flag(self):
+        payload = self.create_payload(self.root / "no-bytecode", version="0.2.20")
+        mcp_rel = bundle.PREFIX + ".mcp.json"
+        mcp_data = bundle.encoded(
+            {
+                "mcpServers": {
+                    "rollout-viewer": {
+                        "command": "python3",
+                        "args": ["-B", "./server/main.py"],
+                        "cwd": ".",
+                    }
+                }
+            }
+        )
+        (payload / mcp_rel).write_bytes(mcp_data)
+        manifest_path = payload / "bundle-manifest.json"
+        manifest = json.loads(manifest_path.read_bytes())
+        manifest["files"][mcp_rel] = bundle.digest(mcp_data)
+        manifest_path.write_bytes(bundle.encoded(manifest))
+        manager, _ = self.install(self.manager(payload))
+        installed_mcp = json.loads((manager.bundle_path / mcp_rel).read_bytes())
+        self.assertEqual(
+            installed_mcp["mcpServers"]["rollout-viewer"]["args"], ["-B", "./server/main.py"]
+        )
+        self.assertTrue(manager.verify(require_current=True)["valid"])
+
+    def test_semver_prerelease_upgrade_and_downgrade_ordering(self):
+        self.install()
+        for version in ("0.2.20-next.1", "0.2.20-next.2", "0.2.20-next.10", "0.2.20"):
+            payload = self.create_payload(self.root / f"rel-{version}", version=version)
+            manager, _ = self.install(self.manager(payload))
+            self.assertEqual(manager.verify(require_current=True)["version"], version)
+        for rejected in ("0.2.20-next.10", "0.2.19", "0.2.19-dev.1"):
+            payload = self.create_payload(self.root / f"rej-{rejected}", version=rejected)
+            with self.assertRaisesRegex(bundle.BundleError, "Downgrades"):
+                self.manager(payload).plan()
+
+    def test_prune_superseded_bundles_keeps_active_previous_and_foreign_content(self):
+        first, _ = self.install()
+        p2 = self.create_payload(self.root / "rel-0220", version="0.2.20")
+        second, _ = self.install(self.manager(p2))
+        p3 = self.create_payload(self.root / "rel-0221", version="0.2.21")
+        third, _ = self.install(self.manager(p3))
+        custom = third.source_path / "bundles/custom-user-dir"
+        custom.mkdir(parents=True)
+        (custom / "note.txt").write_text("keep")
+        pruned = third.prune_superseded_bundles(retain=2)
+        self.assertEqual(pruned, [first.bundle_relative])
+        self.assertFalse(first.bundle_path.exists())
+        self.assertTrue(second.bundle_path.exists())
+        self.assertTrue(third.bundle_path.exists())
+        self.assertEqual((custom / "note.txt").read_text(), "keep")
+
+        # An older managed bundle containing an unrecognized user file is preserved.
+        (second.bundle_path / "user-note.txt").write_text("preserve")
+        p4 = self.create_payload(self.root / "rel-0222", version="0.2.22")
+        fourth, _ = self.install(self.manager(p4))
+        self.assertEqual(fourth.prune_superseded_bundles(retain=2), [])
+        self.assertTrue(second.bundle_path.exists())
+        self.assertEqual((second.bundle_path / "user-note.txt").read_text(), "preserve")
 
 
 if __name__ == "__main__":

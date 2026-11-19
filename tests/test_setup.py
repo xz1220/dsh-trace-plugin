@@ -15,7 +15,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 SPEC = importlib.util.spec_from_file_location(
-    "trace_setup", Path(__file__).resolve().parents[1] / "scripts/setup.py"
+    "trace_setup",
+    Path(__file__).resolve().parents[1] / "packages/dsh-trace-extension/installer/setup.py",
 )
 setup = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(setup)

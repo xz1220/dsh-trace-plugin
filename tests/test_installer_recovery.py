@@ -141,6 +141,69 @@ class RecoveryTests(unittest.TestCase):
             self.install(self.newer())
         self.assertEqual(fixtures.tree_snapshot(self.home), before)
 
+    def test_foreign_python_version_pyc_does_not_block_upgrade_doctor_or_uninstall(self):
+        import importlib.util
+
+        instance, _ = self.install()
+        source = self.cache(instance) / "server/store.py"
+        data = source.read_bytes()
+        other_tag = (
+            "cpython-311" if sys.implementation.cache_tag != "cpython-311" else "cpython-312"
+        )
+        other_magic = (3495 if other_tag == "cpython-311" else 3531).to_bytes(2, "little") + b"\r\n"
+        pycache = source.parent / "__pycache__"
+        pycache.mkdir(exist_ok=True)
+        # Timestamp-based PEP 552 header matching source size.
+        ts_pyc = pycache / f"store.{other_tag}.pyc"
+        ts_pyc.write_bytes(
+            other_magic
+            + (0).to_bytes(4, "little")
+            + (123456).to_bytes(4, "little")
+            + (len(data) & 0xFFFFFFFF).to_bytes(4, "little")
+            + b"\xe3fake-marshaled-code"
+        )
+        # Hash-based PEP 552 header matching source SipHash.
+        hash_pyc = pycache / f"store.{other_tag}.opt-1.pyc"
+        hash_pyc.write_bytes(
+            other_magic
+            + (1).to_bytes(4, "little")
+            + importlib.util.source_hash(data)
+            + b"cfake-marshaled-code"
+        )
+        report = self.installer(action="doctor").doctor()["installedContent"]
+        self.assertEqual(report["extra"], [])
+        self.assertEqual(len(report["generatedBytecode"]), 2)
+        # Forged foreign pyc with wrong size is still flagged as unowned.
+        bad_pyc = pycache / f"store.{other_tag}.opt-2.pyc"
+        bad_pyc.write_bytes(
+            other_magic
+            + (0).to_bytes(4, "little")
+            + (0).to_bytes(4, "little")
+            + (len(data) + 99).to_bytes(4, "little")
+            + b"\xe3wrong-size"
+        )
+        bad_report = self.installer(action="doctor").doctor()["installedContent"]
+        self.assertEqual(bad_report["extra"], [f"server/__pycache__/store.{other_tag}.opt-2.pyc"])
+        bad_pyc.unlink()
+        self.assertEqual(self.install(self.newer())[1]["pluginVersion"], "0.2.20")
+
+    def test_prerelease_upgrade_and_third_release_prunes_oldest_bundle(self):
+        first, _ = self.install()
+        first_bundle = first.bundle.bundle_path
+        next_payload = fixtures.make_npm_payload(self.case.root / "rel-next", "0.2.20-next.1")
+        second, next_result = self.install(next_payload)
+        self.assertEqual(next_result["pluginVersion"], "0.2.20-next.1")
+        doctor = self.installer(next_payload, "doctor").doctor()
+        self.assertEqual(doctor["status"], "configured-needs-native-check")
+        self.assertTrue(doctor["installedContent"]["verified"])
+        final_payload = fixtures.make_npm_payload(self.case.root / "rel-final", "0.2.20")
+        third, final_result = self.install(final_payload)
+        self.assertEqual(final_result["pluginVersion"], "0.2.20")
+        self.assertFalse(first_bundle.exists())
+        self.assertTrue(second.bundle.bundle_path.exists())
+        self.assertTrue(third.bundle.bundle_path.exists())
+        self.assertIn(first.bundle.bundle_relative, final_result.get("prunedBundles", []))
+
     def test_downgrade_and_unknown_state_fields_are_rejected(self):
         self.install(self.newer())
         with self.assertRaisesRegex(fixtures.setup.SetupError, "Downgrades"):

@@ -63,7 +63,7 @@ def create_preview_server(port, trace_id=None, *, store, dispatch, plugin) -> Pr
                 self.send_header("Location", "/")
                 self.end_headers()
             elif path == "/" and self.authorized():
-                html = (plugin / "assets/viewer.html").read_text()
+                html = (plugin / "assets/viewer.html").read_text(encoding="utf-8")
                 bootstrap = json.dumps({"preview": True, "traceId": trace_id}).replace(
                     "<", "\\u003c"
                 )
@@ -73,7 +73,9 @@ def create_preview_server(port, trace_id=None, *, store, dispatch, plugin) -> Pr
                 )
                 self.send(200, html, "text/html")
             elif path == "/native-frame" and self.authorized():
-                self.send(200, (plugin / "assets/viewer.html").read_text(), "text/html")
+                self.send(
+                    200, (plugin / "assets/viewer.html").read_text(encoding="utf-8"), "text/html"
+                )
             elif path == "/harness" and self.authorized():
                 meta = store.catalog.find(trace_id=trace_id) if trace_id else None
                 config = json.dumps(

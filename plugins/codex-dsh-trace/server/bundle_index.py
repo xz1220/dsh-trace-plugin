@@ -119,11 +119,10 @@ class BundleIndex:
 
     def remember_refs(self, value):
         if isinstance(value, dict):
-            if {"raw_payload_id", "path", "kind"} <= value.keys():
-                if not isinstance(value["path"], str) or not PAYLOAD_RE.fullmatch(value["path"]):
-                    raise TraceError(
-                        "录制中的 payload 路径不合法。", code="invalid_payload_reference"
-                    )
+            if {"raw_payload_id", "path", "kind"} <= value.keys() and (
+                not isinstance(value["path"], str) or not PAYLOAD_RE.fullmatch(value["path"])
+            ):
+                raise TraceError("录制中的 payload 路径不合法。", code="invalid_payload_reference")
             for item in value.values():
                 self.remember_refs(item)
         elif isinstance(value, list):
