@@ -32,13 +32,14 @@ npm run build
 npm test
 ```
 
-Run formatting, static checks, and the generated-file check before a pull request:
+Run formatting, static checks, generated-file verification, and documentation link checks before a pull request:
 
 ```sh
 npm run format:check
 npm run lint
 npm run typecheck
 npm run check:generated
+npm run check:docs
 ```
 
 Python development tools are configured in `pyproject.toml` and locked in `uv.lock`. Install them before static checks:
@@ -98,19 +99,18 @@ Start with the [README](../README.md) for installation and use, then this guide 
 
 The root keeps user-facing entry documents and files that package managers, editors, and linters discover by convention. Community policies and release configuration live under `.github/`; detailed product and architecture documents live under `docs/`.
 
-| Path                                              | Purpose                                                                 |
-| ------------------------------------------------- | ----------------------------------------------------------------------- |
-| `src/`                                            | React integration, MCP Apps host bridge, local styles and preferences   |
-| `plugins/codex-dsh-trace/server/`                 | Standard-library Python reader and MCP server                           |
-| `plugins/codex-dsh-trace/assets/`                 | Generated frontend and plugin branding                                  |
-| `packages/dsh-trace-extension/`                   | npm CLI and distribution template                                       |
-| `scripts/setup.py`, `scripts/installer_bundle.py` | Setup plans, stable bundled copies, ownership protection, and uninstall |
-| `.github/`                                        | Contribution and security policies, CI, and release configuration       |
-| `vendor/dsh/`                                     | Pinned upstream source, licenses, hashes, and reviewed patches          |
-| `vendor/licenses/`                                | Additional license texts included in generated dependency notices       |
-| `tests/`, `tests/e2e/`, `tests/npm/`              | Isolated unit, browser/accessibility, and npm tarball checks            |
-| `scripts/`                                        | Build, verification, recording, fixtures, and packaging                 |
-| `docs/`                                           | Product and interface behavior, architecture, sources, and roadmap      |
+| Path                                 | Purpose                                                                       |
+| ------------------------------------ | ----------------------------------------------------------------------------- |
+| `src/`                               | React integration, MCP Apps host bridge, local styles and preferences         |
+| `plugins/codex-dsh-trace/server/`    | Standard-library Python reader and MCP server                                 |
+| `plugins/codex-dsh-trace/assets/`    | Generated frontend and plugin branding                                        |
+| `packages/dsh-trace-extension/`      | npm CLI, distribution template, and modular Python installer (`installer/`)   |
+| `.github/`                           | Contribution and security policies, CI, and release configuration             |
+| `vendor/dsh/`                        | Pinned upstream source, licenses, hashes, and reviewed patches                |
+| `vendor/licenses/`                   | Additional license texts included in generated dependency notices             |
+| `tests/`, `tests/e2e/`, `tests/npm/` | Isolated unit, browser/accessibility, and npm tarball checks                  |
+| `scripts/`                           | Build, verification, doc link checks, recording, fixtures, and packaging      |
+| `docs/`                              | Product and interface behavior, architecture, installer, reconciliation, etc. |
 
 Regenerable tool caches, coverage, browser results, and retained demo fixtures go under `.cache/`; release archives go under `dist/`. Do not add private recordings, credentials, machine-specific paths, or private working notes to Git or release packages.
 
@@ -192,7 +192,7 @@ The **Prepare release PR** workflow uses [Release Please](https://github.com/goo
 
 To run PR CI automatically on these bot-created changes, configure the repository secret `RELEASE_PLEASE_TOKEN` with a repository-scoped token that can write contents, pull requests, and issues. GitHub may also require **Allow GitHub Actions to create and approve pull requests** in repository settings. Without that secret, the workflow uses `GITHUB_TOKEN` and validates the generated build itself; GitHub does not trigger the separate PR CI from that token. A maintainer must manually run **CI** on the release PR branch before merging. See the [official token behavior](https://github.com/googleapis/release-please-action#other-actions-on-release-please-prs).
 
-After reviewing and merging the release PR, a maintainer pushes a `v<version>` tag for that merged commit. **Release plugin** verifies that the tag matches `package.json`, checks tests and committed artifacts with the canonical toolchain, packages the ZIP, and publishes it with checksums. Its release description comes from the reviewed changelog entry for that version; a missing entry fails the release.
+After reviewing and merging the release PR, a maintainer pushes a `v<version>` tag for that merged commit. **Release plugin** verifies that the tag matches `package.json`, runs the full quality/check and npm tarball verification suites with the canonical toolchain, packages the ZIP, and publishes it with checksums. Its release description comes from the reviewed changelog entry for that version; a missing entry fails the release. An optional approval-gated `publish-npm` job supports OIDC trusted publishing with `--provenance` when `ENABLE_NPM_PUBLISH` is enabled (or triggered via `workflow_dispatch`) and the `npm-release` environment is configured.
 
 Release Please's [extra-file updaters](https://github.com/googleapis/release-please/blob/main/docs/customizing.md#updating-arbitrary-files) can replace version fields, but cannot regenerate the compiled HTML. This project therefore derives all runtime copies through `npm run build` rather than configuring independent version substitutions.
 

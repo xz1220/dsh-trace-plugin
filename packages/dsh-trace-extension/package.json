@@ -3,6 +3,21 @@
   "version": "0.0.0-development",
   "private": true,
   "description": "Set up local DSH-style execution traces for coding agents.",
+  "keywords": [
+    "codex",
+    "mcp",
+    "mcp-app",
+    "trace",
+    "rollout",
+    "dsh",
+    "deepseek-harness",
+    "observability",
+    "coding-agent"
+  ],
+  "homepage": "https://github.com/xz1220/dsh-trace-plugin#readme",
+  "bugs": {
+    "url": "https://github.com/xz1220/dsh-trace-plugin/issues"
+  },
   "type": "module",
   "license": "MIT",
   "bin": {

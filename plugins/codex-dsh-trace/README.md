@@ -4,16 +4,35 @@ A local Codex MCP App for official `rollout-trace` recordings. Plugin ID: `codex
 
 ## Install and update
 
+Recommended installation uses the self-contained npm setup helper (no GitHub login, source checkout, or local build required):
+
+```sh
+npx dsh-trace-extension setup
+```
+
+To check status or uninstall a helper-managed installation:
+
+```sh
+npx dsh-trace-extension doctor
+npx dsh-trace-extension uninstall
+```
+
+Fully quit and reopen Codex after installing or updating so it reloads both the Python backend and the bundled frontend. Run a new task, then choose **Codex Trace** in the conversation's right-panel tools menu.
+
+The built plugin requires Python **3.9+** as `python3` (launched with `-B`) and a compatible Codex client. The runtime reader needs no Python packages or Node.js runtime. macOS / Codex is the currently supported target; Linux and Windows native integrations remain unverified. Codex CLI 0.163.0 is the historical integration baseline, not a minimum-version guarantee.
+
+### Alternative: source or Git marketplace
+
+For source development or isolated manual testing (do not mix with an existing npm-managed `rollout-local` registration in the same Codex profile):
+
 ```sh
 codex plugin marketplace add xz1220/dsh-trace-plugin
 codex plugin add codex-dsh-trace@rollout-local
 ```
 
-To update, run `codex plugin marketplace upgrade rollout-local`, then add the plugin again. Fully quit and reopen Codex to reload its backend and frontend. Choose **Codex Trace** in the conversation's right-panel tools menu.
+To update a Git marketplace checkout, run `codex plugin marketplace upgrade rollout-local`, then add the plugin again and restart Codex.
 
-The built plugin requires Python **3.9+** as `python3` and a compatible Codex client. It needs no Python packages or Node.js runtime. macOS arm64 has been checked locally; Linux and Windows native integrations remain unverified. Codex CLI 0.163.0 is the historical integration baseline, not a minimum-version guarantee.
-
-See the [project README](https://github.com/xz1220/dsh-trace-plugin#readme) for full installation, platform, troubleshooting, and development instructions.
+See the [project README](https://github.com/xz1220/dsh-trace-plugin#readme) and [installer guide](https://github.com/xz1220/dsh-trace-plugin/blob/main/docs/INSTALLER.md) for full installation, troubleshooting, and development instructions.
 
 ## Enable recording
 

@@ -2,6 +2,11 @@
 
 # Codex Trace
 
+[![CI](https://github.com/xz1220/dsh-trace-plugin/actions/workflows/ci.yml/badge.svg)](https://github.com/xz1220/dsh-trace-plugin/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/dsh-trace-extension)](https://www.npmjs.com/package/dsh-trace-extension)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![Platform: macOS / Codex](https://img.shields.io/badge/platform-macOS%20%2F%20Codex-lightgrey)](#requirements)
+
 **When an agent stalls or surprises you, inspect what it received and which tools it called.**
 
 Bring the DeepSeek Harness (DSH) timeline, execution ledger, and detail inspector into the Codex conversation sidebar.
@@ -24,7 +29,7 @@ npx dsh-trace-extension setup
 - **Node.js** and npm/npx to run the setup helper.
 - **Python** available as `python3`, and a **Codex CLI** on PATH with plugin commands. The Python reader needs no additional Python packages.
 
-See the [installer guide](docs/INSTALLER.md#用户入口) for detailed environment requirements.
+See the [installer guide](docs/INSTALLER.md#quick-start) for detailed environment requirements.
 
 ### 1. Install
 
@@ -85,7 +90,7 @@ Inspect the current source without changing it:
 codex plugin marketplace list --json
 ```
 
-If temporary project discovery causes the conflict, retrying from a trusted directory outside the repository may help. Changing directories does not remove persistent registrations. Setup preserves the existing source and stops; keep its registration, settings, and recordings, and follow [source-conflict troubleshooting](docs/INSTALLER.md#rollout-local-来源冲突) instead of force-deleting or overwriting them.
+If temporary project discovery causes the conflict, retrying from a trusted directory outside the repository may help. Changing directories does not remove persistent registrations. Setup preserves the existing source and stops; keep its registration, settings, and recordings, and follow [source-conflict troubleshooting](docs/INSTALLER.md#rollout-local-source-conflict) instead of force-deleting or overwriting them.
 
 </details>
 
@@ -111,7 +116,7 @@ doctor checks settings and files without changing them. Uninstall preserves reco
 ## Documentation
 
 - [Installation and troubleshooting](docs/INSTALLER.md)
-- [Usage](docs/PRODUCT.md) · [How it works](docs/ARCHITECTURE.md)
+- [Usage](docs/PRODUCT.md) · [How it works](docs/ARCHITECTURE.md) · [Read-only reconciliation](docs/RECONCILIATION.md)
 - [Data handling and sharing](.github/SECURITY.md)
 - [Project roadmap](docs/ROADMAP.md)
 

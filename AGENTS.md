@@ -4,7 +4,7 @@
 
 - `src/`: React UI, host bridge, styles, and localization.
 - `plugins/codex-dsh-trace/server/`: standard-library Python reader/MCP server; sibling `assets/` contains generated frontend and branding.
-- `packages/dsh-trace-extension/`: npm installer; `scripts/`: build, packaging, and fixture tools.
+- `packages/dsh-trace-extension/`: npm CLI, distribution template, and Python installer modules (`installer/`); `scripts/`: build, packaging, doc checks, and fixture tools.
 - `tests/`: unit suites; `tests/e2e/`: browser checks; `tests/npm/`: tarball checks.
 - `vendor/dsh/`: pinned upstream components; `docs/` and `.github/`: architecture and contribution policies.
 
@@ -15,7 +15,7 @@ Use Node from `.nvmrc`, Python 3.9+, and uv. Run from the repository root:
 - `npm ci` and `uv sync --group dev`: install development dependencies.
 - `npm run build`: regenerate plugin assets.
 - `npm run demo`: start an isolated synthetic preview.
-- `npm run check`: run lint, formatting, mypy, unit tests, and generated-file verification.
+- `npm run check`: run lint, formatting, mypy, unit tests, generated-file verification, and doc-link verification.
 - `npm run package` / `npm run package:npm`: create ZIP/npm distributions under `dist/`.
 
 ## Coding Style & Naming Conventions

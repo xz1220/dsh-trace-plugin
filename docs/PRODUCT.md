@@ -27,7 +27,7 @@ Review UI changes at narrow and wide widths in both themes, with keyboard focus,
 
 ## Identity and upstream design
 
-The panel title is **Codex Trace**, the repository is `dsh-trace-plugin`, and the plugin ID is `codex-dsh-trace`. Compatibility identifiers are documented in [ARCHITECTURE.md](ARCHITECTURE.md#compatibility-identifiers).
+The panel title is **Codex Trace**, the repository is `dsh-trace-plugin`, and the plugin ID is `codex-dsh-trace`. Compatibility identifiers are documented in [ARCHITECTURE.md](ARCHITECTURE.md#current-internal-identifiers).
 
 The icon connects three execution nodes with a rounded path and highlights the current endpoint. Its light palette is graphite `#181C1B`, white `#F4F7F6`, and mint `#64DFC2`; its dark-surface palette is `#F0F5F3`, `#18231F`, and `#087C65`. The composer icon is 64 px and logos are 256 px. Avoid lettering and fine details that disappear at small sizes.
 

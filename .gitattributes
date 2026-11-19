@@ -1,2 +1,5 @@
 # Bundled dependencies contain meaningful whitespace inside JavaScript strings.
 plugins/codex-dsh-trace/assets/viewer.html -whitespace linguist-generated=true
+plugins/codex-dsh-trace/THIRD_PARTY_NOTICES.txt linguist-generated=true
+plugins/codex-dsh-trace/server/trajectory-locales.json linguist-generated=true
+vendor/** linguist-vendored=true

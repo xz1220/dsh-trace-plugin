@@ -2,6 +2,11 @@
 
 # Codex Trace
 
+[![CI](https://github.com/xz1220/dsh-trace-plugin/actions/workflows/ci.yml/badge.svg)](https://github.com/xz1220/dsh-trace-plugin/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/dsh-trace-extension)](https://www.npmjs.com/package/dsh-trace-extension)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![Platform: macOS / Codex](https://img.shields.io/badge/platform-macOS%20%2F%20Codex-lightgrey)](#运行要求)
+
 **Agent 卡住或结果出乎预期时，沿轨迹查看它收到什么、调用了什么。**
 
 把 DeepSeek Harness（DSH）的时间轴、执行列表和详情查看带到 Codex 聊天侧栏。
@@ -24,7 +29,7 @@ npx dsh-trace-extension setup
 - **Node.js** 与 npm/npx，用于运行安装助手。
 - 可用的 **Python**（`python3`）及 PATH 中支持插件命令的 **Codex CLI**。Python 读取器无需额外 Python 包。
 
-详细环境要求见[安装说明](docs/INSTALLER.md#用户入口)。
+详细环境要求见[安装说明](docs/INSTALLER.zh-CN.md#用户入口)。
 
 ### 1. 安装
 
@@ -46,7 +51,7 @@ npx dsh-trace-extension setup
 
 从聊天右侧工具菜单选择 **Codex Trace**。面板会查找当前聊天的录制，并持续读取新事件。时间轴定位步骤，执行列表追踪调用，详情面板展开内容。
 
-设置与排障帮助见[安装说明](docs/INSTALLER.md)。
+设置与排障帮助见[安装说明](docs/INSTALLER.zh-CN.md)。
 
 ## 如何工作
 
@@ -85,7 +90,7 @@ Codex 负责录制，查看器读取官方录制包。支持的录制格式见[�
 codex plugin marketplace list --json
 ```
 
-如果冲突来自临时项目发现，在信任的仓库外目录重试可能解决；切换目录不会移除持久登记。安装器会保留已有来源并停下，请保留原注册、配置和录制，按[来源冲突排障](docs/INSTALLER.md#rollout-local-来源冲突)处理，不要强删或覆盖。
+如果冲突来自临时项目发现，在信任的仓库外目录重试可能解决；切换目录不会移除持久登记。安装器会保留已有来源并停下，请保留原注册、配置和录制，按[来源冲突排障](docs/INSTALLER.zh-CN.md#rollout-local-来源冲突)处理，不要强删或覆盖。
 
 </details>
 
@@ -104,14 +109,14 @@ npx dsh-trace-extension doctor
 npx dsh-trace-extension uninstall
 ```
 
-doctor 只读检查配置和文件。卸载保留录制和无关配置。已安装文件与运行中的面板可能不同步，重开客户端后再核对界面。更多帮助见[安装说明](docs/INSTALLER.md)。
+doctor 只读检查配置和文件。卸载保留录制和无关配置。已安装文件与运行中的面板可能不同步，重开客户端后再核对界面。更多帮助见[安装说明](docs/INSTALLER.zh-CN.md)。
 
 </details>
 
 ## 文档
 
-- [安装与排障](docs/INSTALLER.md)
-- [使用说明](docs/PRODUCT.md) · [工作原理](docs/ARCHITECTURE.md)
+- [安装与排障](docs/INSTALLER.zh-CN.md)
+- [使用说明](docs/PRODUCT.md) · [工作原理](docs/ARCHITECTURE.md) · [只读对账工具](docs/RECONCILIATION.md)
 - [数据使用与分享](.github/SECURITY.md)
 - [项目路线图](docs/ROADMAP.md)
 

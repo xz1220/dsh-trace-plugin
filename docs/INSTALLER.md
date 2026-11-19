@@ -1,41 +1,41 @@
-# npx 安装助手
+English | [简体中文](INSTALLER.zh-CN.md)
 
-GitHub 仓库已于 2026-11-16 公开；首个 npm 发行版 [`dsh-trace-extension@0.2.19`](https://www.npmjs.com/package/dsh-trace-extension/v/0.2.19) 于 2026-11-17 发布。安装设计面向全新安装，不为此前的内部开发版补做迁移路径。
+# Installer guide
 
-> [`0.2.22`](https://www.npmjs.com/package/dsh-trace-extension/v/0.2.22) 已发布并设为 npm 默认版本，公共归档已完成哈希核验。本版包含终端正文对齐和当前会话的子代理轨迹隔离修复。全新安装及 `0.2.21` 到本版的更新通过真实 CLI 与私有登录 shim 验证；更早的兼容证据按对应版本记录，不能据此宣称本版原生 GUI 或真实重新登录已验收。
+The repository became public on 2026-11-16, and the first npm release, [`dsh-trace-extension@0.2.19`](https://www.npmjs.com/package/dsh-trace-extension/v/0.2.19), was published on 2026-11-17. Installation and upgrade guarantees use `0.2.19` as the compatibility baseline; earlier internal development installs are not migrated automatically.
 
-## 用户入口
+## Quick start
 
-在自己信任的仓库外目录运行：
+Run from a trusted directory outside the source repository:
 
 ```sh
 npx dsh-trace-extension setup
 ```
 
-包内直接包含已构建插件、安装逻辑和许可证。默认安装不需要 GitHub 登录、私有仓库权限、源码克隆或前端构建。
+The package bundles the built plugin, installer logic, and licenses. Default setup requires no GitHub login, private repository access, source checkout, or local frontend build.
 
-当前要求：
+Requirements:
 
-- Node.js 20.19+ 和 npm/npx。
-- Python 3.9+，供本地读取器运行。
-- 支持本地插件、MCP Apps 和官方录制的 Codex 客户端。
-- 首版面向 macOS / Codex；Antigravity 等尚未接入。
+- **Node.js 20.19+** and `npm`/`npx`.
+- **Python 3.9+** (`python3`) for the local MCP reader (launched with `python3 -B` so it does not write `.pyc` bytecode into the plugin install cache).
+- A **Codex** client with local plugins, MCP Apps, and official `rollout-trace` recording support.
+- Currently supported target: **macOS / Codex**. Other hosts (such as Antigravity) are not yet integrated.
 
-安装助手展示具体操作计划，确认后准备持久插件副本、登记本地来源、安装插件并配置录制。安装后手动完全退出并重新打开 Codex，再运行一个新任务并打开 **Codex Trace**。
+Setup prints the exact plan of files and settings it will touch. After confirmation, it installs a stable local bundle, registers the local marketplace source, adds the plugin, and configures local recording. Fully quit and reopen Codex afterwards, run a new task, and open **Codex Trace** from the conversation's right-panel tools menu.
 
-## rollout-local 来源冲突
+## rollout-local source conflict
 
-`Marketplace 'rollout-local' uses a different or unknown source` 表示所选 Codex 配置中这个名字已经指向另一来源，例如源码 checkout。已发布的 `0.2.19`、`0.2.20` 和 `0.2.21` 都保留此保护：只接续可核验的受管来源与 receipt，不自动把开发登记改成 npm 安装。移到中性 cwd 可避开项目级发现，但不会移除已有持久登记，`--yes` 也不绕过归属检查。
+`Marketplace 'rollout-local' uses a different or unknown source` means the selected Codex profile already binds `rollout-local` to another origin (for example, a source checkout). The helper only adopts verifiable managed sources and receipts and will not overwrite a development registration. Moving to a neutral working directory avoids temporary project-level discovery, but does not remove a persistent registration, and `--yes` never bypasses ownership checks.
 
-在自己信任的仓库外目录，可只读查看登记；输出中的本机路径或来源信息不要原样公开：
+Inspect current registrations read-only from a trusted directory outside the checkout (do not publish local paths from the output):
 
 ```sh
 codex plugin marketplace list --json
 ```
 
-已有个人源码注册时先保留它；普通 npm 安装与用户验收另用没有这项开发登记的干净普通用户配置。临时 CLI 配置不能替代独立 GUI／登录环境，本地候选包也不是个人来源冲突的自动解决办法。若以后选择切换个人开发注册，需要先明确要保留的来源、插件、录制和配置，以及重启与登录环境影响，再由用户授权处理该项登记；不要为解决冲突删除整个 CODEX_HOME、录制或无关配置。正式入口仍使用已发布的 npm 包。
+Preserve existing personal source registrations; use a clean profile without that development registration when testing ordinary npm setup. Temporary CLI overrides do not replace an isolated GUI/login environment. Never delete an entire `CODEX_HOME`, recordings, or unrelated settings to work around a conflict.
 
-## 检查与卸载
+## Check and uninstall
 
 ```sh
 npx dsh-trace-extension setup --dry-run
@@ -43,19 +43,19 @@ npx dsh-trace-extension doctor
 npx dsh-trace-extension uninstall
 ```
 
-`--dry-run` 不创建持久配置或复制插件到用户目录。`doctor` 只读检查配置和文件，不把已安装或旧录制当作原生验收。`--yes` 可用于无交互终端，但不会绕过无关配置或文件修改冲突。`--json` 输出结构化结果。
+- `--dry-run` inspects the plan without creating persistent configuration or copying plugin files.
+- `doctor` performs read-only checks on configuration, managed files, the Codex install cache, and the local backend; it does not treat an existing install or old recording as native panel acceptance.
+- `--yes` skips interactive confirmation in non-interactive shells, while keeping all ownership and edit-conflict guards active.
+- `--json` emits machine-readable structured output.
+- `--codex-home` and `--trace-root` override default paths. By default, setup installs a login LaunchAgent so future macOS login sessions inherit recording settings; pass `--no-persist` to configure only the current login session. You still need to quit and reopen Codex, and startup ordering with auto-launched Codex should be verified in your native environment.
 
-`--codex-home`、`--trace-root` 可指定目录。默认创建供后续登录使用的录制 LaunchAgent；`--no-persist` 只配置当前登录会话。首次仍需重启 Codex，登录时与自动启动 Codex 的先后关系也需要实际验证。
+## Terminal animation
 
-## 终端动效（0.2.21 起）
+Interactive terminals default to a compact progress view showing only the checks, installation actions, verification steps, and next action, with a fixed-width marker column for consistent alignment. Repair explanations, login details, and internal paths stay collapsed until requested; recording notices appear before confirmation only when recording settings actually change. Custom destinations, target changes, unknown actions, and errors are always shown. Enter `d` at the confirmation prompt to expand the full plan (viewing details does not accept it; enter `y` to install), or pass `--verbose` up front. `--dry-run` always prints the full plan, and unchanged owned installs skip confirmation.
 
-以下交互已随 `0.2.21` 的实际安装器交付，运行默认 npm 安装入口即可使用。
+Pass `--no-animation` or set `DSH_TRACE_NO_ANIMATION=1` for static output, and `NO_COLOR` to disable color independently. Redirected output, `TERM=dumb`, CI, and `--json` stay plain without animation control codes.
 
-交互终端默认只展示实际发生的检查、安装、校验步骤及下一步，每个输出段落都以小表情开头，减少空行。已知修复原因、登录设置和内部路径收进详情；仅实际启用录制或改变登录设置时，在确认前保留一行影响提示。自定义录制目录、改变后的目标目录、未知操作和错误始终可见。确认时输入 `d` 展开完整计划，仍需明确输入 `y` 才会安装；`--verbose` 直接展示详情，`--dry-run` 保留完整计划。无需修改时不再询问是否应用。
-
-`--no-animation` 或 `DSH_TRACE_NO_ANIMATION=1` 关闭动态刷新，`NO_COLOR` 单独关闭颜色。重定向输出、`TERM=dumb`、CI 和 `--json` 使用原有静态输出，不写动效控制码。
-
-也可在源码工作区试看合成片段：
+Maintainers can preview synthetic terminal flows from a source checkout without touching personal configuration:
 
 ```sh
 npm run demo:installer
@@ -65,50 +65,44 @@ npm run demo:installer -- --scenario error
 npm run demo:installer -- --verbose
 ```
 
-预览仅播放合成步骤，不调用安装器、不读取个人配置、不修改安装或录制。预览中的等待用于观察表情和光点，实际安装不会为了播放动效而延时。这个预览脚本只作为源码开发工具，不包含在 npm 发行包中；发行包入口仍为 `setup`、`doctor` 和 `uninstall`。
+This preview script is a development tool only and is excluded from the published npm package.
 
-## 更新与恢复（0.2.20 起）
+## Updates and recovery
 
-安装、更新和可确认归属的修复使用同一入口：
+Installation, upgrades, and verifiable repairs use the same command:
 
 ```sh
 npx dsh-trace-extension@latest setup --dry-run
 npx dsh-trace-extension@latest setup
 ```
 
-更新基线从正式 npm `0.2.19` 开始。首发 receipt 必须匹配已发布的 payload 身份；后续 receipt 保存原始 manifest 与配置模板以核验归属。历史开发来源、未知字段、内容修改、降级或同版本不同包内容会停止，不自动接管。
+Upgrades start from official npm `0.2.19` and support SemVer 2.0 stable and prerelease progressions (such as `0.2.23-rc.1` via `@next`). Receipts from `0.2.19` must match the published payload digest; newer receipts record the original bundle manifest and managed configuration templates to prove ownership. Unrecognized sources, unknown receipt fields, locally edited files, downgrades, or mismatched bytes for the same version stop safely without overwriting user data.
 
-更新先准备新的持久 bundle，保留旧 bundle；相同发行包重复安装复用现有内容。受管来源或 Codex 安装缓存中的已知缺失文件可以从相同包补齐。已有文件内容被修改时保留并停止，不能把用户编辑与文件损坏混为一谈。缓存中的额外文件不被修复操作删除；版本更新和卸载遇到未知额外内容会要求先复核。只有与当前 Python、已校验源码完全对应的生成 bytecode 才识别为运行缓存。
+Upgrades stage the new persistent bundle before switching, retain the active bundle plus the immediate previous bundle (up to 2 managed bundles), and safely prune older superseded bundles after the new state is verified (skipping symlinks or directories with unrecognized files). Re-running the same release reuses verified files. Missing managed files in the stable source or Codex install cache can be restored from the matching package; edited files are preserved and reported rather than overwritten. Extra files in the install cache are never silently deleted during repair; upgrades and uninstall stop for review when unexpected files are present. Inside `__pycache__/` of verified owned Python files, bytecode matching the current interpreter or passing read-only PEP 552 header validation for another CPython version is recognized as runtime cache without executing it.
 
-从公开 `0.2.19` 更新时，若旧稳定来源缺少插件文件，但首发身份、receipt、来源现存内容、安装归属与完整旧缓存均可独立核验，新助手会在同一计划和事务中从旧缓存补回确知的旧字节，再继续更新。它不使用新包内容冒充旧文件，也不会自动联网获取旧包。缓存不足或被修改时停止，要求从独立核验的原始归档或备份恢复明确缺失的路径后，再重试当前助手；公开 `0.2.19` 的原 setup 不具备这项修复能力，不能把重跑它当作恢复步骤。
+When upgrading from `0.2.19` with missing files in the stable source, if the `0.2.19` receipt, remaining source files, ownership, and intact install cache all verify independently, setup restores the exact original bytes from the cache inside the same transaction before upgrading. It never substitutes newer bytes or fetches old packages over the network.
 
-安装在修改前记录私有 `operation.json`，使用同 profile 的操作锁防止并发修改。已知中断后的同版本重试会先展示恢复计划，按记录恢复仍匹配的写入，再继续安装；更新失败保留旧资源，或保留明确的恢复记录。doctor 会报告未完成操作及应重试的版本。恢复记录、配置或环境被外部修改时停止，保留文件供复核，不盲删状态文件。
+Before making changes, setup acquires a per-`CODEX_HOME` lock under `~/Library/Caches/dsh-trace-extension/` and records a private write-ahead journal (`operation.json`). Re-running the same version after an interruption displays a recovery plan, rolls back matching partial writes, and resumes cleanly. `doctor` reports interrupted operations along with the version to retry. If the journal, config, or environment changed externally, setup preserves files and stops for manual review.
 
-Python 的绝对路径属于受管安装身份。旧解释器路径不可用时，可以在 PATH 中提供有效 Python 3.9+，或用 `DSH_TRACE_PYTHON=/absolute/path/to/python3` 选择解释器，再运行新助手的 setup。它会核对旧来源并重新固定受管副本与安装缓存中的启动路径，保留旧 bundle。无需手工改 receipt；未知或被编辑的来源仍要求先复核。
+The resolved Python interpreter path is part of managed installation identity. If the old interpreter disappears, provide a valid Python 3.9+ on `PATH` or pass `DSH_TRACE_PYTHON=/absolute/path/to/python3` and re-run `setup` to re-pin the managed copy and install cache without editing receipts manually.
 
-操作锁位于 `~/Library/Caches/dsh-trace-extension/`，按 CODEX_HOME 区分。恢复记录、备份和绝对路径属于本地私有资料，不应提交或上传。助手不为历史开发安装补做迁移。
+## Doctor checks
 
-## doctor 的检查范围
+`doctor` reports configuration, managed source integrity, Codex install cache integrity, and a sandboxed backend probe separately; native panel readiness is always reported as unverified. The cache check inspects the actual files of the enabled version rather than trusting CLI metadata alone. Running a different `npx` version than the installed version is not treated as corruption.
 
-doctor 分别报告配置、受管来源、Codex 安装缓存和后端探测，原生状态始终单独标为未验证。安装缓存检查会核对当前启用版本的实际文件，而不仅依赖 CLI 的 installed/enabled 元数据。本次运行的 npx 包版本与已安装版本不同，本身不代表安装损坏。
+Only when managed source, install cache, and interpreter checks pass does `doctor` copy hash-verified server files into a private temporary directory and run an MCP `initialize`/`tools/list` probe with an empty `HOME` and empty trace directory. Staging enforces file count and 128 MiB size limits; the subprocess is capped at 5 seconds and 128 KiB combined output, terminating its process group on limit breach. Modified or untrusted cache files are never executed, real chats are never read, and a successful probe does not prove native sidebar readiness.
 
-仅在受管内容、安装缓存和解释器满足检查条件时，才将经过哈希复核的代码复制到私有临时目录，以空 HOME、空录制目录执行 MCP initialize/tools-list。准备文件有数量和 128 MiB 总量上限；后端子进程限制为 5 秒和合计 128 KiB 输出，超限会停止本探测创建的进程组。它不会执行被修改或来源不明的缓存文件，不读取真实聊天，也不把返回工具列表当作原生侧栏通过。无法安全确定时显示 unknown 或 not-run 及原因。
+## Stable local copy
 
-缺失文件可查看 setup 计划；被修改或未知的文件先保留并复核。不要为绕过保护直接删除录制、整个 CODEX_HOME 或恢复记录。未完成 setup 应先按 doctor 给出的原操作版本恢复，再卸载。
+Codex registers `$CODEX_HOME/dsh-trace-extension/marketplace`, not the ephemeral `npx` cache, so clearing the npm cache does not break the installed plugin. The managed copy pins the absolute Python executable path to reduce GUI `PATH` drift.
 
-## 稳定的本地副本
+Repeat runs verify files and reuse them; foreign sources or user-edited managed files are preserved and reported. Uninstall preserves recordings and unrelated settings, and retains the stable bundle if Codex still references it to avoid a dangling marketplace path.
 
-Codex 登记的来源位于 `$CODEX_HOME/dsh-trace-extension/marketplace`，而不是 npx 缓存。清空 npm 缓存不会删除安装好的插件。受管副本使用已检测的 Python 绝对路径，减少 GUI PATH 差异。
+Recordings can contain prompts, code, tool output, and credentials; review [Security and privacy](../.github/SECURITY.md) before sharing anything.
 
-重复安装校验自身文件后复用；同名陌生来源或被用户修改的受管内容会保留并报错。已知发行版的更新、修复与恢复规则见上文；公开前开发安装不构成迁移契约。
+## Maintainer packaging and verification
 
-卸载保留录制和无关配置。仍被 Codex 来源登记引用的稳定副本保留，避免产生悬空路径。安装过程中如果已经尝试登记来源，后续失败也会保留可验证的副本并说明状态。
-
-录制可能包含提示词、代码、工具输出和敏感值，分享前阅读[安全说明](../.github/SECURITY.md)。
-
-## 维护者打包和验收
-
-根开发包保持 `private: true`。独立 npm 发行包从显式白名单生成，只包含 CLI、安装与校验模块、bundle manifest、marketplace、已构建插件、图标和许可证。
+The root workspace package stays `private: true`. The installer modules live under `packages/dsh-trace-extension/installer/`, and the standalone npm package is assembled from an explicit allowlist containing only the CLI, installer/check modules, bundle manifest, marketplace, built plugin, icons, and licenses.
 
 ```sh
 npm ci
@@ -116,26 +110,22 @@ npm run build
 npm run test:npm
 ```
 
-这些检查属于维护者内部校验。`test:npm` 使用本地 tarball、临时 HOME 与 fake Codex/launchctl，检查缓存独立、重复安装、doctor 和卸载，不替代真实 npm 获取、原生侧栏或用户原样验收。核对并冻结源码、版本和生成物后，再生成一个实际发行归档：
+`test:npm` validates tarball contents, cache independence, repeat setup, upgrades, recovery, `doctor`, and uninstall using temporary `HOME`/`CODEX_HOME` directories and fake `codex`/`launchctl` shims. It does not replace real npm registry downloads or native Codex acceptance. To freeze a release archive:
 
 ```sh
 npm run package:npm
 npm pack ./dist/npm/dsh-trace-extension --ignore-scripts --pack-destination dist/npm --json
 ```
 
-记录该归档的提交、版本、SHA-256/integrity、文件表和许可，排除私有工作资料。后续预发、验收和正式推广使用同一份归档；内容改变须重新冻结与核对，已公开的版本不能替换字节。
+The package has zero runtime dependencies, no `install`/`postinstall` lifecycle scripts, and excludes tests, user configuration, recordings, logs, and the source tree. Installation happens only when the user explicitly runs `setup`.
 
-包无依赖、无 install/postinstall 脚本，不包含测试、用户配置、录制、日志或整个源仓库。安装仅在用户显式执行 `setup` 时进行。
+### Verify a local release archive
 
-### 校验本地发行归档
-
-本节仅供维护者内部 CLI 校验，可用于复核已发布归档或检查下一版候选；本地 tgz 不替代真实 npm 验证或交给用户的原样验收。
-
-`npx dsh-trace-extension setup` 使用 npm 发布包，切换工作树分支不会让它运行本地源码。要复核某份发行归档，请取得已核对的 `.tgz`，或按[维护者打包和验收](#维护者打包和验收)生成，再显式指定绝对路径。在自己信任的仓库外目录试跑；下面以 `0.2.21` 为例，创建当前用户独占的临时 cwd，只生成计划：
+Maintainers can dry-run a verified `.tgz` archive in an isolated temporary directory without modifying personal CLI config:
 
 ```sh
-# 替换为已核对的发行归档绝对路径
-dsh_archive_tgz="/absolute/path/to/dsh-trace-extension-0.2.21.tgz"
+# Replace with the absolute path to a verified release archive
+dsh_archive_tgz="/absolute/path/to/dsh-trace-extension-NEW_VERSION.tgz"
 (
   dsh_trial_root="$(mktemp -d)" || exit 1
   [ -n "$dsh_trial_root" ] || exit 1
@@ -150,37 +140,17 @@ dsh_archive_tgz="/absolute/path/to/dsh-trace-extension-0.2.21.tgz"
 )
 ```
 
-这里 npx 可写临时缓存，安装助手只读检查计划；真实登录域若已有不同录制配置，仍会保留并拒绝。`--codex-home` 和临时 HOME 只分开 CLI 文件，不能替代原生 GUI／登录域隔离；不要直接去掉 `--dry-run` 当作隔离安装，`--no-persist` 也仍可能设置当前登录环境。已知发行版的更新归属从可核验的 npm `0.2.19` 受管安装开始；每版都应单独记录实际覆盖的升级和验收范围，不能用本地归档的 CLI 结果证明原生侧栏或重新登录通过。
+Note that `--codex-home` and a temporary `HOME` isolate CLI files only, not the macOS GUI login domain; do not drop `--dry-run` assuming full desktop isolation.
 
-## 发行记录与后续发布
+### Prerelease and promotion workflow
 
-`dsh-trace-extension@0.2.19` 是 2026-11-17 发布的首个 npm 版本，包含已构建前端、Python 读取器、安装器、图标及许可证。此前的开发版本不构成发行或迁移契约。后续兼容性评估从 `0.2.19` 开始；发布下一版本前需要明确并验证升级行为。
+See [CHANGELOG.md](../CHANGELOG.md) for release history. When publishing a new version (`NEW_VERSION`):
 
-`0.2.19` 已从公共 npm 仓库下载，在 macOS 的隔离 HOME / CODEX_HOME 中用真实 Codex CLI 验证全新安装、重复安装、doctor 和卸载。清空 npm 缓存后，已安装后端仍能提供工具和完整前端资源。这一轮隔离测试未修改个人 Codex 配置与登录环境；该轮证据不包含重启后的原生侧栏或再次登录时的启动顺序。
+1. **Internal checks**: freeze and verify the archive (`npm run check`, `npm run test:npm`, `npm run test:e2e`, SHA-256 and file list).
+2. **Authorized prerelease**: after explicit publication authorization, publish to the `next` dist-tag (`npm publish "/absolute/path/to/dsh-trace-extension-NEW_VERSION.tgz" --tag next --access public --ignore-scripts`, or via the opt-in OIDC release workflow). The `latest` tag remains unchanged.
+3. **Real npm and native verification**: test `npx dsh-trace-extension@next setup` in an isolated macOS / Codex test account, verifying the downloaded archive, sidebar rendering, full client restart, and recording after relogin.
+4. **Promote to `latest`**: after native verification and explicit promotion authorization, run `npm dist-tag add "dsh-trace-extension@NEW_VERSION" latest` to promote the exact tested archive, then verify `npx dsh-trace-extension setup` in a clean user profile.
 
-`0.2.20` 于 2026-11-18 发布，当时设为默认 `latest`，从真实 npm 下载的归档与修复包哈希一致。经用户授权，个人配置已备份并切换至 npm 管理，README 原命令的交互安装和后端自检通过，原源码与录制保留。用户随后确认侧栏可正常打开，因此侧栏打开检查已验收；这项反馈不单独证明新录制生成、实时事件更新或重新登录后的行为。
+## Acknowledgements
 
-`0.2.21` 已于 2026-11-18 发布并设为默认 `latest`，公共 npm 归档与冻结的发行归档哈希一致。本版交付紧凑机器人终端交互、详情展开和动效开关；合成预览脚本仍仅为源码开发工具。
-
-本版全新安装、`0.2.19` 到 `0.2.21` 和 `0.2.20` 到 `0.2.21` 的更新已通过真实 Codex CLI 与私有登录 shim 验证。这些检查覆盖声明的 CLI 安装与更新路径，shim 模拟的登录域不能证明原生 GUI 进程继承环境、重开或真实重新登录后的录制行为。`0.2.20` 的侧栏反馈也不作为 `0.2.21` 的原生验收记录。
-
-发布后，README 字面命令 `npx dsh-trace-extension setup` 已在全新私有配置、npm 缓存和登录 shim 中实际下载并安装 `0.2.21`；展开的 35 个包文件与冻结归档逐字节一致。公共入口 doctor 核验后端版本为 `0.2.21`，重复安装无需交互即返回 unchanged。
-
-`0.2.22` 已于 2026-11-18 发布并成为默认版本，公共归档与验收的新归档哈希一致，包内线程索引代码与指定修复提交一致。本版全新安装、`0.2.21` 更新、公共无版本 npx 入口、终端对齐及资源保护已验证。实际个人安装也已更新并核对已安装代码；客户端当前连接与原生界面仍需在重开后单独复核，磁盘已安装版本不能代替实时连接版本。
-
-公开预发前核对真实 tarball 内容、完整性和已有内部验证，并确认预发已获明确授权；推广到默认入口前核对真实 npm 获取、原生验收结果和推广授权。直接发布已审阅的 `.tgz`，不要发布根开发包；发布账号须具备 npm 权限和有效认证。
-
-### 预发、推广与用户原样验收
-
-以下是后续版本可选的预发与验收流程，不是对 `0.2.21` 已有测试范围的追加声明。命令中的 `NEW_VERSION` 必须替换为准备发布的新版本；`0.2.21` 已发布，不能重新上传或替换其内容。每个 npx 入口都从自己信任的仓库外目录运行；内部本地包测试不能跳过后面的真实 npm 和用户验收。
-
-1. **内部校验**：维护者复核同一归档；临时 CLI 配置和私有 launchctl shim 的结果只覆盖其声明范围。
-2. **单独授权公开预发**：取得明确授权后，可执行 `npm publish "/absolute/path/to/dsh-trace-extension-NEW_VERSION.tgz" --tag next --access public --ignore-scripts`。`next` 的包可被任何人下载，版本内容随即公开且不可替换；默认 `latest` 保持原版。发布到 `next` 不是私有预览，也不是用户原样验收。
-3. **真实 npm 与原生验证**：交付／验收会话通过 `npx dsh-trace-extension@next setup` 从真实 npm 安装，在独立 macOS／Codex 测试身份核对下载归档、真实侧栏、完全重开和重新登录后的录制。新任务应对应当前聊天并持续显示步骤；不能用本地 tgz、仅改 CODEX_HOME 或模拟登录域证明这些结论。
-4. **推广，再交用户**：上述检查通过且正式推广也已获明确授权后，才执行 `npm dist-tag add "dsh-trace-extension@NEW_VERSION" latest`，推广同一已验版本，不重新打包。随后在干净普通用户配置中按 README 原样执行 `npx dsh-trace-extension setup`，实际安装、重开、跑新任务、打开侧栏，核对当前聊天与持续步骤。`@next` 的预发验证不能代替这一步。
-
-发布前重新只读核对版本和标签，等待实际归档可从 npm 下载并比对完整性。发 `next` 与切 `latest` 都须处于明确授权范围内；授权可以预先覆盖不同阶段，但不能从预发自动延伸到正式推广，当前说明也不构成执行授权。预发和公开发布都不会消除个人已有的源码 `rollout-local` 冲突，源码开发身份不作为新用户验收起点。
-
-## REA 参考
-
-参考 [morluto/rea](https://github.com/morluto/rea) 的自包含 npm 分发，以及 setup/doctor/uninstall、计划确认、归属保护和文件完整性检查。研究基线为 [`552d1c7`](https://github.com/morluto/rea/tree/552d1c7108b99d1c9ec15d8b629ae07dc56d4714)，[MIT 许可](https://github.com/morluto/rea/blob/552d1c7108b99d1c9ec15d8b629ae07dc56d4714/LICENSE)。本项目为独立实现，没有复制 REA 代码。
+Inspired by [morluto/rea](https://github.com/morluto/rea) for self-contained npm distribution, `setup`/`doctor`/`uninstall` lifecycle UX, plan confirmation, ownership protection, and integrity verification (studied at [`552d1c7`](https://github.com/morluto/rea/tree/552d1c7108b99d1c9ec15d8b629ae07dc56d4714), [MIT License](https://github.com/morluto/rea/blob/552d1c7108b99d1c9ec15d8b629ae07dc56d4714/LICENSE)). This project is an independent implementation and copies no REA code.

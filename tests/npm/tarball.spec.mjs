@@ -39,6 +39,8 @@ test('the real npm tarball is self-contained and survives deletion of the npx ca
   assert.ok(files.includes('payload/plugins/codex-dsh-trace/assets/viewer.html'));
   assert.ok(files.includes('payload/installer/setup.py'));
   assert.ok(files.includes('payload/installer/installer_bundle.py'));
+  assert.ok(files.includes('payload/installer/installer_checks.py'));
+  assert.ok(files.includes('payload/installer/installer_journal.py'));
   assert.ok(files.includes('payload/installer/installer_ui.py'));
   assert.ok(files.includes('payload/.agents/plugins/marketplace.json'));
   assert.ok(files.includes('THIRD_PARTY_NOTICES.txt'));
@@ -63,6 +65,12 @@ test('the real npm tarball is self-contained and survives deletion of the npx ca
   assert.equal(metadata.private, undefined);
   assert.deepEqual(metadata.dependencies || {}, {});
   assert.equal(metadata.scripts, undefined);
+  assert.ok(Array.isArray(metadata.keywords) && metadata.keywords.includes('codex'));
+  assert.match(metadata.homepage, /^https:\/\/github\.com\/xz1220\/dsh-trace-plugin/);
+  assert.match(
+    metadata.bugs?.url || '',
+    /^https:\/\/github\.com\/xz1220\/dsh-trace-plugin\/issues$/,
+  );
   const home = path.join(temp, 'home'),
     bin = path.join(temp, 'bin');
   const codexHome = path.join(home, '.codex'),
@@ -158,10 +166,11 @@ if(write){fs.mkdirSync(root,{recursive:true});fs.writeFileSync(file,JSON.stringi
   const plugin = path.resolve(state.marketplace.root, catalog.plugins[0].source.path);
   const mcp = JSON.parse(readFileSync(path.join(plugin, '.mcp.json'), 'utf8'));
   assert.ok(path.isAbsolute(mcp.mcpServers['rollout-viewer'].command));
+  assert.deepEqual(mcp.mcpServers['rollout-viewer'].args, ['-B', './server/main.py']);
   rmSync(cache, { recursive: true, force: true });
   const rpc = spawnSync(
     mcp.mcpServers['rollout-viewer'].command,
-    [path.join(plugin, 'server/main.py')],
+    mcp.mcpServers['rollout-viewer'].args,
     {
       cwd: plugin,
       env,
