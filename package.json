@@ -27,7 +27,7 @@
   },
   "dependencies": {
     "@shikijs/langs": "4.6.0",
-    "@tanstack/react-virtual": "3.14.10",
+    "@tanstack/react-virtual": "3.14.26",
     "clsx": "2.1.1",
     "diff": "9.0.0",
     "katex": "0.19.1",
